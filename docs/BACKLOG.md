@@ -1,0 +1,78 @@
+# SmartFarm360 implementation backlog
+
+Each phase is a vertical slice (migration → domain → service → API → web/mobile UI → tests → docs) and must leave
+the build green. A phase is complete only when its acceptance checks have actually been run and recorded in
+[PROGRESS.md](PROGRESS.md).
+
+## Phase 1 — Baseline and hygiene ✅ (see PROGRESS.md)
+
+## Phase 2 — Platform foundation
+
+- Package restructure for `platform` (ADR 0001) and ArchUnit boundary tests.
+- Auth (ADR 0003): JWT access + rotating hashed refresh tokens, logout, password reset, rate limiting on auth
+  endpoints, non-enumerating registration. Remove HTTP Basic.
+- Bootstrap admin off by default; becomes a platform administrator.
+- Roles and permissions (ADR 0002): `sf_role`, `sf_permission`, `sf_membership_role`, seeded system roles,
+  `@RequiresPermission`, central `TenantContext` interceptor. Invitations and membership lifecycle.
+- Tenant settings (language, timezone, currency, unit preferences), enabled modules, entitlement flags (no billing).
+- `sf_audit_history` for sensitive changes.
+- RFC 7807 errors with codes; global exception handler; no internal details in responses.
+- springdoc OpenAPI; Actuator health/readiness only; correlation-id filter and MDC.
+- `/api/v1` versions of tenant, farm and land-parcel endpoints with update/deactivate; remove `/api/smartfarm/*`
+  after clients move.
+- Cross-tenant endpoint inventory test.
+- Web: router, auth flow, tenant switcher, shared API client, i18next with shared catalogs, Vitest, ESLint.
+- Mobile: login, tenant selection, secure token storage, shared catalogs, Jest.
+- **Accept when:** every tenant endpoint has a passing cross-tenant test; auth tests cover expiry, rotation, reuse
+  and lockout; web/mobile language switching works and is tested.
+
+## Phase 3 — Finance core
+
+- Written posting rules (ADR 0004) reviewed before code.
+- Chart of accounts, categories, cash/bank accounts, documents with lines and states, payments and allocations,
+  receivables/payables, recurring expenses, loans and interest, worker advances (ledger side), attachments (ADR 0009).
+- Idempotency keys on money-creating writes.
+- Migrate `sf_finance_entries` into posted documents (forward-only, verified).
+- **Accept when:** calculation unit tests, rollback tests, duplicate-payment tests and journal balance invariants pass.
+
+## Phase 4 — Inventory, purchasing and sales
+
+- Units catalog, items, lots/expiry, locations, append-only movements, on-hand projection (ADR 0005).
+- Multi-line purchases and sales, customers, returns, wastage, adjustments, transfers, low-stock alerts, exports.
+- Migrate `sf_inventory_items` quantities to opening balances and `sf_purchases` into purchase documents.
+- **Accept when:** on-hand always equals sum of movements under concurrent writes; no duplicate movements on retry.
+
+## Phase 5 — Crop management v2
+
+- Cost objects; activities consume inventory; harvest batches become inventory lots; sales link to harvests;
+  pest/disease observations; weather notes; cost per acre / per unit; crop profitability.
+- Retire `sf_harvest_records.sale_value` from revenue calculations.
+
+## Phase 6 — Workforce and assets
+
+- Workers, attendance, work logs, wages, advances and settlements, labour cost allocation.
+- Equipment registry, fuel, repairs, maintenance, useful life, depreciation postings.
+
+## Phase 7 — Dashboard and core reports
+
+- Income vs expenses, cash/bank balances, receivables/payables, monthly P&L, category breakdown, activity
+  profitability, inventory valuation, wages, maintenance. CSV/XLSX/PDF exports with tenant checks.
+- Every report states date range, inclusion rules and actual vs estimated.
+
+## Phases 8–12 — Farming modules
+
+8. Livestock core + dairy (animals, milk records and quality, feed, health, breeding, calving, milk sales, cost per litre)
+9. Poultry batches and eggs; goat/sheep herds
+10. Aquaculture (ponds, stocking batches, water quality, harvest and grading)
+11. Organic resources (compost/vermicompost batches, internal transfers without revenue)
+12. Processing and trading (grading, drying, packaging, yields, traceability from harvest to finished goods)
+
+## Phase 13 — Mobile offline
+
+- Local persistence (expo-sqlite), UUIDv7 client ids, idempotent sync, retries, explicit conflict resolution,
+  protected local data.
+
+## Phase 14 — SaaS operations and production readiness
+
+- Platform admin console, tenant status, usage limits, support tools, tenant export and deletion, privacy/consent.
+- Hosting and deployment, backups with a tested restore, monitoring, incident and release checklists, load tests.

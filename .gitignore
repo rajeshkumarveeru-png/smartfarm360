@@ -11,3 +11,17 @@ frontend/dist/
 release/
 logs/
 runtime/java/
+
+# TypeScript incremental build state
+*.tsbuildinfo
+
+# Local TLS certificates and database dumps must never be committed
+certs/
+*.pem
+*.backup
+*.dump
+
+# IDE per-user state (shared project settings in .idea/ stay tracked)
+.idea/workspace.xml
+.idea/shelf/
+out/

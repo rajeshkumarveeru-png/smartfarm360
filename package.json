@@ -9,7 +9,7 @@
     "start": "electron .",
     "web:dev": "npm --prefix frontend run dev",
     "web:build": "npm --prefix frontend run build",
-    "backend:build": "gradle -p backend clean bootJar",
+    "backend:build": "cd backend && gradlew.bat clean bootJar",
     "dist": "npm run web:build && npm run backend:build && electron-builder --win portable"
   },
   "devDependencies": {
