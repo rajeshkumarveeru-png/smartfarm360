@@ -1,0 +1,59 @@
+{
+  "name": "smartfarm360-desktop",
+  "version": "0.3.0",
+  "description": "SmartFarm360 integrated farming management desktop application",
+  "main": "electron/main.cjs",
+  "author": "SmartFarm360",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "web:dev": "npm --prefix frontend run dev",
+    "web:build": "npm --prefix frontend run build",
+    "backend:build": "gradle -p backend clean bootJar",
+    "dist": "npm run web:build && npm run backend:build && electron-builder --win portable"
+  },
+  "devDependencies": {
+    "electron": "^44.3.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.smartfarm360.desktop",
+    "productName": "SmartFarm360",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**/*",
+      "package.json",
+      "frontend/dist/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "backend/build/libs/smartfarm360-0.1.0.jar",
+        "to": "lib/smartfarm360.jar"
+      },
+      {
+        "from": "config/application.properties",
+        "to": "config/application.properties"
+      },
+      {
+        "from": "config/logback-spring.xml",
+        "to": "config/logback-spring.xml"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "portable": {
+      "artifactName": "SmartFarm360-${version}-Portable.exe"
+    }
+  }
+}

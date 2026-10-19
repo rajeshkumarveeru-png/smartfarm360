@@ -1,0 +1,84 @@
+databaseChangeLog:
+  - changeSet:
+      id: 025-smartfarm360-foundation
+      author: smartfarm360
+      changes:
+        - createTable:
+            tableName: sf_users
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: email, type: VARCHAR(254), constraints: { nullable: false, unique: true } }
+              - column: { name: password_hash, type: VARCHAR(100), constraints: { nullable: false } }
+              - column: { name: display_name, type: VARCHAR(140), constraints: { nullable: false } }
+              - column: { name: active, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
+              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+        - createTable:
+            tableName: sf_tenants
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: name, type: VARCHAR(140), constraints: { nullable: false } }
+              - column: { name: slug, type: VARCHAR(100), constraints: { nullable: false, unique: true } }
+              - column: { name: preferred_language, type: VARCHAR(5), defaultValue: en, constraints: { nullable: false } }
+              - column: { name: active, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
+              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+        - createTable:
+            tableName: sf_tenant_memberships
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: tenant_id, type: BIGINT, constraints: { nullable: false, foreignKeyName: fk_sf_membership_tenant, references: sf_tenants(id) } }
+              - column: { name: user_id, type: BIGINT, constraints: { nullable: false, foreignKeyName: fk_sf_membership_user, references: sf_users(id) } }
+              - column: { name: role, type: VARCHAR(30), constraints: { nullable: false } }
+              - column: { name: active, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
+              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+        - addUniqueConstraint:
+            tableName: sf_tenant_memberships
+            columnNames: tenant_id,user_id
+            constraintName: uq_sf_tenant_membership
+        - createIndex:
+            tableName: sf_tenant_memberships
+            indexName: ix_sf_membership_user
+            columns:
+              - column: { name: user_id }
+        - createTable:
+            tableName: sf_farms
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: tenant_id, type: BIGINT, constraints: { nullable: false, foreignKeyName: fk_sf_farm_tenant, references: sf_tenants(id) } }
+              - column: { name: name, type: VARCHAR(140), constraints: { nullable: false } }
+              - column: { name: farm_type, type: VARCHAR(40), defaultValue: MIXED, constraints: { nullable: false } }
+              - column: { name: village, type: VARCHAR(120) }
+              - column: { name: district, type: VARCHAR(120) }
+              - column: { name: state, type: VARCHAR(120), defaultValue: Tamil Nadu }
+              - column: { name: country, type: VARCHAR(80), defaultValue: India, constraints: { nullable: false } }
+              - column: { name: active, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
+              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+        - createIndex:
+            tableName: sf_farms
+            indexName: ix_sf_farm_tenant
+            columns:
+              - column: { name: tenant_id }
+        - createTable:
+            tableName: sf_land_parcels
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: tenant_id, type: BIGINT, constraints: { nullable: false, foreignKeyName: fk_sf_parcel_tenant, references: sf_tenants(id) } }
+              - column: { name: farm_id, type: BIGINT, constraints: { nullable: false, foreignKeyName: fk_sf_parcel_farm, references: sf_farms(id) } }
+              - column: { name: name, type: VARCHAR(120), constraints: { nullable: false } }
+              - column: { name: area, type: "DECIMAL(12,3)", constraints: { nullable: false } }
+              - column: { name: area_unit, type: VARCHAR(20), defaultValue: ACRE, constraints: { nullable: false } }
+              - column: { name: soil_type, type: VARCHAR(80) }
+              - column: { name: irrigation_type, type: VARCHAR(80) }
+              - column: { name: active, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
+              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+        - createIndex:
+            tableName: sf_land_parcels
+            indexName: ix_sf_parcel_tenant_farm
+            columns:
+              - column: { name: tenant_id }
+              - column: { name: farm_id }
+      rollback:
+        - dropTable: { tableName: sf_land_parcels }
+        - dropTable: { tableName: sf_farms }
+        - dropTable: { tableName: sf_tenant_memberships }
+        - dropTable: { tableName: sf_tenants }
+        - dropTable: { tableName: sf_users }

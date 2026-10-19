@@ -1,0 +1,13 @@
+{
+  "expo": {
+    "name": "SmartFarm360",
+    "slug": "smartfarm360",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": { "backgroundColor": "#F5F7F0" },
+    "ios": { "supportsTablet": true, "bundleIdentifier": "com.smartfarm360.mobile" },
+    "android": { "package": "com.smartfarm360.mobile", "adaptiveIcon": { "backgroundColor": "#F5F7F0" } }
+  }
+}

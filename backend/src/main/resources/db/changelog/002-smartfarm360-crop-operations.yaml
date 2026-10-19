@@ -1,0 +1,146 @@
+databaseChangeLog:
+  - changeSet:
+      id: 026-smartfarm360-crop-operations
+      author: smartfarm360
+      changes:
+        - createTable:
+            tableName: sf_crop_masters
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: tenant_id, type: BIGINT, constraints: { nullable: false, foreignKeyName: fk_sf_crop_tenant, references: sf_tenants(id) } }
+              - column: { name: name, type: VARCHAR(120), constraints: { nullable: false } }
+              - column: { name: local_name, type: VARCHAR(120) }
+              - column: { name: category, type: VARCHAR(60) }
+              - column: { name: description, type: VARCHAR(120) }
+              - column: { name: active, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
+              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+        - addUniqueConstraint: { tableName: sf_crop_masters, columnNames: "tenant_id,name", constraintName: uq_sf_crop_tenant_name }
+        - createIndex:
+            tableName: sf_crop_masters
+            indexName: ix_sf_crop_tenant_active
+            columns:
+              - column: { name: tenant_id }
+              - column: { name: active }
+        - createTable:
+            tableName: sf_crop_varieties
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: tenant_id, type: BIGINT, constraints: { nullable: false, foreignKeyName: fk_sf_variety_tenant, references: sf_tenants(id) } }
+              - column: { name: crop_id, type: BIGINT, constraints: { nullable: false, foreignKeyName: fk_sf_variety_crop, references: sf_crop_masters(id) } }
+              - column: { name: name, type: VARCHAR(120), constraints: { nullable: false } }
+              - column: { name: local_name, type: VARCHAR(120) }
+              - column: { name: duration_days, type: INTEGER }
+              - column: { name: notes, type: VARCHAR(120) }
+              - column: { name: active, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
+              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+        - addUniqueConstraint: { tableName: sf_crop_varieties, columnNames: "tenant_id,crop_id,name", constraintName: uq_sf_variety_crop_name }
+        - createTable:
+            tableName: sf_crop_seasons
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: tenant_id, type: BIGINT, constraints: { nullable: false, foreignKeyName: fk_sf_season_tenant, references: sf_tenants(id) } }
+              - column: { name: name, type: VARCHAR(120), constraints: { nullable: false } }
+              - column: { name: start_date, type: DATE, constraints: { nullable: false } }
+              - column: { name: end_date, type: DATE, constraints: { nullable: false } }
+              - column: { name: season_type, type: VARCHAR(40) }
+              - column: { name: active, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
+              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+        - createIndex:
+            tableName: sf_crop_seasons
+            indexName: ix_sf_season_tenant_dates
+            columns:
+              - column: { name: tenant_id }
+              - column: { name: start_date }
+        - createTable:
+            tableName: sf_cultivation_cycles
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: tenant_id, type: BIGINT, constraints: { nullable: false, foreignKeyName: fk_sf_cycle_tenant, references: sf_tenants(id) } }
+              - column: { name: farm_id, type: BIGINT, constraints: { nullable: false, foreignKeyName: fk_sf_cycle_farm, references: sf_farms(id) } }
+              - column: { name: land_parcel_id, type: BIGINT, constraints: { nullable: false, foreignKeyName: fk_sf_cycle_parcel, references: sf_land_parcels(id) } }
+              - column: { name: crop_id, type: BIGINT, constraints: { nullable: false, foreignKeyName: fk_sf_cycle_crop, references: sf_crop_masters(id) } }
+              - column: { name: variety_id, type: BIGINT, constraints: { nullable: true, foreignKeyName: fk_sf_cycle_variety, references: sf_crop_varieties(id) } }
+              - column: { name: season_id, type: BIGINT, constraints: { nullable: true, foreignKeyName: fk_sf_cycle_season, references: sf_crop_seasons(id) } }
+              - column: { name: name, type: VARCHAR(120), constraints: { nullable: false } }
+              - column: { name: planned_sowing_date, type: DATE, constraints: { nullable: false } }
+              - column: { name: expected_harvest_date, type: DATE }
+              - column: { name: cultivated_area, type: "DECIMAL(12,3)" }
+              - column: { name: area_unit, type: VARCHAR(20), defaultValue: ACRE, constraints: { nullable: false } }
+              - column: { name: status, type: VARCHAR(30), defaultValue: PLANNED, constraints: { nullable: false } }
+              - column: { name: active, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
+              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+        - createIndex:
+            tableName: sf_cultivation_cycles
+            indexName: ix_sf_cycle_tenant_farm
+            columns:
+              - column: { name: tenant_id }
+              - column: { name: farm_id }
+        - createIndex:
+            tableName: sf_cultivation_cycles
+            indexName: ix_sf_cycle_tenant_parcel
+            columns:
+              - column: { name: tenant_id }
+              - column: { name: land_parcel_id }
+        - createTable:
+            tableName: sf_farm_activities
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: tenant_id, type: BIGINT, constraints: { nullable: false, foreignKeyName: fk_sf_activity_tenant, references: sf_tenants(id) } }
+              - column: { name: cycle_id, type: BIGINT, constraints: { nullable: false, foreignKeyName: fk_sf_activity_cycle, references: sf_cultivation_cycles(id) } }
+              - column: { name: activity_type, type: VARCHAR(40), constraints: { nullable: false } }
+              - column: { name: activity_date, type: DATE, constraints: { nullable: false } }
+              - column: { name: notes, type: VARCHAR(500) }
+              - column: { name: input_name, type: VARCHAR(120) }
+              - column: { name: quantity, type: "DECIMAL(13,3)" }
+              - column: { name: quantity_unit, type: VARCHAR(40) }
+              - column: { name: cost, type: "DECIMAL(14,2)", defaultValueNumeric: 0, constraints: { nullable: false } }
+              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+        - createIndex:
+            tableName: sf_farm_activities
+            indexName: ix_sf_activity_tenant_date
+            columns:
+              - column: { name: tenant_id }
+              - column: { name: activity_date }
+        - createTable:
+            tableName: sf_harvest_records
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: tenant_id, type: BIGINT, constraints: { nullable: false, foreignKeyName: fk_sf_harvest_tenant, references: sf_tenants(id) } }
+              - column: { name: cycle_id, type: BIGINT, constraints: { nullable: false, foreignKeyName: fk_sf_harvest_cycle, references: sf_cultivation_cycles(id) } }
+              - column: { name: harvest_date, type: DATE, constraints: { nullable: false } }
+              - column: { name: quantity, type: "DECIMAL(13,3)", constraints: { nullable: false } }
+              - column: { name: quantity_unit, type: VARCHAR(40), constraints: { nullable: false } }
+              - column: { name: sale_value, type: "DECIMAL(14,2)", defaultValueNumeric: 0, constraints: { nullable: false } }
+              - column: { name: notes, type: VARCHAR(500) }
+              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+        - createIndex:
+            tableName: sf_harvest_records
+            indexName: ix_sf_harvest_tenant_date
+            columns:
+              - column: { name: tenant_id }
+              - column: { name: harvest_date }
+        # Composite tenant-aware keys prevent cross-tenant relationships even if a caller bypasses service validation.
+        - addUniqueConstraint: { tableName: sf_farms, columnNames: "tenant_id,id", constraintName: uq_sf_farm_tenant_id }
+        - addUniqueConstraint: { tableName: sf_land_parcels, columnNames: "tenant_id,id", constraintName: uq_sf_parcel_tenant_id }
+        - addUniqueConstraint: { tableName: sf_crop_masters, columnNames: "tenant_id,id", constraintName: uq_sf_crop_tenant_id }
+        - addUniqueConstraint: { tableName: sf_crop_varieties, columnNames: "tenant_id,id", constraintName: uq_sf_variety_tenant_id }
+        - addUniqueConstraint: { tableName: sf_crop_varieties, columnNames: "tenant_id,crop_id,id", constraintName: uq_sf_variety_tenant_crop_id }
+        - addUniqueConstraint: { tableName: sf_crop_seasons, columnNames: "tenant_id,id", constraintName: uq_sf_season_tenant_id }
+        - addUniqueConstraint: { tableName: sf_cultivation_cycles, columnNames: "tenant_id,id", constraintName: uq_sf_cycle_tenant_id }
+        - addForeignKeyConstraint: { baseTableName: sf_crop_varieties, baseColumnNames: "tenant_id,crop_id", referencedTableName: sf_crop_masters, referencedColumnNames: "tenant_id,id", constraintName: fk_sf_variety_crop_tenant }
+        - addForeignKeyConstraint: { baseTableName: sf_cultivation_cycles, baseColumnNames: "tenant_id,farm_id", referencedTableName: sf_farms, referencedColumnNames: "tenant_id,id", constraintName: fk_sf_cycle_farm_tenant }
+        - addForeignKeyConstraint: { baseTableName: sf_cultivation_cycles, baseColumnNames: "tenant_id,land_parcel_id", referencedTableName: sf_land_parcels, referencedColumnNames: "tenant_id,id", constraintName: fk_sf_cycle_parcel_tenant }
+        - addForeignKeyConstraint: { baseTableName: sf_cultivation_cycles, baseColumnNames: "tenant_id,crop_id", referencedTableName: sf_crop_masters, referencedColumnNames: "tenant_id,id", constraintName: fk_sf_cycle_crop_tenant }
+        - addForeignKeyConstraint: { baseTableName: sf_cultivation_cycles, baseColumnNames: "tenant_id,season_id", referencedTableName: sf_crop_seasons, referencedColumnNames: "tenant_id,id", constraintName: fk_sf_cycle_season_tenant }
+        - addForeignKeyConstraint: { baseTableName: sf_cultivation_cycles, baseColumnNames: "tenant_id,crop_id,variety_id", referencedTableName: sf_crop_varieties, referencedColumnNames: "tenant_id,crop_id,id", constraintName: fk_sf_cycle_variety_crop_tenant }
+        - addForeignKeyConstraint: { baseTableName: sf_farm_activities, baseColumnNames: "tenant_id,cycle_id", referencedTableName: sf_cultivation_cycles, referencedColumnNames: "tenant_id,id", constraintName: fk_sf_activity_cycle_tenant }
+        - addForeignKeyConstraint: { baseTableName: sf_harvest_records, baseColumnNames: "tenant_id,cycle_id", referencedTableName: sf_cultivation_cycles, referencedColumnNames: "tenant_id,id", constraintName: fk_sf_harvest_cycle_tenant }
+      rollback:
+        - dropUniqueConstraint: { tableName: sf_farms, constraintName: uq_sf_farm_tenant_id }
+        - dropUniqueConstraint: { tableName: sf_land_parcels, constraintName: uq_sf_parcel_tenant_id }
+        - dropTable: { tableName: sf_harvest_records }
+        - dropTable: { tableName: sf_farm_activities }
+        - dropTable: { tableName: sf_cultivation_cycles }
+        - dropTable: { tableName: sf_crop_seasons }
+        - dropTable: { tableName: sf_crop_varieties }
+        - dropTable: { tableName: sf_crop_masters }

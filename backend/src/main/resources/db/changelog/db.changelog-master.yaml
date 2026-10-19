@@ -1,0 +1,7 @@
+databaseChangeLog:
+  - include:
+      file: db/changelog/001-smartfarm360-foundation.yaml
+  - include:
+      file: db/changelog/002-smartfarm360-crop-operations.yaml
+  - include:
+      file: db/changelog/003-smartfarm360-finance-procurement.yaml

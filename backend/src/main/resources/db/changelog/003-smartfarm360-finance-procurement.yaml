@@ -1,0 +1,122 @@
+databaseChangeLog:
+    - changeSet:
+        id: 027-smartfarm360-finance-procurement
+        author: smartfarm360
+        changes:
+          - createTable:
+              tableName: sf_finance_entries
+              columns:
+                - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+                - column: { name: tenant_id, type: BIGINT, constraints: { nullable: false, foreignKeyName: fk_sf_finance_tenant, references: sf_tenants(id) } }
+                - column: { name: farm_id, type: BIGINT }
+                - column: { name: entry_type, type: VARCHAR(10), constraints: { nullable: false } }
+                - column: { name: category, type: VARCHAR(80), constraints: { nullable: false } }
+                - column: { name: description, type: VARCHAR(240), constraints: { nullable: false } }
+                - column: { name: amount, type: "DECIMAL(14,2)", constraints: { nullable: false } }
+                - column: { name: occurred_on, type: DATE, constraints: { nullable: false } }
+                - column: { name: payment_status, type: VARCHAR(20), defaultValue: PAID, constraints: { nullable: false } }
+                - column: { name: reference_no, type: VARCHAR(100) }
+                - column: { name: created_by, type: VARCHAR(254), constraints: { nullable: false } }
+                - column: { name: created_at, type: "TIMESTAMP WITH TIME ZONE", defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+
+          - addForeignKeyConstraint:
+              baseTableName: sf_finance_entries
+              baseColumnNames: "tenant_id,farm_id"
+              referencedTableName: sf_farms
+              referencedColumnNames: "tenant_id,id"
+              constraintName: fk_sf_finance_farm_tenant
+
+          - createIndex:
+              tableName: sf_finance_entries
+              indexName: ix_sf_finance_tenant_date
+              columns:
+                - column: { name: tenant_id }
+                - column: { name: occurred_on }
+
+          - createTable:
+              tableName: sf_suppliers
+              columns:
+                - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+                - column: { name: tenant_id, type: BIGINT, constraints: { nullable: false, foreignKeyName: fk_sf_supplier_tenant, references: sf_tenants(id) } }
+                - column: { name: name, type: VARCHAR(140), constraints: { nullable: false } }
+                - column: { name: phone, type: VARCHAR(30) }
+                - column: { name: village, type: VARCHAR(120) }
+                - column: { name: notes, type: VARCHAR(300) }
+                - column: { name: active, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
+                - column: { name: created_at, type: "TIMESTAMP WITH TIME ZONE", defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+
+          - addUniqueConstraint:
+              tableName: sf_suppliers
+              columnNames: "tenant_id,id"
+              constraintName: uq_sf_supplier_tenant_id
+
+          - createTable:
+              tableName: sf_inventory_items
+              columns:
+                - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+                - column: { name: tenant_id, type: BIGINT, constraints: { nullable: false, foreignKeyName: fk_sf_item_tenant, references: sf_tenants(id) } }
+                - column: { name: name, type: VARCHAR(140), constraints: { nullable: false } }
+                - column: { name: category, type: VARCHAR(60), constraints: { nullable: false } }
+                - column: { name: unit, type: VARCHAR(30), constraints: { nullable: false } }
+                - column: { name: quantity_on_hand, type: "DECIMAL(14,3)", defaultValueNumeric: 0, constraints: { nullable: false } }
+                - column: { name: reorder_level, type: "DECIMAL(14,3)", defaultValueNumeric: 0, constraints: { nullable: false } }
+                - column: { name: average_unit_cost, type: "DECIMAL(14,2)", defaultValueNumeric: 0, constraints: { nullable: false } }
+                - column: { name: active, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
+                - column: { name: created_at, type: "TIMESTAMP WITH TIME ZONE", defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+
+          - addUniqueConstraint:
+              tableName: sf_inventory_items
+              columnNames: "tenant_id,id"
+              constraintName: uq_sf_item_tenant_id
+
+          - addUniqueConstraint:
+              tableName: sf_inventory_items
+              columnNames: "tenant_id,name"
+              constraintName: uq_sf_item_tenant_name
+
+          - createTable:
+              tableName: sf_purchases
+              columns:
+                - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+                - column: { name: tenant_id, type: BIGINT, constraints: { nullable: false, foreignKeyName: fk_sf_purchase_tenant, references: sf_tenants(id) } }
+                - column: { name: supplier_id, type: BIGINT, constraints: { nullable: false } }
+                - column: { name: item_id, type: BIGINT, constraints: { nullable: false } }
+                - column: { name: purchase_date, type: DATE, constraints: { nullable: false } }
+                - column: { name: quantity, type: "DECIMAL(14,3)", constraints: { nullable: false } }
+                - column: { name: unit_cost, type: "DECIMAL(14,2)", constraints: { nullable: false } }
+                - column: { name: total_amount, type: "DECIMAL(14,2)", constraints: { nullable: false } }
+                - column: { name: paid_amount, type: "DECIMAL(14,2)", defaultValueNumeric: 0, constraints: { nullable: false } }
+                - column: { name: notes, type: VARCHAR(300) }
+                - column: { name: created_by, type: VARCHAR(254), constraints: { nullable: false } }
+                - column: { name: created_at, type: "TIMESTAMP WITH TIME ZONE", defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+
+          - addForeignKeyConstraint:
+              baseTableName: sf_purchases
+              baseColumnNames: "tenant_id,supplier_id"
+              referencedTableName: sf_suppliers
+              referencedColumnNames: "tenant_id,id"
+              constraintName: fk_sf_purchase_supplier_tenant
+
+          - addForeignKeyConstraint:
+              baseTableName: sf_purchases
+              baseColumnNames: "tenant_id,item_id"
+              referencedTableName: sf_inventory_items
+              referencedColumnNames: "tenant_id,id"
+              constraintName: fk_sf_purchase_item_tenant
+
+          - createIndex:
+              tableName: sf_purchases
+              indexName: ix_sf_purchase_tenant_date
+              columns:
+                - column: { name: tenant_id }
+                - column: { name: purchase_date }
+
+        rollback:
+          - dropTable:
+              tableName: sf_purchases
+          - dropTable:
+              tableName: sf_inventory_items
+          - dropTable:
+              tableName: sf_suppliers
+          - dropTable:
+              tableName: sf_finance_entries
