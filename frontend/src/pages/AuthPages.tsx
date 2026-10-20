@@ -1,0 +1,210 @@
+import React, { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { api } from '../api/client';
+import { useAuth } from '../auth/AuthContext';
+import { AuthCard, ErrorBanner } from '../components/common';
+import { describeError } from '../lib/errors';
+
+const PENDING_INVITE = 'sf360.pendingInvite';
+
+/** Reads `#token=...` from the URL fragment (never sent to servers) and removes it from the address bar. */
+function useFragmentToken(): string {
+  const location = useLocation();
+  const [token] = useState(() => new URLSearchParams(location.hash.replace(/^#/, '')).get('token') ?? '');
+  useEffect(() => {
+    if (token) window.history.replaceState(null, '', location.pathname);
+  }, [token, location.pathname]);
+  return token;
+}
+
+export function LoginPage() {
+  const { t } = useTranslation();
+  const { login, sessionExpired } = useAuth();
+  const navigate = useNavigate();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email.trim() || !password) { setError(t('common.required')); return; }
+    setBusy(true); setError('');
+    try {
+      await login(email.trim(), password);
+      navigate(sessionStorage.getItem(PENDING_INVITE) ? '/accept-invitation' : '/', { replace: true });
+    } catch (err) {
+      setError(describeError(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <AuthCard title={t('common.appName')} subtitle={t('auth.signInTitle')}>
+      {sessionExpired && <div className="info-banner" role="status">{t('auth.sessionExpired')}</div>}
+      <form onSubmit={submit} noValidate>
+        <label>{t('auth.email')}<input type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} /></label>
+        <label>{t('auth.password')}<input type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} /></label>
+        <ErrorBanner message={error} />
+        <button className="primary" disabled={busy}>{busy ? t('common.loading') : t('auth.signIn')}</button>
+      </form>
+      <Link className="text-link" to="/forgot-password">{t('auth.forgot')}</Link>
+      <Link className="secondary" to="/register">{t('auth.noAccount')}</Link>
+    </AuthCard>
+  );
+}
+
+export function RegisterPage() {
+  const { t } = useTranslation();
+  const { register } = useAuth();
+  const navigate = useNavigate();
+  const [displayName, setDisplayName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!displayName.trim() || !email.trim() || !password) { setError(t('common.required')); return; }
+    if ([...password].length < 10) { setError(t('errors.PASSWORD_TOO_SHORT')); return; }
+    setBusy(true); setError('');
+    try {
+      await register(email.trim(), password, displayName.trim());
+      navigate(sessionStorage.getItem(PENDING_INVITE) ? '/accept-invitation' : '/', { replace: true });
+    } catch (err) {
+      setError(describeError(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <AuthCard title={t('auth.register')} subtitle={t('auth.registerTitle')}>
+      <form onSubmit={submit} noValidate>
+        <label>{t('auth.displayName')}<input maxLength={140} autoComplete="name" value={displayName} onChange={e => setDisplayName(e.target.value)} /></label>
+        <label>{t('auth.email')}<input type="email" maxLength={254} autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} /></label>
+        <label>{t('auth.password')}<input type="password" autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} aria-describedby="pw-hint" /></label>
+        <small id="pw-hint" className="hint">{t('auth.passwordHint')}</small>
+        <ErrorBanner message={error} />
+        <button className="primary" disabled={busy}>{busy ? t('common.loading') : t('auth.register')}</button>
+      </form>
+      <Link className="secondary" to="/login">{t('auth.haveAccount')}</Link>
+    </AuthCard>
+  );
+}
+
+export function ForgotPasswordPage() {
+  const { t } = useTranslation();
+  const [email, setEmail] = useState('');
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email.trim()) { setError(t('common.required')); return; }
+    setError('');
+    try {
+      await api('/api/v1/auth/password-reset/request', { method: 'POST', body: { email: email.trim() } });
+      setSent(true);
+    } catch (err) {
+      setError(describeError(err));
+    }
+  }
+
+  return (
+    <AuthCard title={t('auth.resetTitle')} subtitle={t('auth.resetIntro')}>
+      {sent ? <div className="info-banner" role="status">{t('auth.resetSent')}</div> : (
+        <form onSubmit={submit} noValidate>
+          <label>{t('auth.email')}<input type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} /></label>
+          <ErrorBanner message={error} />
+          <button className="primary">{t('auth.sendLink')}</button>
+        </form>
+      )}
+      <Link className="secondary" to="/login">{t('auth.signIn')}</Link>
+    </AuthCard>
+  );
+}
+
+export function ResetPasswordPage() {
+  const { t } = useTranslation();
+  const token = useFragmentToken();
+  const [password, setPassword] = useState('');
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState('');
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if ([...password].length < 10) { setError(t('errors.PASSWORD_TOO_SHORT')); return; }
+    setError('');
+    try {
+      await api('/api/v1/auth/password-reset/confirm', { method: 'POST', body: { token, newPassword: password } });
+      setDone(true);
+    } catch (err) {
+      setError(describeError(err));
+    }
+  }
+
+  if (!token) return <AuthCard title={t('auth.resetTitle')}><ErrorBanner message={t('auth.missingToken')} /></AuthCard>;
+  return (
+    <AuthCard title={t('auth.resetTitle')}>
+      {done ? <div className="info-banner" role="status">{t('auth.resetDone')}</div> : (
+        <form onSubmit={submit} noValidate>
+          <label>{t('auth.newPassword')}<input type="password" autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} /></label>
+          <small className="hint">{t('auth.passwordHint')}</small>
+          <ErrorBanner message={error} />
+          <button className="primary">{t('auth.setPassword')}</button>
+        </form>
+      )}
+      <Link className="secondary" to="/login">{t('auth.signIn')}</Link>
+    </AuthCard>
+  );
+}
+
+export function AcceptInvitationPage() {
+  const { t } = useTranslation();
+  const { status, reloadTenants, user } = useAuth();
+  const navigate = useNavigate();
+  const fragmentToken = useFragmentToken();
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  // Keep the token across sign-in/registration, which happen on other pages.
+  const token = fragmentToken || sessionStorage.getItem(PENDING_INVITE) || '';
+  useEffect(() => { if (fragmentToken) sessionStorage.setItem(PENDING_INVITE, fragmentToken); }, [fragmentToken]);
+
+  async function accept() {
+    setBusy(true); setError('');
+    try {
+      const result = await api<{ tenantId: number }>('/api/v1/invitations/accept', { method: 'POST', body: { token } });
+      sessionStorage.removeItem(PENDING_INVITE);
+      await reloadTenants();
+      navigate(`/t/${result.tenantId}/farms`, { replace: true });
+    } catch (err) {
+      setError(describeError(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!token) return <AuthCard title={t('auth.acceptTitle')}><ErrorBanner message={t('auth.missingToken')} /></AuthCard>;
+  return (
+    <AuthCard title={t('auth.acceptTitle')} subtitle={t('auth.acceptIntro')}>
+      {status === 'signedIn' ? (
+        <>
+          <p className="hint">{t('auth.signedInAs', { email: user?.email ?? '' })}</p>
+          <ErrorBanner message={error} />
+          <button className="primary" disabled={busy} onClick={() => void accept()}>{t('auth.accept')}</button>
+        </>
+      ) : (
+        <>
+          <p className="hint">{t('auth.signInToAccept')}</p>
+          <Link className="primary" to="/login">{t('auth.signIn')}</Link>
+          <Link className="secondary" to="/register">{t('auth.register')}</Link>
+        </>
+      )}
+    </AuthCard>
+  );
+}

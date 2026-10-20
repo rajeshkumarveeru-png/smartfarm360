@@ -10,3 +10,18 @@
 /* Phase 3: finance, suppliers and stock */
 .finance-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px;margin:18px 0 12px}.finance-stat{position:relative;display:flex;flex-direction:column;gap:8px;padding:16px;background:#fff;border:1px solid #e2e9df;border-radius:13px;min-width:0}.finance-stat span{font-size:11px;color:#718077}.finance-stat b{font-size:20px;letter-spacing:-.5px;overflow-wrap:anywhere}.finance-stat svg{position:absolute;right:13px;top:13px;color:#388052}.finance-low-stock{display:flex;gap:7px;align-items:center;background:#fff7e6;border:1px solid #f2dfb4;color:#8c641b;padding:10px 13px;border-radius:10px;font-size:12px;margin-bottom:20px}.finance-low-stock b{font-size:17px}.low-stock-label{color:#9a6411!important;font-weight:700}.finance-page .crop-tabs{margin-top:20px}
 @media(max-width:600px){.finance-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.finance-stat{padding:12px}.finance-stat b{font-size:17px}}
+
+/* Phase 2: router layout, tenant switcher, auth pages, accessibility helpers */
+.sidebar nav{display:flex;flex-direction:column;gap:2px}.sidebar .side-link{color:#dbe9de;text-decoration:none}.sidebar .side-link:hover{background:#21492f}
+.tenant-switcher{display:flex;flex-direction:column;gap:6px;margin:0 0 20px}.tenant-switcher select{padding:10px;border-radius:9px;border:1px solid #3b684e;background:#1f4a33;color:#fff;font:inherit;font-size:12px}
+.side-bottom{flex-direction:column;align-items:flex-start;font-size:11px}.side-signout{display:flex;align-items:center;gap:6px;background:transparent;border:1px solid #3b684e;color:#dbe9de;border-radius:8px;padding:8px 10px;cursor:pointer;font:inherit}
+.auth-card form{display:flex;flex-direction:column;gap:12px}.auth-card .secondary,.auth-card .primary{text-decoration:none;text-align:center}.auth-top{display:flex;justify-content:space-between;align-items:center}
+.text-link{color:#267346;font-size:13px;font-weight:600;text-decoration:none}.hint{color:#6c7a6f;font-size:12px;margin:0}
+.info-banner{display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-radius:10px;background:#eef6ea;color:#2f5a37;font-size:13px;margin-bottom:16px}.info-banner p{margin:0}
+.link-box{display:block;padding:8px;border-radius:8px;background:#fff;border:1px solid #d9e6d3;overflow-wrap:anywhere;font-size:12px}
+.pager{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:16px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
+.value-side select{padding:8px;border-radius:8px;border:1px solid #d7ded6;font:inherit;font-size:12px}
+button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid #8fc58a;outline-offset:2px}
+.primary,.secondary{min-height:44px}
+@media(max-width:900px){.sidebar{position:static;width:auto;padding:14px 16px;gap:10px}.sidebar .brand{padding:0}.sidebar .brand>div:last-child{font-size:inherit}.tenant-switcher{margin:0}.sidebar nav{flex-direction:row;overflow-x:auto;gap:6px}.sidebar nav .side-link,.sidebar nav .side-link.active{font-size:13px;white-space:nowrap;justify-content:flex-start;padding:10px 12px}.side-bottom{flex-direction:row;align-items:center;justify-content:space-between;font-size:11px;margin:0;padding:0}.main{margin-left:0;padding:18px 16px}}
