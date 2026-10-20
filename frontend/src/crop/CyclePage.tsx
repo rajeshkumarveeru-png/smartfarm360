@@ -109,7 +109,7 @@ export default function CyclePage() {
             <label>{tf('to')}<input type="date" value={range.to || report.to} onChange={e => setRange({ ...range, to: e.target.value })} /></label>
             <label>{tf('basis')}<select value={range.basis} onChange={e => setRange({ ...range, basis: e.target.value })}>
               <option value="ACCRUAL">{tf('accrual')}</option><option value="CASH">{tf('cashBasis')}</option></select></label>
-            <label>{t('estimatePrice', { unit: report.costUnit ? ts(`unit.${report.costUnit}`) : '' })}<input inputMode="decimal" value={range.price} onChange={e => setRange({ ...range, price: e.target.value })} /></label>
+            <label>{report.costUnit ? t('estimatePrice', { unit: ts(`unit.${report.costUnit}`) }) : t('estimatePriceNoHarvest')}<input inputMode="decimal" value={range.price} onChange={e => setRange({ ...range, price: e.target.value })} /></label>
           </div>
           <p className="hint">{tf('rangeLabel', { from: formatDate(report.from, lang), to: formatDate(report.to, lang) })} · {tf('actualFigures')}</p>
           <div className="finance-stats">

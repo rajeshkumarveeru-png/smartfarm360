@@ -35,7 +35,8 @@ Record every command you ran and its result in `docs/PROGRESS.md` at the end of 
 
 - Backend package root `com.smartfarm360`; tables use the `sf_` prefix.
 - Modular monolith, one package per module (ADR 0001): `platform` (auth, tenant, membership, rbac, security, audit,
-  web, admin, mail), `farm`, `crop`, `finance`, `inventory` (stock), `costing`. Finance reaches stock only through
+  web, admin, mail), `farm`, `crop`, `finance`, `inventory` (stock), `costing`, `operations` (field work that moves stock and money).
+  Finance reaches stock only through
   `StockHook`; `ModuleBoundaryTest` enforces the boundaries.
 - Tenant endpoints live under `/api/v1/tenants/{tenantId}/...`, take a `TenantContext` parameter and must declare
   `@RequiresPermission` (and `@RequiresModule` for optional modules). Never accept a tenant id in a request body.

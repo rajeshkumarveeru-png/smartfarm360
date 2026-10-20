@@ -1,6 +1,6 @@
 # Crop management v2 design (Phase 5)
 
-- Status: **Draft for product-owner review** (2026-10-20). No Phase 5 code is written until this is approved.
+- Status: **Approved** (2026-10-20): F1–F12 as recommended. Implemented in Phase 5; see section 15 for implementation notes.
 - Builds on: the approved [finance posting rules](../finance/posting-rules.md) (cost objects, D3, D7, P16) and the
   approved [stock movement design](../inventory/stock-movements.md) (stock use S3, farm produce S7, lots).
 - Decisions marked **F1–F12** need an answer; each has a recommendation.
@@ -195,7 +195,7 @@ at/by, and a flag for Phase 1 memo rows; `sf_harvest_records` gains `lot_id`, `d
 new `sf_crop_observations` and `sf_weather_notes`; finance gains the *Allocation* record type with lines per cycle.
 All tenant-owned with composite tenant foreign keys. Crop API responses become typed records with paging.
 
-## 13. Decisions needed
+## 13. Decisions (approved as recommended, 2026-10-20)
 
 | # | Question | Recommendation |
 |---|---|---|
@@ -220,3 +220,37 @@ labelled estimates; season comparison and CSV; observations and weather notes; t
 crop screens in Tamil and English; the verified Phase 1 crop migration. Tests: section 9 as a golden scenario,
 allocation totals and rounding, stage changes, reversal of activities, closed-cycle rules, idempotent retries,
 cross-tenant and permission tests for every new endpoint.
+
+## 15. Implementation notes (Phase 5)
+
+Choices made while building, within the approved decisions. None changes a figure in section 9, which the golden test
+(`CropGoldenScenarioTest`) reproduces exactly.
+
+- **Where things live.** The crop module keeps crops, cycles, stages, field records, observations and weather, and
+  never depends on finance or stock. A new **operations** module records field work that moves stock or money: it calls
+  the stock module for inputs and harvests and finance for paid work, all in one transaction. Nothing depends on
+  operations (`ModuleBoundaryTest`). Overhead allocation lives in finance and reads each cycle's area and dates from its
+  cost object, which the crop module keeps up to date.
+- **Permissions.** Recording field work needs `CROP_ACTIVITY_WRITE`; using stock inputs also needs `INVENTORY_WRITE`,
+  paid work `FINANCE_WRITE`, and reversing `FINANCE_REVERSE`. Harvests need only `CROP_ACTIVITY_WRITE`: farm produce
+  enters stock at nil value, so workers can record it. With today's roles, field supervisors and workers can record
+  notes-only work and harvests but not stock inputs (see the open question in PROGRESS).
+- **Produce item.** The first harvest of a crop uses a farm-produce stock item with the crop's name, or creates one
+  (counted in kg, tracking lots, sale category *Crop sales*). Each harvest is a lot named after the cycle
+  (`SAMBA-2026-H1`), unique per item. If a crop's chosen item does not track lots, harvests still enter stock but
+  without a lot, so sales from them are not linked to the cycle automatically.
+- **Stages.** A harvest moves a Planned or Growing cycle to Harvesting even if no sowing was recorded; reversing the
+  last harvest moves it back to Growing. The cycle's activity dates for allocation are its actual sowing date (or
+  planned, until sown) to its closing date.
+- **Allocation.** Overhead lines that name a farm are spread only over that farm's cycles; the rest over all cycles.
+  Cost of goods sold, interest and losses are never allocated. Periods are at most one year; a second allocation that
+  overlaps a posted one is refused until that one is reversed.
+- **Reports.** The cycle report's default period runs from six months before planned sowing to today (or the closing
+  or expected harvest date if later), because inputs are often bought before sowing. In the cash view, allocated
+  overhead is not shown (allocations move no money). Yield and cost per unit use the crop's main produce item in its base
+  unit (kg); the screens convert units for display.
+- **Phase 1 data.** Cycle statuses map to stages (In progress → Growing, Completed → Closed on the expected harvest
+  date, anything unknown → Planned). Cycles without a cost object get one. Activities and harvests are kept as history
+  with their memo values; the migration verifies that no journal line or stock movement was added.
+- **API.** Crop lists are typed and paged (`/cultivation-cycles`, `/activities`, `/harvests` return pages). A crop of
+  another farm business now answers 404 instead of 400, like every other cross-tenant reference.

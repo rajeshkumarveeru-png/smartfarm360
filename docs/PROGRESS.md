@@ -2,9 +2,8 @@
 
 ## Current state
 
-- **Phase:** 4 (inventory, purchasing and sales) complete on branch `feature/phase-4-inventory` (based on
-  `feature/phase-3-finance`). Phase 5 (crop management v2) started on `feature/phase-5-crops`: the crop management
-  design is awaiting review; no Phase 5 code yet.
+- **Phase:** 5 (crop management v2) complete on branch `feature/phase-5-crops` (based on `feature/phase-4-inventory`).
+  Next: Phase 6 (workforce and assets).
 - **Production readiness:** not ready. Authentication, roles, tenant isolation, audit, the finance core and stock with
   movements are in place and tested, but no email provider is configured and hosting/backups are undecided.
 
@@ -25,7 +24,8 @@
 | **Tamil terminology reviewer** | **Open** — required before the first release | ADR 0008 |
 | Finance posting rules, D1–D12 | Approved as recommended (2026-10-20) | [posting rules](finance/posting-rules.md) |
 | Stock movement design, E1–E12 | Approved as recommended (2026-10-20) | [stock movements](inventory/stock-movements.md) |
-| **Crop management design, F1–F12** | **Awaiting review** (draft 2026-10-20) | [crop management](crops/crop-management.md) |
+| Crop management design, F1–F12 | Approved as recommended (2026-10-20) | [crop management](crops/crop-management.md) |
+| **Stock inputs by field supervisors** | **Open** — today only roles with `INVENTORY_WRITE` (owner, farm admin, farm manager, accountant) can record stock used on a crop; field supervisors and workers record notes-only work and harvests. Should field supervisors get stock-use permission? | crop design §15 |
 | **Email provider** | **Open** — Phase 2 ships the `EmailSender` interface with a logging stub, as instructed. Reset and invitation emails are not delivered until a provider is chosen | ADR 0003 |
 
 ## Phase 1 — Baseline and hygiene (2026-10-19)
@@ -252,6 +252,65 @@ sales and opening balances accept item lines. Reads need `INVENTORY_READ`; stock
 Not verified: GitHub Actions (nothing pushed); Electron packaging; a real phone; CSV download in the browser (covered
 by API tests).
 
+## Phase 5 — Crop management v2 (2026-10-20)
+
+Commits on `feature/phase-5-crops`: `79d616d` (design), `0f2b0a4` (backend), `2f5bc5a` (web), `e6538dd` (mobile), plus the
+verification and docs commit.
+
+### Features completed
+
+- **Approved crop design** implemented (F1–F12 as recommended): cycle stages Planned → Growing → Harvesting → Closed
+  (and Cancelled), moved by sowing and harvests, closed by hand, reopened only by owners and farm admins; cycles can be
+  edited; area checked against the field, intercropping warned (F11).
+- **Field work recorded once** (F2, F3): an activity can use stock (a stock-use record for the cycle) and pay for labour
+  or machine hire (a bill for the cycle); notes-only work can be edited or deleted; work with stock or money is
+  reversed. Retries with the same key record nothing twice.
+- **Harvests into stock** (F4, F5): each harvest is a farm-produce record and a lot of the crop's produce item; a sale
+  from the lot is assigned to the cycle by default. Phase 1 harvests stay as history.
+- **Overhead allocation** (F6, P16): preview and post farm overhead to growing crops by area × days, farm-aware,
+  exact to the paisa, one per period, reversible.
+- **Crop reports** (F7, F8): revenue, direct costs, allocated overhead, profit, cost per acre, yield and yield per acre,
+  cost per kg, unsold produce with a labelled estimate, plan against actual, Phase 1 memo figures, season comparison,
+  CSV exports.
+- **Field notes** (F9, F10): pest, disease and other observations with severity; farmer-entered rainfall and weather.
+- **API:** typed and paged crop responses.
+- **Web:** new Crops section (cycles, cycle page with figures and field records, crops and seasons, season comparison,
+  weather) and Finance → Overhead allocation.
+- **Mobile** (F12): the Crops tab placeholder is replaced by real cycles with stage and figures, and forms for field work
+  (with a stock input), harvests and observations (online).
+
+### Database migrations
+
+`007-crop-v2.yaml`: `038-crop-v2-schema`, `039-crop-v2-backfill` (maps Phase 1 statuses, keeps activities and harvests as
+history with their memo values, gives every cycle's cost object its area in acres and dates, and verifies that no
+journal line or stock movement was added). Applied to the local database on 2026-10-20 after a `pg_dump` backup; the
+local *GroundNut* cycle became Planned with 1.7 acres.
+
+The new migration test caught an ordering defect before the changeset was applied anywhere: the harvest check
+constraint was added before Phase 1 harvests were marked as history.
+
+### APIs added
+
+Under `/api/v1/tenants/{tenantId}`: `PATCH /crops/{id}`, `GET|PUT /crops/{id}/produce-item`, `GET /crops/{id}/comparison(.csv)`,
+`GET|PATCH /cultivation-cycles/{id}`, `POST /cultivation-cycles/{id}/status`, `GET /cultivation-cycles/{id}/report(.csv)`,
+`GET|POST /cultivation-cycles/{id}/observations`, `PUT|DELETE /observations/{id}`, `PATCH|DELETE /activities/{id}`,
+`POST /activities/{id}/reverse`, `POST /harvests/{id}/reverse`, `GET /farms/{id}/weather`, `PUT|DELETE /farms/{id}/weather/{date}`,
+`POST /finance/overhead-allocations(/preview)`. Changed: `POST /activities` and `POST /harvests` take the new request
+shapes; cycle, activity and harvest lists are paged.
+
+### Tests and evidence
+
+| Command | Result |
+|---|---|
+| `backend: gradlew test bootJar` | Passed: **355 tests, 0 failures**, including the golden crop scenario (every figure in section 9 of the crop design), 8 crop rule tests (stages and closed cycles, area and intercropping, notes-only edits and reversal, permissions and idempotent retries, harvest lots and reversal, allocation per period and per farm with exact rounding, observations and weather, comparison, CSV and paging), the Phase 1 crop migration test, module boundaries (7 rules), and 248 generated cross-tenant cases (124 tenant endpoints) |
+| `frontend: npm run lint`, `tsc --noEmit`, `npm run build` | Passed (Vite now warns that the bundle is over 500 kB) |
+| `frontend: npx vitest run` | Passed: **35 tests** |
+| `mobile: npm run typecheck`, `npm test`, `expo install --check` | Passed: **21 tests** |
+| Manual browser check (backend :8081 on local PostgreSQL 18, Vite :5174) | Migrations 038–039 applied locally; crop *Paddy* and cycle *Samba 2026* (2 acres) created; fertilizer work with 50 kg urea from stock and ₹400 labour → figures: fertilizer ₹300, labour ₹400, cost per acre ₹350; harvest 10 quintal → lot `SAMBA-2026-H1`, 1,000 kg, 500 kg per acre, ₹0.70 per kg, stage Harvesting. A label glitch found (estimate price before any harvest) was fixed. Backend log: 0 errors, no secrets |
+
+Not verified: GitHub Actions (nothing pushed); Electron packaging; a real phone; CSV downloads in the browser (covered
+by API tests).
+
 ## Known gaps and defects
 
 Security and platform:
@@ -263,17 +322,18 @@ Security and platform:
 - Tamil strings are unreviewed (`shared/i18n/ta.json` → `_meta.reviewStatus`).
 
 Finance and stock:
-- Crop activities do not consume stock yet and harvests are not stock lots yet (Phase 5); produce goes into stock
-  with the *farm produce* record.
 - No purchase orders (E8, deferred); XLSX/PDF exports arrive with Phase 7 (CSV only now).
 - An item's default categories can be changed but not cleared; negative stock cannot be allowed per tenant yet.
-- Crop activity `cost` and harvest `sale_value` remain memo fields outside the accounts (D7); they are replaced in Phase 5.
-- No overhead allocation runs or internal transfers yet (P16/P17); depreciation is entered by hand until Phase 6.
-- Finance report exports arrive in Phase 7. Crop API responses are still untyped maps without paging.
+- Phase 1 crop activity `cost` and harvest `sale_value` stay memo history outside the accounts (D7, F4).
+- Crop photos wait for attachment storage (ADR 0009); weather comes only from farmer entries.
+- The web bundle is over 500 kB; split the bundle by section before production.
+- No internal transfers of own produce or manure yet (P17, Phases 5 → 11); depreciation is entered by hand until Phase 6.
+- Finance report exports arrive in Phase 7.
 - Removing a match after a later report date is not reflected historically in dues ageing (matches have no history).
 
 Clients:
-- Mobile entries are still device-only (sync is Phase 13); "coming soon" crop/livestock screens remain.
+- Mobile money entries wait on the phone when offline; crop recording is online only (offline in Phase 13). The
+  livestock tab is still a placeholder until the livestock modules (Phases 8–12).
 
 Tooling (left unchanged by policy — user scripts):
 - `dev.bat` uses port 5173 (Vite runs on 5174) and sets `SMART_BILLING_LOG_DIR` while logback reads `SMARTFARM_LOG_DIR`.

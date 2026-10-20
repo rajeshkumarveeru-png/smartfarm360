@@ -31,15 +31,16 @@ Deferred from Phase 4:
 - Tenant setting to allow negative stock; clearing an item's default categories.
 - XLSX/PDF stock exports → Phase 7 (CSV exists).
 - Stock records from the phone (the mobile app shows stock; recording is web-only) → Phase 13.
-- Harvests as stock lots and activities consuming stock → Phase 5.
+- Harvests as stock lots and activities consuming stock → done in Phase 5.
 
-## Phase 5 — Crop management v2
+## Phase 5 — Crop management v2 ✅ (see PROGRESS.md)
 
-Design for review: [crop management](crops/crop-management.md) (F1–F12).
-
-- Cost objects; activities consume inventory; harvest batches become inventory lots; sales link to harvests;
-  pest/disease observations; weather notes; cost per acre / per unit; crop profitability.
-- Retire `sf_harvest_records.sale_value` from revenue calculations.
+Deferred from Phase 5:
+- Crop photos (attachment storage, ADR 0009); weather service integration.
+- Other allocation bases (direct cost share, fixed percentages).
+- Offline crop recording on the phone → Phase 13.
+- Internal transfers of own produce/manure (P17) → Phase 11.
+- Decide whether field supervisors may record stock inputs (open question in PROGRESS).
 
 ## Phase 6 — Workforce and assets
 

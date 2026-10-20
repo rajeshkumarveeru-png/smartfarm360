@@ -1110,6 +1110,7 @@
     "noWeather": "No weather notes for these dates.",
     "errors": {
       "rainfall": "Enter rainfall in mm (up to one decimal)."
-    }
+    },
+    "estimatePriceNoHarvest": "Price for unsold produce (₹, estimate)"
   }
 }

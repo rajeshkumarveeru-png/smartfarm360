@@ -31,6 +31,13 @@ Rules:
 - Farming modules record money and stock **only** through `finance` and `inventory` service APIs.
 - Module boundaries will be enforced with ArchUnit tests once the first module is moved (Phase 2).
 
+## Addendum (2026-10-20, Phase 5)
+
+Field work that moves stock and money (an activity's stock inputs and paid work, a harvest into stock) is recorded by a
+small **operations** module that depends on crop, inventory and finance. Crop stays free of finance and stock, finance
+of farming and stock, and nothing depends on operations. Finance reaches stock through the `StockHook` interface it
+owns (Phase 4). `ModuleBoundaryTest` enforces all of this.
+
 ## Consequences
 
 - One deployable, one transaction boundary for money + stock changes, simple local development.
