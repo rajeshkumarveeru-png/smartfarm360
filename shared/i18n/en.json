@@ -70,11 +70,6 @@
     "expense": "Expense",
     "income": "Income",
     "language": "தமிழ்",
-    "cropOverview": "Crop overview",
-    "cropHelp": "Track fields, crop cycles, input costs and harvests.",
-    "land": "Land parcels",
-    "activeCycles": "Active crop cycles",
-    "planned": "Planned activities",
     "livestockOverview": "Livestock overview",
     "livestockHelp": "Track animals, daily production, feed and health.",
     "animals": "Animals",
@@ -118,7 +113,11 @@
     "savedOffline": "No connection. Saved on this phone; it will be recorded when you are back online.",
     "pendingBadge": "● Waiting to send",
     "stockOffline": "Connect to the internet to see stock.",
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "cropsNotEnabled": "Crop records are not switched on for this farm business, or your role cannot see them.",
+    "cropsOffline": "Connect to the internet to see and record crop work.",
+    "cropCost": "Cost so far",
+    "cropSaved": "Recorded."
   },
   "common": {
     "appName": "SmartFarm360",
