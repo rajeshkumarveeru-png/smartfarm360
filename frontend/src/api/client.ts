@@ -25,20 +25,28 @@ export function setAccessToken(token: string | null) { accessToken = token; }
 export function hasAccessToken() { return accessToken !== null; }
 export function onSessionEnded(handler: () => void) { sessionEnded = handler; }
 
-/** Exchanges the refresh cookie for a new access token. Concurrent callers share one request. */
+async function doRefresh(): Promise<TokenResponse | null> {
+  try {
+    const r = await fetch(`${BASE}/api/v1/auth/refresh`, { method: 'POST', credentials: 'include', headers: { [REFRESH_HEADER]: '1' } });
+    if (!r.ok) { accessToken = null; return null; }
+    const body = (await r.json()) as TokenResponse;
+    accessToken = body.accessToken;
+    return body;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Exchanges the refresh cookie for a new access token. Concurrent callers in this tab share one request, and the
+ * Web Locks API serializes refreshes across tabs: the server treats a second use of a rotated token as theft, so two
+ * tabs must never send the same cookie at once. A tab that waited for the lock sends the cookie the first tab received.
+ */
 export function refreshSession(): Promise<TokenResponse | null> {
   if (!refreshing) {
-    refreshing = (async () => {
-      try {
-        const r = await fetch(`${BASE}/api/v1/auth/refresh`, { method: 'POST', credentials: 'include', headers: { [REFRESH_HEADER]: '1' } });
-        if (!r.ok) { accessToken = null; return null; }
-        const body = (await r.json()) as TokenResponse;
-        accessToken = body.accessToken;
-        return body;
-      } catch {
-        return null;
-      }
-    })().finally(() => { refreshing = null; });
+    const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
+    const run = locks ? (async () => await locks.request('sf360-refresh', doRefresh))() : doRefresh();
+    refreshing = run.finally(() => { refreshing = null; });
   }
   return refreshing;
 }

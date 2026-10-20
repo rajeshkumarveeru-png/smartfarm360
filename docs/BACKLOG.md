@@ -6,25 +6,14 @@ the build green. A phase is complete only when its acceptance checks have actual
 
 ## Phase 1 — Baseline and hygiene ✅ (see PROGRESS.md)
 
-## Phase 2 — Platform foundation
+## Phase 2 — Platform foundation ✅ (see PROGRESS.md)
 
-- Package restructure for `platform` (ADR 0001) and ArchUnit boundary tests.
-- Auth (ADR 0003): JWT access + rotating hashed refresh tokens, logout, password reset, rate limiting on auth
-  endpoints, non-enumerating registration. Remove HTTP Basic.
-- Bootstrap admin off by default; becomes a platform administrator.
-- Roles and permissions (ADR 0002): `sf_role`, `sf_permission`, `sf_membership_role`, seeded system roles,
-  `@RequiresPermission`, central `TenantContext` interceptor. Invitations and membership lifecycle.
-- Tenant settings (language, timezone, currency, unit preferences), enabled modules, entitlement flags (no billing).
-- `sf_audit_history` for sensitive changes.
-- RFC 7807 errors with codes; global exception handler; no internal details in responses.
-- springdoc OpenAPI; Actuator health/readiness only; correlation-id filter and MDC.
-- `/api/v1` versions of tenant, farm and land-parcel endpoints with update/deactivate; remove `/api/smartfarm/*`
-  after clients move.
-- Cross-tenant endpoint inventory test.
-- Web: router, auth flow, tenant switcher, shared API client, i18next with shared catalogs, Vitest, ESLint.
-- Mobile: login, tenant selection, secure token storage, shared catalogs, Jest.
-- **Accept when:** every tenant endpoint has a passing cross-tenant test; auth tests cover expiry, rotation, reuse
-  and lockout; web/mobile language switching works and is tested.
+Deferred from Phase 2 (not blocking Phase 3):
+- Email provider behind `EmailSender` (decision pending), then email verification.
+- Row-Level Security with a separate non-owner database role.
+- Shared rate-limit store before running several backend instances.
+- Drop the unused `sf_tenant_memberships.role` column (contract step).
+- Mobile registration and password reset screens.
 
 ## Phase 3 — Finance core
 

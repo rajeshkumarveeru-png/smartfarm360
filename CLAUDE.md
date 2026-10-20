@@ -24,18 +24,25 @@ Architecture decisions live in [docs/adr/](docs/adr/). Follow them; if a change 
 | Area | Command (from the directory) |
 |---|---|
 | backend | `./gradlew test bootJar` — includes migration tests on embedded PostgreSQL |
-| frontend | `npm run build` |
-| mobile | `npx tsc --noEmit` and `npx expo install --check` |
+| frontend | `npm run lint`, `npm test`, `npm run build` |
+| mobile | `npx tsc --noEmit`, `npm test`, `npx expo install --check` |
+
+Port 8080 may be taken locally by another project (BIZ360); use `PORT=8081` and `SMARTFARM_API_TARGET=http://localhost:8081`.
 
 Record every command you ran and its result in `docs/PROGRESS.md` at the end of a phase.
 
 ## Conventions
 
 - Backend package root `com.smartfarm360`; tables use the `sf_` prefix.
-- Target structure is a modular monolith, one package per module (ADR 0001). Phase 1 code still uses the
-  older `controller/service/entity` layout; new modules follow the ADR.
+- Modular monolith, one package per module (ADR 0001): `platform` (auth, tenant, membership, rbac, security, audit,
+  web, admin, mail), `farm`, `crop`, `finance`. `ModuleBoundaryTest` enforces the boundaries.
+- Tenant endpoints live under `/api/v1/tenants/{tenantId}/...`, take a `TenantContext` parameter and must declare
+  `@RequiresPermission` (and `@RequiresModule` for optional modules). Never accept a tenant id in a request body.
+- Errors: throw `ApiException` with a stable `code`, and add that code to `errors.*` in both catalogs.
+- Every tenant-data change that matters to owners is recorded with `AuditService` (no secrets in details).
 - Controllers stay thin; business rules live in services; typed request/response records with Bean Validation.
   Do not add new `Map<String,Object>` request bodies.
 - UTC `TIMESTAMP WITH TIME ZONE` for instants; `DATE` for farm-local dates.
-- UI text goes through the localization catalog (English and Tamil); no hard-coded user-facing strings in new code.
+- UI text goes through `shared/i18n/{en,ta}.json` (used by web and mobile); keys must exist in both files
+  (a test enforces it). No hard-coded user-facing strings.
 - Git: work on a feature branch; commits end with the attribution line required by the session.

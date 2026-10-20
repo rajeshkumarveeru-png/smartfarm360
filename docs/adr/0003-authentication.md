@@ -18,7 +18,8 @@ request. The mobile client expects a bearer token. A bootstrap admin `admin`/`ad
   cookie scoped to the refresh path; mobile stores tokens in `expo-secure-store`.
 - **Passwords:** BCrypt (existing). Rate-limit login, registration and password-reset endpoints. Registration responses
   must not reveal whether an email exists.
-- **Password reset:** single-use, hashed, time-limited tokens delivered by email (provider to be chosen in Phase 2).
+- **Password reset:** single-use, hashed, 30-minute tokens delivered by email. Phase 2 implements an `EmailSender`
+  interface with a logging stub; a real provider is plugged in once chosen.
 - **Bootstrap admin:** disabled by default; enabling it requires an explicit password via environment variable and it
   creates a *platform* administrator, not a tenant role.
 - **Signing keys** come from environment/secret store, never the repository.

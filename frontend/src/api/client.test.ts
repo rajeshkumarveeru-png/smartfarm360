@@ -37,6 +37,17 @@ describe('api client', () => {
     expect(refreshCalls).toBe(1);
   });
 
+  it('holds a cross-tab lock while refreshing when the browser supports Web Locks', async () => {
+    const request = vi.fn((_name: string, callback: () => Promise<unknown>) => callback());
+    vi.stubGlobal('navigator', { ...navigator, locks: { request } });
+    fetchMock
+      .mockResolvedValueOnce(json(401, { code: 'UNAUTHENTICATED' }))
+      .mockResolvedValueOnce(json(200, { accessToken: 'locked', user: {} }))
+      .mockResolvedValueOnce(json(200, {}));
+    await api('/api/v1/tenants');
+    expect(request).toHaveBeenCalledWith('sf360-refresh', expect.any(Function));
+  });
+
   it('ends the session when the refresh fails', async () => {
     const ended = vi.fn();
     onSessionEnded(ended);

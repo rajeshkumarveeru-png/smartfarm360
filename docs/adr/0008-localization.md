@@ -4,7 +4,8 @@
 
 ## Decision
 
-- One translation catalog per language (`en`, `ta`) shared by web and mobile, keyed by stable identifiers.
+- One translation catalog per language, `shared/i18n/en.json` and `shared/i18n/ta.json`, shared by web and mobile,
+  keyed by stable identifiers.
   Web uses `i18next`/`react-i18next`; mobile uses the same JSON catalogs.
 - The backend returns machine-readable error codes and field names (RFC 7807 problem details); clients translate them.
   Stored data uses canonical codes (`ACRE`, `EXPENSE`), never translated labels.

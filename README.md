@@ -3,7 +3,7 @@
 Multi-tenant integrated farming management for farmers in India — crops, dairy, poultry, goat/sheep,
 aquaculture, organic manure, labour, equipment, processing and trading. Tamil and English.
 
-> **Status: early development (Phase 1 of 14).** Not production-ready. See
+> **Status: early development (Phase 2 of 14 complete).** Not production-ready. See
 > [docs/PROGRESS.md](docs/PROGRESS.md) for what is implemented, verified and still missing.
 
 ## Repository layout
@@ -62,15 +62,23 @@ npx expo start
 
 For a physical phone set `EXPO_PUBLIC_API_URL` to your computer's LAN address (see `mobile/.env.example`).
 
-> **Local bootstrap admin.** Until Phase 2, the backend creates an `admin` / `admin123` account unless
-> `APP_BOOTSTRAP_ADMIN_ENABLED=false`. Never deploy with this enabled.
+Create an account at http://localhost:5174/register, then create your farm business. Optional settings (JWT secret,
+dev-only email links, platform administrator bootstrap) are listed in `.env.example`. Email delivery is not
+configured yet: set `APP_MAIL_DEV_LOG_LINKS=true` locally to see password-reset and invitation links in the log.
+
+> If another app already uses port 8080, start the backend with `PORT=8081` and Vite with
+> `SMARTFARM_API_TARGET=http://localhost:8081`.
+
+API documentation: http://localhost:8080/swagger-ui.html (disable with `APP_API_DOCS_ENABLED=false`).
 
 ## Tests and quality gates
 
 ```bash
 cd backend && ./gradlew test bootJar      # unit + migration tests; starts an embedded PostgreSQL
 cd frontend && npm run build              # type check + production build
+cd frontend && npm run lint && npm test     # lint + unit/component tests
 cd mobile && npx tsc --noEmit             # type check
+cd mobile && npm test                     # Jest (jest-expo)
 cd mobile && npx expo install --check     # Expo SDK dependency alignment
 ```
 

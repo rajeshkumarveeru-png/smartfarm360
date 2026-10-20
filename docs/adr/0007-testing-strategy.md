@@ -17,5 +17,5 @@ databases or schemas, so neither Testcontainers nor a disposable schema in the d
   and migrations against PostgreSQL; API tests through MockMvc with real security.
 - Mandatory suites: cross-tenant negative tests for every tenant endpoint, financial and inventory consistency tests,
   duplicate/idempotency tests, transaction rollback tests.
-- Web: Vitest + Testing Library (added in Phase 2). Mobile: Jest with `jest-expo` (added in Phase 2).
+- Web: Vitest + Testing Library + ESLint. Mobile: Jest with `jest-expo` (logic modules; no component rendering yet).
 - CI (`.github/workflows/ci.yml`) runs backend tests and JAR build, web build, mobile type check and Expo dependency check.
