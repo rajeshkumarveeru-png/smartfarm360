@@ -40,9 +40,11 @@ public class DocumentService {
     private final AuditService audit;
     private final ObjectMapper json;
     private final StockHook stock;
+    private final List<ReversalGuard> reversalGuards;
 
     public DocumentService(JdbcClient jdbc, PostingEngine posting, MasterDataService master, FinanceSettingsService settings,
-                           CostObjectService costObjects, AuditService audit, ObjectMapper json, StockHook stock) {
+                           CostObjectService costObjects, AuditService audit, ObjectMapper json, StockHook stock,
+                           List<ReversalGuard> reversalGuards) {
         this.jdbc = jdbc;
         this.posting = posting;
         this.master = master;
@@ -51,12 +53,19 @@ public class DocumentService {
         this.audit = audit;
         this.json = json;
         this.stock = stock;
+        this.reversalGuards = reversalGuards;
     }
 
     /** Header fields of a new record. */
     private record Header(DocType type, LocalDate docDate, LocalDate dueDate, Long partyId, Long farmId, Long financialAccountId,
                           Long toFinancialAccountId, Long loanId, BigDecimal total, BigDecimal principal, BigDecimal interest,
-                          String notes, String referenceNo) {
+                          String notes, String referenceNo, LocalDate periodFrom, LocalDate periodTo, Long assetId) {
+        Header(DocType type, LocalDate docDate, LocalDate dueDate, Long partyId, Long farmId, Long financialAccountId,
+               Long toFinancialAccountId, Long loanId, BigDecimal total, BigDecimal principal, BigDecimal interest, String notes, String referenceNo) {
+            this(type, docDate, dueDate, partyId, farmId, financialAccountId, toFinancialAccountId, loanId, total, principal, interest, notes,
+                    referenceNo, null, null, null);
+        }
+
         Header(DocType type, LocalDate docDate, Long partyId, Long financialAccountId, BigDecimal total, String notes) {
             this(type, docDate, null, partyId, null, financialAccountId, null, null, total, null, null, notes, null);
         }
@@ -64,7 +73,14 @@ public class DocumentService {
 
     private record NewLine(Long categoryId, String accountCode, String side, String description, BigDecimal quantity, String unit,
                            BigDecimal rate, BigDecimal amount, Long costObjectId, Long farmId, Long partyId, Long financialAccountId, Long loanId,
-                           Long itemId, Long locationId, String lotNo, LocalDate lotExpiry, BigDecimal baseQuantity) {
+                           Long itemId, Long locationId, String lotNo, LocalDate lotExpiry, BigDecimal baseQuantity, Long assetId) {
+        NewLine(Long categoryId, String accountCode, String side, String description, BigDecimal quantity, String unit, BigDecimal rate,
+                BigDecimal amount, Long costObjectId, Long farmId, Long partyId, Long financialAccountId, Long loanId,
+                Long itemId, Long locationId, String lotNo, LocalDate lotExpiry, BigDecimal baseQuantity) {
+            this(categoryId, accountCode, side, description, quantity, unit, rate, amount, costObjectId, farmId, partyId, financialAccountId,
+                    loanId, itemId, locationId, lotNo, lotExpiry, baseQuantity, null);
+        }
+
         NewLine(Long categoryId, String accountCode, String side, String description, BigDecimal quantity, String unit, BigDecimal rate,
                 BigDecimal amount, Long costObjectId, Long farmId, Long partyId, Long financialAccountId, Long loanId) {
             this(categoryId, accountCode, side, description, quantity, unit, rate, amount, costObjectId, farmId, partyId, financialAccountId,
@@ -82,7 +98,30 @@ public class DocumentService {
      * {@code total} null means the value moved: the sum of the journal's debits.
      */
     public record StockRecord(DocType type, LocalDate docDate, Long partyId, Long farmId, Long financialAccountId, Long originalDocumentId,
-                              BigDecimal total, String notes, String referenceNo, List<StockRecordLine> lines) {}
+                              BigDecimal total, String notes, String referenceNo, List<StockRecordLine> lines, Long assetId) {
+        public StockRecord(DocType type, LocalDate docDate, Long partyId, Long farmId, Long financialAccountId, Long originalDocumentId,
+                           BigDecimal total, String notes, String referenceNo, List<StockRecordLine> lines) {
+            this(type, docDate, partyId, farmId, financialAccountId, originalDocumentId, total, notes, referenceNo, lines, null);
+        }
+    }
+
+    /** Running costs can name an asset (workforce and assets design, G12); the asset register lives in the assets module. */
+    void requireAsset(long tenantId, long assetId) {
+        boolean ok = jdbc.sql("select exists (select 1 from sf_assets where id = :id and tenant_id = :t)").param("id", assetId).param("t", tenantId)
+                .query(Boolean.class).single();
+        if (!ok) throw ApiException.notFound("ASSET_NOT_FOUND", "Asset not found.");
+    }
+
+    /** A line of a record built by another module; {@code partyId} names e.g. the worker, {@code assetId} the asset. */
+    public record ModuleLine(Long categoryId, String accountCode, String side, String description, BigDecimal quantity, String unit,
+                             BigDecimal amount, Long costObjectId, Long farmId, Long partyId, Long assetId) {}
+
+    /**
+     * A record built by another module (payroll, asset disposal, depreciation run). {@code total} is required; {@code periodFrom}
+     * and {@code periodTo} are set for pay runs; {@code assetId} tags the record to an asset.
+     */
+    public record ModuleRecord(DocType type, LocalDate docDate, Long partyId, Long farmId, Long financialAccountId, LocalDate periodFrom,
+                               LocalDate periodTo, Long assetId, BigDecimal total, String notes, String referenceNo, List<ModuleLine> lines) {}
 
     /** Writes a stock record's movements once its lines exist, and returns its journal lines (empty when it has no value). */
     @FunctionalInterface
@@ -176,8 +215,9 @@ public class DocumentService {
             }
             if (l.categoryId() == null) throw ApiException.badRequest("CATEGORY_REQUIRED", "Choose a category or a stock item.");
             Category c = invoiceCategory(ctx, type, l.categoryId());
+            if (l.assetId() != null) requireAsset(ctx.tenantId(), l.assetId());
             lines.add(new NewLine(c.id(), c.accountCode(), null, trim(l.description()), l.quantity(), trim(l.unit()), l.rate(), amount,
-                    l.costObjectId(), l.farmId(), null, null, null));
+                    l.costObjectId(), l.farmId(), null, null, null, null, null, null, null, null, l.assetId()));
         }
         return lines;
     }
@@ -435,6 +475,33 @@ public class DocumentService {
     }
 
     /**
+     * Records and posts a payroll, asset or depreciation record built by its module (workforce design W1–W3, G9, G11). The
+     * module validates the request and supplies {@code poster}, which writes its own rows and returns the journal.
+     */
+    @Transactional
+    public Document recordModule(TenantContext ctx, ModuleRecord r, String key, Object request, StockPoster poster) {
+        if (!r.type().isModuleRecord() || r.type().isStockRecord()) throw new IllegalArgumentException(r.type() + " is not a module record");
+        Optional<Document> replay = replay(ctx, key, r.type(), request);
+        if (replay.isPresent()) return replay.get();
+        settings.ensureDefaults(ctx.tenantId());
+        settings.requireOpen(ctx.tenantId(), r.docDate());
+        if (r.partyId() != null) master.requireParty(ctx.tenantId(), r.partyId());
+        if (r.financialAccountId() != null) master.requireFinancialAccount(ctx.tenantId(), r.financialAccountId(), true);
+        if (r.farmId() != null) master.requireFarm(ctx.tenantId(), r.farmId());
+        List<NewLine> lines = r.lines().stream().map(l -> new NewLine(l.categoryId(), l.accountCode(), l.side(), trim(l.description()), l.quantity(),
+                l.unit(), null, l.amount(), l.costObjectId(), l.farmId(), l.partyId(), null, null, null, null, null, null, null, l.assetId())).toList();
+        Header h = new Header(r.type(), r.docDate(), null, r.partyId(), r.farmId(), r.financialAccountId(), null, null, money(r.total()), null, null,
+                trim(r.notes()), trim(r.referenceNo()), r.periodFrom(), r.periodTo(), r.assetId());
+        long id = insert(ctx, h, lines, "POSTED", key, hash(r.type(), request));
+        List<Long> lineIds = jdbc.sql("select id from sf_finance_document_lines where document_id = :id and tenant_id = :t order by line_no")
+                .param("id", id).param("t", ctx.tenantId()).query(Long.class).list();
+        List<JournalLine> journal = posting.fromParts(ctx.tenantId(), poster.post(id, lineIds), costObjects.overhead(ctx.tenantId()));
+        posting.write(ctx.tenantId(), id, r.docDate(), "POSTING", journal);
+        markPosted(ctx, id, r.type(), r.docDate(), h.total());
+        return document(ctx, id);
+    }
+
+    /**
      * Records and posts a stock record (issue, transfer, wastage, count, farm produce, returns). The stock module
      * validates the request and supplies {@code poster}, which writes the movements and returns the journal. Returns
      * with a party are matched to the original bill or sale first, then to the party's oldest open ones.
@@ -452,8 +519,9 @@ public class DocumentService {
         List<NewLine> lines = r.lines().stream().map(l -> new NewLine(l.categoryId(), l.accountCode(), null, trim(l.description()), l.quantity(),
                 l.unit(), l.rate(), l.amount(), l.costObjectId(), null, null, null, null, l.itemId(), l.locationId(), trim(l.lotNo()),
                 l.lotExpiry(), l.baseQuantity())).toList();
+        if (r.assetId() != null) requireAsset(ctx.tenantId(), r.assetId());
         Header h = new Header(r.type(), r.docDate(), null, r.partyId(), r.farmId(), r.partyId() == null ? r.financialAccountId() : null,
-                null, null, r.total() == null ? ZERO : money(r.total()), null, null, trim(r.notes()), trim(r.referenceNo()));
+                null, null, r.total() == null ? ZERO : money(r.total()), null, null, trim(r.notes()), trim(r.referenceNo()), null, null, r.assetId());
         long id = insert(ctx, h, lines, "POSTED", key, hash(r.type(), request));
         List<Long> lineIds = jdbc.sql("select id from sf_finance_document_lines where document_id = :id and tenant_id = :t order by line_no")
                 .param("id", id).param("t", ctx.tenantId()).query(Long.class).list();
@@ -619,6 +687,7 @@ public class DocumentService {
             jdbc.sql("update sf_payment_allocations set removed_at = now(), removed_by = :u where source_document_id = :id and removed_at is null")
                     .param("u", ctx.userId()).param("id", id).update();
         }
+        for (ReversalGuard guard : reversalGuards) guard.checkReversal(ctx, id, d.type());
         if (d.type().isInvoice() || d.type().isStockRecord() || d.type() == DocType.OPENING_BALANCE) {
             List<JournalPart> corrections = stock.reverse(ctx, id, date);
             posting.reverse(ctx.tenantId(), id, date, posting.fromParts(ctx.tenantId(), corrections, costObjects.overhead(ctx.tenantId())));
@@ -684,7 +753,7 @@ public class DocumentService {
         List<DocumentLine> lines = jdbc.sql("""
                         select l.id, l.line_no, l.category_id, c.code, c.name, l.account_code, l.side, l.description, l.quantity, l.unit, l.rate,
                                l.amount, l.cost_object_id, co.name, l.farm_id, l.party_id, l.financial_account_id, l.loan_id,
-                               l.item_id, si.name, l.location_id, l.lot_no, l.base_quantity
+                               l.item_id, si.name, l.location_id, l.lot_no, l.base_quantity, l.asset_id
                         from sf_finance_document_lines l
                         left join sf_finance_categories c on c.id = l.category_id
                         left join sf_cost_objects co on co.id = l.cost_object_id and co.tenant_id = l.tenant_id
@@ -695,7 +764,7 @@ public class DocumentService {
                         rs.getString(6), rs.getString(7), rs.getString(8), rs.getBigDecimal(9), rs.getString(10), rs.getBigDecimal(11),
                         rs.getBigDecimal(12), (Long) rs.getObject(13), rs.getString(14), (Long) rs.getObject(15), (Long) rs.getObject(16),
                         (Long) rs.getObject(17), (Long) rs.getObject(18), (Long) rs.getObject(19), rs.getString(20), (Long) rs.getObject(21),
-                        rs.getString(22), rs.getBigDecimal(23)))
+                        rs.getString(22), rs.getBigDecimal(23), (Long) rs.getObject(24)))
                 .list();
         List<Allocation> allocations = jdbc.sql("""
                         select a.id, a.source_document_id, s.number, s.doc_type, a.target_document_id, t.number, t.doc_type, a.amount, a.allocation_date
@@ -761,14 +830,14 @@ public class DocumentService {
         long id = jdbc.sql("""
                         insert into sf_finance_documents (tenant_id, doc_type, status, doc_date, due_date, party_id, farm_id, financial_account_id,
                           to_financial_account_id, loan_id, total_amount, principal_amount, interest_amount, notes, reference_no,
-                          idempotency_key, request_hash, created_by)
+                          idempotency_key, request_hash, created_by, period_from, period_to, asset_id)
                         values (:t, :type, :status, :date, :due, :party, :farm, :fin, :toFin, :loan, :total, :principal, :interest, :notes, :ref,
-                          :key, :hash, :u) returning id""")
+                          :key, :hash, :u, :pFrom, :pTo, :asset) returning id""")
                 .param("t", ctx.tenantId()).param("type", h.type().name()).param("status", initialStatus).param("date", h.docDate())
                 .param("due", h.dueDate()).param("party", h.partyId()).param("farm", h.farmId()).param("fin", h.financialAccountId())
                 .param("toFin", h.toFinancialAccountId()).param("loan", h.loanId()).param("total", h.total()).param("principal", h.principal())
                 .param("interest", h.interest()).param("notes", h.notes()).param("ref", h.referenceNo()).param("key", key)
-                .param("hash", requestHash).param("u", ctx.userId())
+                .param("hash", requestHash).param("u", ctx.userId()).param("pFrom", h.periodFrom()).param("pTo", h.periodTo()).param("asset", h.assetId())
                 .query(Long.class).single();
         insertLines(ctx, id, lines);
         return id;
@@ -780,14 +849,14 @@ public class DocumentService {
             jdbc.sql("""
                             insert into sf_finance_document_lines (tenant_id, document_id, line_no, category_id, account_code, side, description,
                               quantity, unit, rate, amount, cost_object_id, farm_id, party_id, financial_account_id, loan_id,
-                              item_id, location_id, lot_no, lot_expiry, base_quantity)
+                              item_id, location_id, lot_no, lot_expiry, base_quantity, asset_id)
                             values (:t, :d, :no, :cat, :acc, :side, :desc, :qty, :unit, :rate, :amount, :co, :farm, :party, :fin, :loan,
-                              :item, :loc, :lot, :expiry, :baseQty)""")
+                              :item, :loc, :lot, :expiry, :baseQty, :asset)""")
                     .param("t", ctx.tenantId()).param("d", documentId).param("no", no++).param("cat", l.categoryId()).param("acc", l.accountCode())
                     .param("side", l.side()).param("desc", l.description()).param("qty", l.quantity()).param("unit", l.unit()).param("rate", l.rate())
                     .param("amount", l.amount()).param("co", l.costObjectId()).param("farm", l.farmId()).param("party", l.partyId())
                     .param("fin", l.financialAccountId()).param("loan", l.loanId()).param("item", l.itemId()).param("loc", l.locationId())
-                    .param("lot", l.lotNo()).param("expiry", l.lotExpiry()).param("baseQty", l.baseQuantity())
+                    .param("lot", l.lotNo()).param("expiry", l.lotExpiry()).param("baseQty", l.baseQuantity()).param("asset", l.assetId())
                     .update();
         }
     }

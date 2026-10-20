@@ -13,8 +13,8 @@ public enum FarmModule {
     AQUACULTURE(false),
     ORGANIC(false),
     PROCESSING(false),
-    WORKFORCE(false),
-    ASSETS(false);
+    WORKFORCE(true),
+    ASSETS(true);
 
     private final boolean available;
 

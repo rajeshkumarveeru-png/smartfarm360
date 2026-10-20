@@ -59,7 +59,11 @@ public final class StockDtos {
 
     /** Using stock on an activity (a crop cycle) or on the farm in general (no cost object). */
     public record IssueRequest(@NotNull LocalDate docDate, Long locationId, Long costObjectId, Long farmId,
-                               @NotEmpty @Size(max = 100) List<@Valid ItemQuantity> lines, @Size(max = 500) String notes) {}
+                               @NotEmpty @Size(max = 100) List<@Valid ItemQuantity> lines, @Size(max = 500) String notes, Long assetId) {
+        public IssueRequest(LocalDate docDate, Long locationId, Long costObjectId, Long farmId, List<ItemQuantity> lines, String notes) {
+            this(docDate, locationId, costObjectId, farmId, lines, notes, null);
+        }
+    }
 
     public record TransferRequest(@NotNull LocalDate docDate, @NotNull Long fromLocationId, @NotNull Long toLocationId,
                                   @NotEmpty @Size(max = 100) List<@Valid ItemQuantity> lines, @Size(max = 500) String notes) {}

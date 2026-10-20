@@ -71,7 +71,7 @@ public class StockRecordService {
         Long defaultCategory = systemCategory("OTHER_INPUTS");
         List<String> warnings = new ArrayList<>();
         Document doc = documents.recordStock(ctx, new StockRecord(DocType.STOCK_ISSUE, r.docDate(), null, r.farmId(), null, null, null, r.notes(),
-                null, List.of()), key, r, (id, lineIds) -> {
+                null, List.of(), r.assetId()), key, r, (id, lineIds) -> {
             lock(ctx, lines);
             Map<Long, BigDecimal> costByCategory = new LinkedHashMap<>();
             for (Resolved l : lines) {

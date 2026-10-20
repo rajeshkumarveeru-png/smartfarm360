@@ -37,7 +37,7 @@ public final class FinanceDtos {
 
     /** Balances are positive amounts; an advance is money paid/received before a bill/sale exists. */
     public record Party(long id, String name, String phone, String village, String notes, boolean customer, boolean supplier,
-                        boolean lender, boolean active, BigDecimal receivable, BigDecimal payable) {}
+                        boolean lender, boolean active, BigDecimal receivable, BigDecimal payable, boolean worker) {}
 
     public record Loan(long id, String name, long lenderPartyId, String lenderName, LocalDate startDate, BigDecimal outstanding) {}
 
@@ -60,10 +60,10 @@ public final class FinanceDtos {
                               @PositiveOrZero @Digits(integer = 14, fraction = 4) BigDecimal rate,
                               @Positive @Digits(integer = 12, fraction = 2) BigDecimal amount,
                               Long costObjectId, Long farmId, Long itemId, Long locationId, @Size(max = 60) String lotNo,
-                              LocalDate lotExpiry) {
+                              LocalDate lotExpiry, Long assetId) {
         public LineRequest(Long categoryId, String description, BigDecimal quantity, String unit, BigDecimal rate, BigDecimal amount,
                            Long costObjectId, Long farmId) {
-            this(categoryId, description, quantity, unit, rate, amount, costObjectId, farmId, null, null, null, null);
+            this(categoryId, description, quantity, unit, rate, amount, costObjectId, farmId, null, null, null, null, null);
         }
     }
 
@@ -146,7 +146,7 @@ public final class FinanceDtos {
     public record DocumentLine(long id, int lineNo, Long categoryId, String categoryCode, String categoryName, String accountCode,
                                String side, String description, BigDecimal quantity, String unit, BigDecimal rate, BigDecimal amount,
                                Long costObjectId, String costObjectName, Long farmId, Long partyId, Long financialAccountId, Long loanId,
-                               Long itemId, String itemName, Long locationId, String lotNo, BigDecimal baseQuantity) {}
+                               Long itemId, String itemName, Long locationId, String lotNo, BigDecimal baseQuantity, Long assetId) {}
 
     public record Allocation(long id, long sourceDocumentId, String sourceNumber, String sourceType, long targetDocumentId,
                              String targetNumber, String targetType, BigDecimal amount, LocalDate allocationDate) {}

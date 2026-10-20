@@ -13,3 +13,5 @@ databaseChangeLog:
       file: db/changelog/006-stock-core.yaml
   - include:
       file: db/changelog/007-crop-v2.yaml
+  - include:
+      file: db/changelog/008-workforce-assets.yaml

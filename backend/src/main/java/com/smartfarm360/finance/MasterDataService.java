@@ -126,7 +126,7 @@ public class MasterDataService {
     // ---- Parties ------------------------------------------------------------------------------------------------
 
     private static final String PARTY_SELECT = """
-            select p.id, p.name, p.phone, p.village, p.notes, p.is_customer, p.is_supplier, p.is_lender, p.active,
+            select p.id, p.name, p.phone, p.village, p.notes, p.is_customer, p.is_supplier, p.is_lender, p.active, p.is_worker,
                    coalesce((select sum(l.debit - l.credit) from sf_journal_lines l where l.tenant_id = p.tenant_id and l.party_id = p.id and l.account_code = '1100'), 0),
                    coalesce((select sum(l.credit - l.debit) from sf_journal_lines l where l.tenant_id = p.tenant_id and l.party_id = p.id and l.account_code = '2000'), 0)
             from sf_parties p""";
@@ -185,7 +185,7 @@ public class MasterDataService {
 
     private static Party party(java.sql.ResultSet rs) throws java.sql.SQLException {
         return new Party(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5), rs.getBoolean(6),
-                rs.getBoolean(7), rs.getBoolean(8), rs.getBoolean(9), rs.getBigDecimal(10), rs.getBigDecimal(11));
+                rs.getBoolean(7), rs.getBoolean(8), rs.getBoolean(9), rs.getBigDecimal(11), rs.getBigDecimal(12), rs.getBoolean(10));
     }
 
     // ---- Loans and cost objects ---------------------------------------------------------------------------------

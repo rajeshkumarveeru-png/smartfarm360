@@ -68,7 +68,7 @@ class PermissionIntegrationTest extends ApiIntegrationTest {
     void disabledModuleBlocksItsEndpointsAndUnavailableModulesCannotBeEnabled() throws Exception {
         put(base() + "/modules/CROP", owner, Map.of("enabled", false)).andExpect(status().isOk());
         get(base() + "/crops", owner).andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("MODULE_DISABLED"));
-        get("/api/v1/tenants", owner).andExpect(jsonPath("$[0].enabledModules").isEmpty());
+        get("/api/v1/tenants", owner).andExpect(jsonPath("$[0].enabledModules").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem("CROP"))));
 
         put(base() + "/modules/CROP", owner, Map.of("enabled", true)).andExpect(status().isOk());
         get(base() + "/crops", owner).andExpect(status().isOk());
@@ -97,7 +97,7 @@ class PermissionIntegrationTest extends ApiIntegrationTest {
         get("/api/v1/tenants", viewer).andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].roles").value(org.hamcrest.Matchers.contains("VIEWER")))
                 .andExpect(jsonPath("$[0].permissions").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem("FARM_WRITE"))))
-                .andExpect(jsonPath("$[0].enabledModules").value(org.hamcrest.Matchers.contains("CROP")));
+                .andExpect(jsonPath("$[0].enabledModules").value(org.hamcrest.Matchers.containsInAnyOrder("CROP", "WORKFORCE", "ASSETS")));
         get("/api/v1/roles", viewer).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(7));
     }
 }

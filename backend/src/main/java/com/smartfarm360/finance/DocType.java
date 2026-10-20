@@ -22,7 +22,12 @@ public enum DocType {
     PRODUCE_RECEIPT("PROD"),
     PURCHASE_RETURN("PRET"),
     SALE_RETURN("SRET"),
-    ALLOCATION("ALLOC");
+    ALLOCATION("ALLOC"),
+    ADVANCE("ADV"),
+    ADVANCE_REPAYMENT("ADVR"),
+    PAY_RUN("PAYRUN"),
+    WAGE_PAYMENT("WAGE"),
+    ASSET_DISPOSAL("DISP");
 
     private final String prefix;
 
@@ -37,6 +42,15 @@ public enum DocType {
     public boolean isStockRecord() {
         return this == STOCK_ISSUE || this == STOCK_TRANSFER || this == WASTAGE || this == STOCK_COUNT || this == PRODUCE_RECEIPT
                 || this == PURCHASE_RETURN || this == SALE_RETURN;
+    }
+
+    /**
+     * Records other modules build and post through {@link DocumentService#recordModule}: stock records, payroll
+     * (workforce design W1–W3) and asset disposals and depreciation runs (G9, G11).
+     */
+    public boolean isModuleRecord() {
+        return isStockRecord() || this == ADVANCE || this == ADVANCE_REPAYMENT || this == PAY_RUN || this == WAGE_PAYMENT
+                || this == ASSET_DISPOSAL || this == DEPRECIATION;
     }
 
     /** Records that settle bills or sales through allocations. */

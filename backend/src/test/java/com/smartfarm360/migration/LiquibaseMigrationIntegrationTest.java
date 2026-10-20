@@ -57,7 +57,9 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
                 "036-stock-guards-and-seed",
                 "037-stock-legacy-migration",
                 "038-crop-v2-schema",
-                "039-crop-v2-backfill");
+                "039-crop-v2-backfill",
+                "040-workforce-assets-schema",
+                "041-workforce-assets-seed");
     }
 
     @Test
@@ -77,7 +79,9 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
                 "sf_finance_documents", "sf_finance_document_lines", "sf_payment_allocations", "sf_journal_entries", "sf_journal_lines",
                 "sf_document_sequences",
                 "sf_units", "sf_stock_locations", "sf_stock_items", "sf_item_units", "sf_stock_lots", "sf_stock_movements", "sf_stock_balances",
-                "sf_crop_observations", "sf_weather_notes");
+                "sf_crop_observations", "sf_weather_notes",
+                "sf_workers", "sf_worker_rates", "sf_attendance", "sf_piece_work", "sf_assets", "sf_asset_depreciation", "sf_asset_usage",
+                "sf_maintenance_plans", "sf_maintenance_logs", "sf_pay_run_workers");
     }
 
     @Test
@@ -302,6 +306,29 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
                 .isEqualByComparingTo("2.4711");
         assertThatThrownBy(() -> db.update("update sf_cultivation_cycles set status = 'IN_PROGRESS' where id = ?", growing))
                 .hasMessageContaining("ck_sf_cycle_status");
+    }
+
+    @Test
+    void upgradingSwitchesOnWorkforceAndAssetsAndGrantsTheirPermissions() throws Exception {
+        DataSource legacy = newDatabase("legacy_wf_" + UUID.randomUUID().toString().replace("-", ""));
+        JdbcTemplate db = new JdbcTemplate(legacy);
+        runChangelog(legacy, 15); // everything before Phase 6 (changesets 025-039)
+        long tenant = db.queryForObject("insert into sf_tenants(name, slug) values ('Old farm', 'old-farm-wf') returning id", Long.class);
+        db.update("insert into sf_tenant_modules(tenant_id, module_code, enabled) values (?, 'CROP', true)", tenant);
+        long party = db.queryForObject("insert into sf_parties(tenant_id, name, is_supplier) values (?, 'Agro depot', true) returning id", Long.class, tenant);
+
+        runChangelog(legacy, null);
+
+        assertThat(db.queryForList("select module_code from sf_tenant_modules where tenant_id = ? and enabled", String.class, tenant))
+                .containsExactlyInAnyOrder("CROP", "WORKFORCE", "ASSETS");
+        assertThat(db.queryForObject("select is_worker from sf_parties where id = ?", Boolean.class, party)).isFalse();
+        assertThat(db.queryForList("select rp.permission_code from sf_role_permissions rp join sf_roles r on r.id = rp.role_id where r.code = 'FIELD_SUPERVISOR' " +
+                "and rp.permission_code in ('WORKFORCE_WRITE', 'PAYROLL_MANAGE', 'ASSETS_WRITE')", String.class)).containsExactlyInAnyOrder("WORKFORCE_WRITE", "ASSETS_WRITE");
+        assertThat(db.queryForList("select rp.permission_code from sf_role_permissions rp join sf_roles r on r.id = rp.role_id where r.code = 'WORKER' " +
+                "and rp.permission_code like 'WORKFORCE%'", String.class)).isEmpty();
+        // Pay types are checked by the database too
+        assertThatThrownBy(() -> db.update("insert into sf_workers(tenant_id, party_id, pay_type, joined_on) values (?, ?, 'HOURLY', current_date)", tenant, party))
+                .hasMessageContaining("pay_type");
     }
 
     @Test

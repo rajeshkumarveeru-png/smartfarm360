@@ -47,7 +47,7 @@ public class TenantService {
     @Transactional
     public TenantSummary create(CurrentUser user, CreateTenantRequest request) {
         Set<FarmModule> requested = request.modules() == null || request.modules().isEmpty()
-                ? EnumSet.of(FarmModule.CROP) : EnumSet.copyOf(request.modules());
+                ? EnumSet.of(FarmModule.CROP, FarmModule.WORKFORCE, FarmModule.ASSETS) : EnumSet.copyOf(request.modules());
         requested.forEach(TenantService::requireAvailable);
 
         SfTenant tenant = new SfTenant();
