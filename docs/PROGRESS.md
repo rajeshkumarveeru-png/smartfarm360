@@ -2,12 +2,10 @@
 
 ## Current state
 
-- **Phase:** 3 (finance core) complete on branch `feature/phase-3-finance` (based on `feature/phase-2-platform`).
-  Phase 4 (inventory, purchasing and sales) started on `feature/phase-4-inventory`: the stock movement design is
-  awaiting review; no Phase 4 code yet.
-- **Production readiness:** not ready. Authentication, roles, tenant isolation, audit and the finance core are in place
-  and tested, but no email provider is configured, hosting/backups are undecided, and stock quantities still change
-  without movement records (Phase 4).
+- **Phase:** 4 (inventory, purchasing and sales) complete on branch `feature/phase-4-inventory` (based on
+  `feature/phase-3-finance`). Next: Phase 5 (crop management v2).
+- **Production readiness:** not ready. Authentication, roles, tenant isolation, audit, the finance core and stock with
+  movements are in place and tested, but no email provider is configured and hosting/backups are undecided.
 
 ## Decisions
 
@@ -25,7 +23,7 @@
 | **Desktop (Electron) scope** | **Open** — kept working as is; needs a decision because it requires a local PostgreSQL | — |
 | **Tamil terminology reviewer** | **Open** — required before the first release | ADR 0008 |
 | Finance posting rules, D1–D12 | Approved as recommended (2026-10-20) | [posting rules](finance/posting-rules.md) |
-| **Stock movement design, E1–E12** | **Awaiting review** (draft 2026-10-20) | [stock movements](inventory/stock-movements.md) |
+| Stock movement design, E1–E12 | Approved as recommended (2026-10-20) | [stock movements](inventory/stock-movements.md) |
 | **Email provider** | **Open** — Phase 2 ships the `EmailSender` interface with a logging stub, as instructed. Reset and invitation emails are not delivered until a provider is chosen | ADR 0003 |
 
 ## Phase 1 — Baseline and hygiene (2026-10-19)
@@ -199,6 +197,59 @@ and read-endpoint tests were added.
 
 Not verified: GitHub Actions (nothing pushed); Electron packaging; a real phone.
 
+## Phase 4 — Inventory, purchasing and sales (2026-10-20)
+
+Commits on `feature/phase-4-inventory`: `8688193`, `67041de` (design), `5fdbc12` (backend and web), `7334594` (mobile),
+plus the verification and docs commit.
+
+### Features completed
+
+- **Approved stock movement design** implemented (E1–E12 as recommended): unit catalog (mass, volume, count, length,
+  area) with each item kept in one base unit and its own pack units (bag = 45 kg); items (input, farm produce, bought to
+  sell) with reorder level, lots and default categories; locations with a default *Main store*; lots with expiry.
+- **Movements:** append-only (a database trigger refuses edits), on-hand per item, location and lot updated in the same
+  transaction under row locks, moving-average value per item, no negative stock, the last unit out takes the
+  remaining value.
+- **Records** (all finance records: numbered, lock-date checked, idempotent, audited, reversible): item lines on bills
+  (stock at cost, not an expense) and sales (cost of goods sold at average), use on an activity, transfers, wastage,
+  stock counts, farm produce at nil value, returns to suppliers and from customers, opening stock.
+- **Reports:** stock on hand (by location and lot), value on any date, item movement history with running balance,
+  ledger reconciliation (Stock 1200 = stock value), low-stock and expiry alerts, CSV exports (E9).
+- **Web:** new *Stock* section (overview, items, item detail, locations, reports, a form for every stock record);
+  item lines and opening stock in the finance forms; record pages show stock movements and offer returns.
+- **Mobile:** stock view with value, quantities in base and pack units, low-stock and expiry alerts on the home screen.
+- **Retired:** `/suppliers`, `/inventory/items`, `/purchases` and the *Stock & purchases* page (E12).
+
+### Database migrations
+
+`006-stock-core.yaml`: `035-stock-schema`, `036-stock-guards-and-seed`, `037-stock-legacy-migration`. The migration
+turns Phase 1 items and purchases into stock items and movements, links each purchase to its bill, records opening
+stock (Dr 1200 / Cr 3900), records any shortfall as a stock count to review, verifies inside the changeset that
+quantities, values and the Stock (1200) balance agree, and makes `sf_inventory_items`, `sf_purchases` and
+`sf_suppliers` read-only. Applied to the local database on 2026-10-20 after a `pg_dump` backup; the local database had
+no Phase 1 stock rows.
+
+### APIs added
+
+All under `/api/v1/tenants/{tenantId}/stock`: units, items (list, create, detail, update, pack units, lots, movements,
+movements.csv), locations (list, create, update), issues, transfers, wastage, counts, produce, purchase-returns,
+sale-returns, and reports (on-hand, on-hand.csv, valuation, valuation.csv, reconciliation, alerts). Finance bills,
+sales and opening balances accept item lines. Reads need `INVENTORY_READ`; stock records `INVENTORY_WRITE`; returns
+`FINANCE_WRITE`; reversals `FINANCE_REVERSE` (through the finance API).
+
+### Tests and evidence
+
+| Command | Result |
+|---|---|
+| `backend: gradlew test bootJar` | Passed: **297 tests, 0 failures**, including the golden July scenario (every figure in section 7 of the stock design), 18 stock rule tests (units, negative stock, last-unit value, transfers, reversal with corrections, sales and drafts, lots and expiry, farm produce, counts, returns both ways, opening stock, idempotent retries, two concurrent issues, lock date, permissions, alerts, CSV safety), stock invariants checked after every stock test, the Phase 1 stock migration test (opening, shortfall, unknown units, duplicate names, ledger = store, read-only tables), and 202 generated cross-tenant cases (101 tenant endpoints) plus object-level cross-tenant stock checks |
+| `frontend: npm run lint`, `tsc --noEmit`, `npm run build` | Passed |
+| `frontend: npx vitest run` | Passed: **31 tests** (catalog test covers every new error code and audit action in English and Tamil) |
+| `mobile: npm run typecheck`, `npm test`, `expo install --check` | Passed: **17 tests** |
+| Manual browser check (backend :8081 on local PostgreSQL 18, Vite :5174) | Migrations 035–037 applied to the local database; item *Urea* with bag = 45 kg created; bill for 10 bags × ₹270 → `BILL/2026-27/0002`, +450 kg ₹2,700; use of 300 kg → `ISSUE/2026-27/0001`, ₹1,800 at ₹6/kg; overview 150 kg ₹900; item history with running balance; reconciliation ₹900 = ₹900; Tamil screens. Backend log: 0 errors, no secrets |
+
+Not verified: GitHub Actions (nothing pushed); Electron packaging; a real phone; CSV download in the browser (covered
+by API tests).
+
 ## Known gaps and defects
 
 Security and platform:
@@ -210,10 +261,13 @@ Security and platform:
 - Tamil strings are unreviewed (`shared/i18n/ta.json` → `_meta.reviewStatus`).
 
 Finance and stock:
-- Stock quantities still change without movement records and crop activities do not consume stock (Phase 4–5).
+- Crop activities do not consume stock yet and harvests are not stock lots yet (Phase 5); produce goes into stock
+  with the *farm produce* record.
+- No purchase orders (E8, deferred); XLSX/PDF exports arrive with Phase 7 (CSV only now).
+- An item's default categories can be changed but not cleared; negative stock cannot be allowed per tenant yet.
 - Crop activity `cost` and harvest `sale_value` remain memo fields outside the accounts (D7); they are replaced in Phase 5.
 - No overhead allocation runs or internal transfers yet (P16/P17); depreciation is entered by hand until Phase 6.
-- No report exports yet (Phase 7). Crop and stock API responses are still untyped maps without paging.
+- Finance report exports arrive in Phase 7. Crop API responses are still untyped maps without paging.
 - Removing a match after a later report date is not reflected historically in dues ageing (matches have no history).
 
 Clients:

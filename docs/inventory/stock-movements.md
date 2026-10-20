@@ -1,6 +1,6 @@
 # Stock movement design (Phase 4)
 
-- Status: **Draft for product-owner review** (2026-10-20). No Phase 4 code is written until this is approved.
+- Status: **Approved** (2026-10-20): E1–E12 as recommended. Implemented in Phase 4; see section 14 for implementation notes.
 - Builds on: [ADR 0005 — Inventory movements and valuation](../adr/0005-inventory-valuation.md) and the approved
   [finance posting rules](../finance/posting-rules.md) (Stock is ledger account 1200; D3 values farm-produced stock at nil).
 - Decisions marked **E1–E12** need an answer; each has a recommendation.
@@ -159,7 +159,7 @@ Finance document types are extended (stock issue, transfer, wastage, count adjus
 return, customer return), and bill/sale lines gain item, unit and location columns. All tables carry `tenant_id` with
 composite tenant foreign keys.
 
-## 12. Decisions needed
+## 12. Decisions (approved as recommended, 2026-10-20)
 
 | # | Question | Recommendation |
 |---|---|---|
@@ -185,3 +185,35 @@ history, ledger reconciliation and CSV exports; web stock screens and mobile sto
 verified legacy migration. Tests: section 7 as a golden scenario, on-hand = Σ movements and 1200 = stock value as
 invariants after every test, negative-stock refusal, concurrent issues, reversal, unit conversion and rounding,
 cross-tenant and permission tests for every new endpoint.
+
+## 14. Implementation notes (Phase 4)
+
+Choices made while building, within the approved decisions. None changes a figure in section 7, which the golden
+test (`StockGoldenScenarioTest`) reproduces exactly.
+
+- **Where things live.** Finance owns records, numbering, journal and reversal; the stock module owns items, units,
+  locations, lots and movements. Finance reaches stock only through the `StockHook` interface it defines, so the module
+  boundary (finance never depends on stock) still holds.
+- **Item totals.** The item row keeps the item-wide quantity and value (one average per item, E2); per location and lot
+  only the quantity is kept. A location's share of value in reports is its quantity at the item's average cost.
+- **Reversing stock that came in at a different average.** A reversal takes stock out at its original value, except
+  when that would leave value with no quantity (or a negative value). Then it takes what is there, and the difference is
+  posted in the reversal entry against farm inputs (5000), cost of goods sold (5700) for customer returns, or losses
+  (5980) for counts and wastage, so the ledger still equals the store. If the stock has already been used, sold or
+  moved, the reversal is refused (`STOCK_ALREADY_USED`); record a return or a count instead.
+- **Count surplus with nothing on hand** is valued at the item's last purchase cost (0 if it was never bought).
+- **Lots.** Lot numbers are required on every movement of an item that tracks lots. A lot's expiry is set when it is
+  first received. Expiry warnings cover 30 days; the screens list lots first-expiring-first.
+- **Returns.** A supplier return reduces the party's payable and is matched first to the bill it names, then to the
+  party's oldest open bills; a cash refund goes to a cash or bank account. A customer return must name the sale: stock
+  comes back at the value it left with, in proportion, and the last units take exactly what is left.
+- **Cash-basis view.** It counts money for categories, so cost of goods sold (non-cash) is left out and a cash refund
+  of a cash sale reduces revenue. Stock bought is not a cost in either view.
+- **Item categories.** Using stock posts to the item's farm-input category (account 5000), or *Other inputs* when none
+  is set. An item line on a sale uses the line's category, or the item's sale category.
+- **Phase 1 data.** Opening stock is dated when the item was created (never after its first purchase). Where the Phase 1
+  quantity was below what had been bought, the migration records the shortfall as a stock count to review
+  (Dr 5980 / Cr 1200 at purchase cost) instead of inventing an opening value; the item and record are marked
+  *needs review*. Phase 1 names that differed only in case get the old id appended (for example "urea (14)").
+- **Exports.** CSV files start with a byte-order mark so spreadsheet programs read Tamil correctly, and text starting
+  with `=`, `+`, `-` or `@` is prefixed with `'` so it cannot run as a formula.

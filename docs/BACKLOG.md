@@ -24,12 +24,14 @@ Deferred from Phase 3:
 - CSV/XLSX/PDF exports of reports → Phase 7.
 - GST (D12) → with processing and trading.
 
-## Phase 4 — Inventory, purchasing and sales
+## Phase 4 — Inventory, purchasing and sales ✅ (see PROGRESS.md)
 
-- Units catalog, items, lots/expiry, locations, append-only movements, on-hand projection (ADR 0005).
-- Multi-line purchases and sales, customers, returns, wastage, adjustments, transfers, low-stock alerts, exports.
-- Migrate `sf_inventory_items` quantities to opening balances and `sf_purchases` into purchase documents.
-- **Accept when:** on-hand always equals sum of movements under concurrent writes; no duplicate movements on retry.
+Deferred from Phase 4:
+- Purchase orders (E8) → when traders need them.
+- Tenant setting to allow negative stock; clearing an item's default categories.
+- XLSX/PDF stock exports → Phase 7 (CSV exists).
+- Stock records from the phone (the mobile app shows stock; recording is web-only) → Phase 13.
+- Harvests as stock lots and activities consuming stock → Phase 5.
 
 ## Phase 5 — Crop management v2
 
