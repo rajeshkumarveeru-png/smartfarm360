@@ -101,7 +101,8 @@ export default function AttendancePage() {
                   const working = e.status === 'PRESENT' || e.status === 'HALF_DAY';
                   return (
                     <tr key={w.workerId}>
-                      <td>{w.workerName}<small> · {t(`payType.${w.payType}`)}</small>{w.locked && <small className="low-stock-label"> · {t('paid')}</small>}</td>
+                      <td>{w.workerName}<small> · {t(`payType.${w.payType}`)}</small>{w.locked && <small className="low-stock-label"> · {t('paid')}</small>}
+                        {w.paidByBill && <small className="low-stock-label"> · {t('paidByBill')}</small>}</td>
                       <td><select aria-label={t('statusFor', { name: w.workerName })} disabled={disabled} value={e.status} onChange={ev => set(w.workerId, { status: ev.target.value as AttendanceStatus | '' })}>
                         <option value="">—</option>{ATTENDANCE.map(s => <option key={s} value={s}>{t(`status.${s}`)}</option>)}</select></td>
                       <td><select aria-label={t('workedOnFor', { name: w.workerName })} disabled={disabled || !working} value={e.costObjectId} onChange={ev => set(w.workerId, { costObjectId: ev.target.value })}>

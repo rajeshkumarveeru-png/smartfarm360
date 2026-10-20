@@ -2,9 +2,8 @@
 
 ## Current state
 
-- **Phase:** 5 (crop management v2) complete on branch `feature/phase-5-crops` (based on `feature/phase-4-inventory`).
-  Phase 6 (workforce and assets) started on `feature/phase-6-workforce`: the workforce and assets design is awaiting
-  review; no Phase 6 code yet.
+- **Phase:** 6 (workforce and assets) complete on branch `feature/phase-6-workforce` (based on `feature/phase-5-crops`).
+  Next: Phase 7 (dashboard and core reports). Nothing is pushed yet.
 - **Production readiness:** not ready. Authentication, roles, tenant isolation, audit, the finance core and stock with
   movements are in place and tested, but no email provider is configured and hosting/backups are undecided.
 
@@ -313,6 +312,144 @@ shapes; cycle, activity and harvest lists are paged.
 Not verified: GitHub Actions (nothing pushed); Electron packaging; a real phone; CSV downloads in the browser (covered
 by API tests).
 
+## Phase 6 — Workforce and assets (2026-10-20)
+
+Commits on `feature/phase-6-workforce` (based on `feature/phase-5-crops`):
+
+- `c703473`: design.
+- `a90b032`: backend.
+- `ee4be0e`: web.
+- `8186d97`: mobile.
+- A final commit: verification, the G7 warning and docs.
+
+### Features completed
+
+- **Approved design.** [workforce and assets](workforce/workforce-and-assets.md) is implemented with G1–G15 as recommended.
+  Implementation notes are in section 14 of the design.
+- **Workers** (G1, G2):
+  - Each worker is a party, so wages owed sit on 2100 and advances on 1150 in that party's ledger.
+  - Pay types are daily, monthly or piece rate, with dated rates.
+  - Leaving is refused while wages or an advance are outstanding. A worker can rejoin.
+- **Attendance** (G3, G7):
+  - The daily muster roll records present, half day, absent, paid leave or unpaid leave, with the crop worked on.
+  - Two quick actions: "all present" and "all present on <crop>".
+  - Piece work is recorded by quantity.
+  - A day is locked once a posted pay run covers it.
+  - The muster warns when a worker is also on a labour bill for the same day.
+- **Pay runs** (G4, G5):
+  - Each run is previewed, then posted.
+  - Labour cost goes to each crop by days worked; the rest goes to overhead.
+  - Extras can be added.
+  - A worker can be in only one pay run per period.
+  - Monthly workers are paid for whole calendar months only.
+  - A pay run is reversible until wages are paid against it.
+- **Wage payments and advances** (W1–W3):
+  - Each worker's payment is its own record, and it recovers their advance.
+  - Advances can also be repaid in cash.
+  - Each worker has a statement.
+  - Reports cover labour by crop and the month's attendance.
+  - Wages and advances are reconciled with the ledger.
+- **Assets** (G8–G13):
+  - An asset can be bought on a bill and registered in one step.
+  - Costs already on Farm assets (1300), from bills or opening balances, can be registered.
+  - Depreciation is monthly straight-line, posted as runs in month order and reversible from the latest month.
+  - Breeding animals are registered but not depreciated.
+  - Selling or scrapping posts the gain to 4900 or the loss to 5980.
+  - Each asset has a use log, maintenance plans by days or hours (due and overdue), and a maintenance log.
+  - Running costs come from bills and stock issues tagged with the asset, and give a cost per hour.
+  - The register is reconciled against 1300 and 1310 and can be exported as CSV.
+- **Modules and permissions** (G14):
+  - *Workforce* and *Assets* are on for every farm business.
+  - New permissions: `WORKFORCE_READ`, `WORKFORCE_WRITE`, `PAYROLL_MANAGE`, `ASSETS_READ`, `ASSETS_WRITE`.
+  - Depreciation runs and disposals need `FINANCE_MANAGE`.
+- **Web:**
+  - New *Workers & wages* section: attendance, workers, worker page, pay, reports.
+  - New *Assets* section: register, asset page, depreciation, maintenance.
+  - An optional "for asset" field on expense bill lines and stock issues.
+- **Mobile** (G15):
+  - Workers screen under *More*: mark the day's attendance (all present, or per worker, with the crop).
+  - It shows what each worker is owed and the advance still to recover.
+  - Online only.
+
+### Database migrations
+
+`008-workforce-assets.yaml` contains two changesets:
+
+- `040-workforce-assets-schema`:
+  - Adds the worker, rate, attendance, piece-work, pay-run-worker, asset, depreciation, usage and maintenance tables.
+  - Adds `is_worker` on parties.
+  - Adds `asset_id` on finance documents and lines.
+  - Extends the document type and period checks.
+- `041-workforce-assets-seed`: permissions, role grants, and both modules turned on for every tenant.
+
+These were applied to the local database on 2026-10-20, after a `pg_dump` backup (`smartfarm360-before-phase6.backup`).
+No business data was changed. A new migration test upgrades a database from changeset 015 to the latest.
+
+### APIs added
+
+Under `/api/v1/tenants/{tenantId}/workforce`:
+
+- `GET|POST /workers`, `GET|PATCH /workers/{id}`, `POST /workers/{id}/rates`, `GET /workers/{id}/statement`
+- `GET|PUT /attendance/{date}`, `GET /attendance-sheet`
+- `GET|POST /piece-work`, `DELETE /piece-work/{id}`
+- `POST /advances`, `POST /advance-repayments`
+- `POST /pay-runs/preview`, `POST /pay-runs`
+- `POST /wage-payments`
+- `GET /reports/labour`, `GET /reports/reconciliation`
+
+Under `/api/v1/tenants/{tenantId}/assets`:
+
+- `GET|POST /`, `GET|PATCH|DELETE /{id}`, `POST /purchases`, `GET /unregistered`
+- `GET /{id}/schedule`, `POST /{id}/disposal`
+- `GET|POST /depreciation-runs`, `POST /depreciation-runs/preview`
+- `GET|POST /{id}/usage`, `DELETE /usage/{id}`
+- `GET /maintenance-plans`, `GET|POST /{id}/maintenance-plans`, `PUT /maintenance-plans/{id}`
+- `GET|POST /{id}/maintenance`, `GET /{id}/costs`
+- `GET /reports/reconciliation`, `GET /reports/register.csv`
+
+Changed: bill lines and stock issues accept an optional `assetId`.
+
+### Tests and evidence
+
+| Command | Result |
+|---|---|
+| `backend: gradlew test --rerun bootJar` | Passed: **460 tests, 0 failures** (see below) |
+| `frontend: npm run lint`, `tsc --noEmit`, `npm run build` | Passed; the bundle is still over 500 kB |
+| `frontend: npm test` | Passed: **42 tests**, including 7 new workforce and asset screen tests and the catalog completeness test |
+| `mobile: npm run typecheck`, `npm test`, `npx expo install --check` | Passed: **26 tests**, including 5 new attendance and balance tests |
+| Manual browser check | Passed (see below) |
+
+The backend run includes:
+
+- The golden scenario from section 7 of the design. Every figure is asserted: labour by crop, operating costs, other
+  income, cash flow, the tractor's book value, and an unexplained reconciliation difference of 0.
+- 8 workforce rule tests: pay arithmetic, locking, advances, retries, attendance and the G7 warning, permissions.
+- 7 asset rule tests: schedules, first and last month, catch-up and reversal, disposal gain and loss, breeding animals,
+  maintenance, reconciliation.
+- The upgrade migration test.
+- 9 module-boundary rules.
+- Generated cross-tenant cases for every tenant endpoint, including the new ones.
+
+The manual browser check ran against backend :8081 on local PostgreSQL 18, with Vite on :5174:
+
+- Migrations 040–041 were applied.
+- Worker *Murugan* was added at ₹500 a day and marked "all present on Samba 2026" for 20 Oct.
+- A pay run was previewed and posted: ₹500, all of it to Samba 2026.
+- ₹500 was paid from *Cash in hand*.
+- The labour report showed Samba 2026: 1 day, ₹500, and the workforce reconciliation agreed.
+- *Power sprayer* was bought for ₹12,000 cash and registered with a 60-month life, giving ₹200 a month.
+- The journal balances to ₹0.00.
+- The backend log shows 0 errors and no secret values.
+- One wording defect was found and fixed ("1 payments recorded").
+
+Not verified:
+
+- GitHub Actions (nothing has been pushed).
+- A real phone.
+- A depreciation run on the local database (the sprayer's first month, November, has not ended yet; runs are covered by
+  the API tests).
+- CSV download in the browser (covered by API tests).
+
 ## Known gaps and defects
 
 Security and platform:
@@ -329,12 +466,15 @@ Finance and stock:
 - Phase 1 crop activity `cost` and harvest `sale_value` stay memo history outside the accounts (D7, F4).
 - Crop photos wait for attachment storage (ADR 0009); weather comes only from farmer entries.
 - The web bundle is over 500 kB; split the bundle by section before production.
-- No internal transfers of own produce or manure yet (P17, Phases 5 → 11); depreciation is entered by hand until Phase 6.
+- No internal transfers of own produce or manure yet (P17, Phases 5 → 11); monthly depreciation runs arrived in Phase 6.
 - Finance report exports arrive in Phase 7.
+- Payroll has no PF, ESI, TDS or minimum-wage rules (G6). There is no WDV depreciation and no machine-hour allocation to
+  crops (G9, G12). Breeding animals are not depreciated until the livestock phases (G10). Recurring expenses are still
+  open.
 - Removing a match after a later report date is not reflected historically in dues ageing (matches have no history).
 
 Clients:
-- Mobile money entries wait on the phone when offline; crop recording is online only (offline in Phase 13). The
+- Mobile money entries wait on the phone when offline; crop recording and attendance are online only (offline in Phase 13). The
   livestock tab is still a placeholder until the livestock modules (Phases 8–12).
 
 Tooling (left unchanged by policy — user scripts):

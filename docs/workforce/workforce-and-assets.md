@@ -1,6 +1,6 @@
 # Workforce and assets design (Phase 6)
 
-- Status: **Draft for product-owner review** (2026-10-20). No Phase 6 code is written until this is approved.
+- Status: **Approved** (2026-10-20, G1–G15 as recommended) and implemented on `feature/phase-6-workforce`; see section 14.
 - Builds on: the approved [finance posting rules](../finance/posting-rules.md) (accounts 1150 Advances to workers,
   2100 Wages payable, 1300 Farm assets, 1310 Accumulated depreciation, 4900 Gain on sale, 5100 Labour, 5800
   Depreciation, 5980 Losses; D8), the [stock design](../inventory/stock-movements.md) and the
@@ -211,3 +211,33 @@ attendance in Tamil and English. Tests: section 7 as a golden scenario, pay-run 
 locking, advance recovery, depreciation schedules (first and last month, salvage, disposal month, catch-up and
 reversal), disposal gain and loss, the ledger reconciliations, idempotent retries, cross-tenant and permission tests for
 every new endpoint.
+
+## 14. Implementation notes (2026-10-20)
+
+- **Modules.** `workforce` and `assets` are new backend packages. Only their own code uses them, and `workforce` does not
+  depend on `assets` (`ModuleBoundaryTest`). Finance stays independent of both. They post through
+  `DocumentService.recordModule`, which is allowed only for module record types (`DocType.isModuleRecord`).
+- **Reversal guards.** A new finance SPI, `ReversalGuard`, lets modules refuse a reversal that would break their records:
+  - `WAGES_ALREADY_PAID`: a pay run with payments after it;
+  - `ADVANCE_ALREADY_RECOVERED`: an advance already recovered;
+  - `DEPRECIATION_LATER_MONTHS`: a depreciation run with later months posted;
+  - `ASSET_DISPOSED`: depreciation of a sold asset;
+  - `ASSET_REGISTERED`: a bill whose cost is in the register.
+
+  The guards are separate beans, so there is no constructor cycle with `DocumentService`.
+- **Locking.** Attendance and piece work are locked once a pay run covering them is posted. This is derived from
+  `sf_pay_run_workers` and the document's status, so reversing the pay run unlocks them without a second flag.
+- **Pay run serialisation.** Posting locks the tenant row, so two pay runs posted at the same moment cannot overlap.
+- **G7 warning.** The muster flags a worker who is also on a posted labour bill (account 5100) addressed to their party for
+  the same day (`paidByBill`). Bills paid in cash with no party cannot be matched.
+- **Asset tags.** Expense bill lines and stock issues take an optional asset (`asset_id` on documents and lines). Asset
+  running costs and cost per hour use these tags (G12).
+- **Opening balances with depreciation.** An asset brought in through an opening balance has its earlier depreciation
+  entered as a manual depreciation record. It is then registered with `depreciationBefore` set to the same amount. The
+  register reconciliation shows manual depreciation as its own line, so the unexplained difference stays zero.
+- **Not built (by decision).** Not included in this phase:
+  - PF, ESI, TDS and minimum-wage rules (G6), a compliance gap before larger farms use payroll;
+  - WDV depreciation (G9);
+  - machine-hour cost allocation to crops (G12);
+  - depreciation of breeding animals, which waits for the livestock phase (G10);
+  - offline attendance on the phone, which waits for Phase 13.

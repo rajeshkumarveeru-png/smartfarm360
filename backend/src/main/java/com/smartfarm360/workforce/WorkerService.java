@@ -199,13 +199,20 @@ public class WorkerService {
                         where a.tenant_id = :t and a.work_date = :d""")
                 .param("t", ctx.tenantId()).param("d", date).query().listOfRows()
                 .forEach(r -> entries.put(((Number) r.get("worker_id")).longValue(), r));
+        // G7: a registered worker's day that is also on a posted labour bill would be paid twice
+        Set<Long> billed = new HashSet<>(jdbc.sql("""
+                        select distinct d.party_id from sf_finance_documents d join sf_finance_document_lines l on l.document_id = d.id and l.tenant_id = d.tenant_id
+                        where d.tenant_id = :t and d.doc_type = 'BILL' and d.status = 'POSTED' and d.doc_date = :d and d.party_id is not null
+                          and l.account_code = '5100'""")
+                .param("t", ctx.tenantId()).param("d", date).query(Long.class).list());
         List<AttendanceRow> rows = new ArrayList<>();
         for (WorkerRow w : workerRows(ctx.tenantId())) {
             Map<String, Object> e = entries.get(w.id());
             if (!w.employedOn(date) && e == null) continue;
             rows.add(new AttendanceRow(w.id(), w.name(), w.payType(), e == null ? null : (String) e.get("status"),
                     e == null ? null : (BigDecimal) e.get("hours"), e == null || e.get("cost_object_id") == null ? null : ((Number) e.get("cost_object_id")).longValue(),
-                    e == null ? null : (String) e.get("co_name"), e == null ? null : (String) e.get("notes"), locked(ctx.tenantId(), w.id(), date)));
+                    e == null ? null : (String) e.get("co_name"), e == null ? null : (String) e.get("notes"), locked(ctx.tenantId(), w.id(), date),
+                    billed.contains(w.partyId())));
         }
         return new Muster(date, rows);
     }

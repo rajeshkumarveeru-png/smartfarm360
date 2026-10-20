@@ -5,7 +5,7 @@ export type AttendanceStatus = 'PRESENT' | 'HALF_DAY' | 'ABSENT' | 'PAID_LEAVE' 
 export const ATTENDANCE: AttendanceStatus[] = ['PRESENT', 'HALF_DAY', 'ABSENT', 'PAID_LEAVE', 'UNPAID_LEAVE'];
 
 export type MusterRow = { workerId: number; workerName: string; payType: string; status: AttendanceStatus | null; hours: number | null;
-  costObjectId: number | null; costObjectName: string | null; locked: boolean };
+  costObjectId: number | null; costObjectName: string | null; locked: boolean; paidByBill?: boolean };
 export type Muster = { date: string; workers: MusterRow[] };
 export type WorkerBalance = { id: number; name: string; payType: string; owed: number; advance: number };
 export type Activity = { costObjectId: number; name: string };

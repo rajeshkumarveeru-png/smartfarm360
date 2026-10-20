@@ -19,8 +19,8 @@ Deferred from Phase 2 (not blocking Phase 3):
 
 Deferred from Phase 3:
 - Overhead allocation runs (P16) → Phase 5; internal transfers of produce/manure (P17) → Phases 5 and 11.
-- Asset register with depreciation schedules (manual depreciation records exist) → Phase 6.
-- Recurring expenses, worker advances and wages → Phase 6.
+- Asset register with depreciation schedules; worker advances and wages → done in Phase 6.
+- Recurring expenses → still open (not in the Phase 6 design); candidate for Phase 7.
 - CSV/XLSX/PDF exports of reports → Phase 7.
 - GST (D12) → with processing and trading.
 
@@ -42,12 +42,14 @@ Deferred from Phase 5:
 - Internal transfers of own produce/manure (P17) → Phase 11.
 - Decide whether field supervisors may record stock inputs (open question in PROGRESS).
 
-## Phase 6 — Workforce and assets
+## Phase 6 — Workforce and assets (done 2026-10-20)
 
-Design for review: [workforce and assets](workforce/workforce-and-assets.md) (G1–G15).
+Approved design: [workforce and assets](workforce/workforce-and-assets.md) (G1–G15). Left for later:
 
-- Workers, attendance, work logs, wages, advances and settlements, labour cost allocation.
-- Equipment registry, fuel, repairs, maintenance, useful life, depreciation postings.
+- PF, ESI, TDS and minimum-wage rules (G6) → before larger farms use payroll.
+- WDV depreciation and machine-hour cost allocation to crops (G9, G12).
+- Depreciation of breeding animals → livestock phases (G10).
+- Offline attendance on the phone → Phase 13.
 
 ## Phase 7 — Dashboard and core reports
 

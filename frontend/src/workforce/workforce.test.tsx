@@ -26,8 +26,8 @@ const murugan: Worker = { id: 1, partyId: 21, name: 'Murugan', phone: null, vill
   leftOn: null, active: true, usualWork: null, notes: null, owed: 6000, advance: 2000, rates: [{ effectiveFrom: '2026-01-01', rate: 500, pieceUnit: null }] };
 const lakshmi: Worker = { ...murugan, id: 2, partyId: 22, name: 'Lakshmi', owed: 0, advance: 0 };
 const muster: Muster = { date: '2026-10-20', workers: [
-  { workerId: 1, workerName: 'Murugan', payType: 'DAILY', status: null, hours: null, costObjectId: null, costObjectName: null, notes: null, locked: false },
-  { workerId: 2, workerName: 'Lakshmi', payType: 'DAILY', status: 'PRESENT', hours: null, costObjectId: null, costObjectName: null, notes: null, locked: true }] };
+  { workerId: 1, workerName: 'Murugan', payType: 'DAILY', status: null, hours: null, costObjectId: null, costObjectName: null, notes: null, locked: false, paidByBill: false },
+  { workerId: 2, workerName: 'Lakshmi', payType: 'DAILY', status: 'PRESENT', hours: null, costObjectId: null, costObjectName: null, notes: null, locked: true, paidByBill: true }] };
 const tractor: Asset = { id: 3, name: 'Tractor', kind: 'VEHICLE', farmId: null, farmName: null, serialNo: 'TN-01', sourceDocumentId: 70, sourceNumber: 'BILL-0007',
   cost: 600000, salvageValue: 60000, usefulLifeMonths: 120, inUseFrom: '2026-04-10', depreciationBefore: 0, accumulated: 9000, bookValue: 591000,
   monthlyDepreciation: 4500, lastDepreciatedMonth: '2026-06', status: 'IN_USE', disposalDocumentId: null, costObjectId: null, costObjectName: null, notes: null };
@@ -80,6 +80,7 @@ describe('workforce web', () => {
     renderAt('/t/9/workforce', <AttendancePage />, '/t/:tenantId/workforce');
     expect(await screen.findByLabelText('Day for Murugan')).toBeEnabled();
     expect(screen.getByLabelText('Day for Lakshmi')).toBeDisabled();
+    expect(screen.getByText(/also on a labour bill/)).toBeInTheDocument();
     await userEvent.click(await screen.findByRole('button', { name: 'All present on Samba 2026' }));
     expect(screen.getByLabelText('Worked on, Murugan')).toHaveValue('11');
     await userEvent.click(screen.getByRole('button', { name: 'Save attendance' }));
@@ -104,7 +105,7 @@ describe('workforce web', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Record payments' }));
     await waitFor(() => expect(calls('/wage-payments').length).toBe(1));
     expect(calls('/wage-payments')[0][1].body).toMatchObject({ financialAccountId: 5, payments: [{ workerId: 1, cash: '4000.00', advanceRecovered: '2000.00' }] });
-    expect(await screen.findByText('1 payments recorded.')).toBeInTheDocument();
+    expect(await screen.findByText('Payments recorded: 1.')).toBeInTheDocument();
   });
 
   it('hides the pay tab from someone who cannot manage payroll', async () => {

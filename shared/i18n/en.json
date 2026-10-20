@@ -1280,7 +1280,7 @@
     "payRunPosted": "Wages for {{from}} to {{to}} posted. Pay them below.",
     "payWages": "Pay wages",
     "nobodyOwed": "No wages are owed.",
-    "paymentsRecorded": "{{count}} payments recorded.",
+    "paymentsRecorded": "Payments recorded: {{count}}.",
     "paidFrom": "Paid from",
     "cashNow": "Pay now",
     "recoverAdvance": "Recover from advance",
@@ -1303,7 +1303,8 @@
     "ledger": "Accounts",
     "check": "Workers against the accounts",
     "agrees": "Agrees",
-    "disagrees": "Does not agree"
+    "disagrees": "Does not agree",
+    "paidByBill": "also on a labour bill for this day — check it is not paid twice"
   },
   "assets": {
     "title": "Assets",

@@ -9,7 +9,7 @@ export type Worker = {
   joinedOn: string; leftOn: string | null; active: boolean; usualWork: string | null; notes: string | null; owed: number; advance: number; rates: Rate[];
 };
 export type AttendanceRow = { workerId: number; workerName: string; payType: PayType; status: AttendanceStatus | null; hours: number | null;
-  costObjectId: number | null; costObjectName: string | null; notes: string | null; locked: boolean };
+  costObjectId: number | null; costObjectName: string | null; notes: string | null; locked: boolean; paidByBill: boolean };
 export type Muster = { date: string; workers: AttendanceRow[] };
 export type MonthRow = { workerId: number; workerName: string; payType: PayType; present: number; halfDays: number; absent: number; paidLeave: number;
   unpaidLeave: number; days: number };

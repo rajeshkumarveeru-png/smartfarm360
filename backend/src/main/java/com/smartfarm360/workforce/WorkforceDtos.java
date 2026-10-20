@@ -46,9 +46,12 @@ public final class WorkforceDtos {
     /** A day's muster roll. An entry with no status clears that worker's day. */
     public record MusterRequest(@NotEmpty @Size(max = 500) List<@Valid AttendanceEntry> entries) {}
 
-    /** {@code locked}: used by a posted pay run; reverse the pay run to change it (principle 4). */
+    /**
+     * {@code locked}: used by a posted pay run; reverse the pay run to change it (principle 4). {@code paidByBill}: the worker is
+     * also on a posted labour bill for this day, so marking them present would pay the day twice (G7).
+     */
     public record AttendanceRow(long workerId, String workerName, String payType, String status, BigDecimal hours, Long costObjectId,
-                                String costObjectName, String notes, boolean locked) {}
+                                String costObjectName, String notes, boolean locked, boolean paidByBill) {}
 
     public record Muster(LocalDate date, List<AttendanceRow> workers) {}
 

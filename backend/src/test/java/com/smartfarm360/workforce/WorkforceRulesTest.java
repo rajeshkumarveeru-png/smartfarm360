@@ -172,6 +172,13 @@ class WorkforceRulesTest extends FinanceTestSupport {
         money(sheet.at("/workers/0/days"), "1");
         JsonNode muster = body(get(w("/attendance/2026-07-05"), owner));
         assertThat(muster.at("/workers/0/costObjectName").asText()).isEqualTo("Samba");
+        assertThat(muster.at("/workers/0/paidByBill").asBoolean()).isFalse();
+
+        // G7: the same day also paid as a labour bill to the worker is flagged on the muster
+        long party = body(get(w("/workers/" + w1), owner)).get("partyId").asLong();
+        invoice("bills", "2026-07-05", party, null, line("LABOUR", 500, samba));
+        assertThat(body(get(w("/attendance/2026-07-05"), owner)).at("/workers/0/paidByBill").asBoolean()).isTrue();
+        assertThat(body(get(w("/attendance/2026-07-06"), owner)).at("/workers/0/paidByBill").asBoolean()).isFalse();
     }
 
     @Test

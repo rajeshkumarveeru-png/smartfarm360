@@ -82,7 +82,7 @@ export default function WorkforceScreen({ tenant, language }: { tenant: TenantSu
         return (
           <View key={w.workerId} style={s.card}>
             <Text style={s.cardTitle}>{w.workerName}</Text>
-            <Text style={s.cardSub}>{t(`workforce.payType.${w.payType}`)}{w.locked ? ` · ${t('workforce.paid')}` : ''}{working ? ` · ${nameOf(mark.costObjectId)}` : ''}</Text>
+            <Text style={s.cardSub}>{t(`workforce.payType.${w.payType}`)}{w.locked ? ` · ${t('workforce.paid')}` : ''}{w.paidByBill ? ` · ${t('workforce.paidByBill')}` : ''}{working ? ` · ${nameOf(mark.costObjectId)}` : ''}</Text>
             <View style={s.choices}>
               {ATTENDANCE.map(status => <Chip key={status} label={t(`workforce.status.${status}`)} on={mark.status === status} disabled={disabled}
                 onPress={() => setMarks(m => ({ ...m, [w.workerId]: { ...mark, status: mark.status === status ? null : status } }))} />)}
