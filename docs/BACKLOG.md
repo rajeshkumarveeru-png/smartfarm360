@@ -44,6 +44,8 @@ Deferred from Phase 5:
 
 ## Phase 6 — Workforce and assets
 
+Design for review: [workforce and assets](workforce/workforce-and-assets.md) (G1–G15).
+
 - Workers, attendance, work logs, wages, advances and settlements, labour cost allocation.
 - Equipment registry, fuel, repairs, maintenance, useful life, depreciation postings.
 

@@ -3,7 +3,8 @@
 ## Current state
 
 - **Phase:** 5 (crop management v2) complete on branch `feature/phase-5-crops` (based on `feature/phase-4-inventory`).
-  Next: Phase 6 (workforce and assets).
+  Phase 6 (workforce and assets) started on `feature/phase-6-workforce`: the workforce and assets design is awaiting
+  review; no Phase 6 code yet.
 - **Production readiness:** not ready. Authentication, roles, tenant isolation, audit, the finance core and stock with
   movements are in place and tested, but no email provider is configured and hosting/backups are undecided.
 
@@ -25,6 +26,7 @@
 | Finance posting rules, D1–D12 | Approved as recommended (2026-10-20) | [posting rules](finance/posting-rules.md) |
 | Stock movement design, E1–E12 | Approved as recommended (2026-10-20) | [stock movements](inventory/stock-movements.md) |
 | Crop management design, F1–F12 | Approved as recommended (2026-10-20) | [crop management](crops/crop-management.md) |
+| **Workforce and assets design, G1–G15** | **Awaiting review** (draft 2026-10-20) | [workforce and assets](workforce/workforce-and-assets.md) |
 | **Stock inputs by field supervisors** | **Open** — today only roles with `INVENTORY_WRITE` (owner, farm admin, farm manager, accountant) can record stock used on a crop; field supervisors and workers record notes-only work and harvests. Should field supervisors get stock-use permission? | crop design §15 |
 | **Email provider** | **Open** — Phase 2 ships the `EmailSender` interface with a logging stub, as instructed. Reset and invitation emails are not delivered until a provider is chosen | ADR 0003 |
 
