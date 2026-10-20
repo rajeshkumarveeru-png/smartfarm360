@@ -7,6 +7,7 @@ export const NAV_ITEMS: NavItem[] = [
   { key: 'farms', path: 'farms', permission: 'FARM_READ' },
   { key: 'crops', path: 'crops', permission: 'CROP_READ', module: 'CROP' },
   { key: 'finance', path: 'finance', permission: 'FINANCE_READ' },
+  { key: 'stock', path: 'stock', permission: 'INVENTORY_READ' },
   { key: 'members', path: 'members', permission: 'MEMBERS_READ' },
   { key: 'audit', path: 'audit', permission: 'AUDIT_READ' },
   { key: 'settings', path: 'settings', permission: 'TENANT_READ' },

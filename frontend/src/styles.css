@@ -25,3 +25,19 @@
 button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid #8fc58a;outline-offset:2px}
 .primary,.secondary{min-height:44px}
 @media(max-width:900px){.sidebar{position:static;width:auto;padding:14px 16px;gap:10px}.sidebar .brand{padding:0}.sidebar .brand>div:last-child{font-size:inherit}.tenant-switcher{margin:0}.sidebar nav{flex-direction:row;overflow-x:auto;gap:6px}.sidebar nav .side-link,.sidebar nav .side-link.active{font-size:13px;white-space:nowrap;justify-content:flex-start;padding:10px 12px}.side-bottom{flex-direction:row;align-items:center;justify-content:space-between;font-size:11px;margin:0;padding:0}.main{margin-left:0;padding:18px 16px}}
+
+/* Phase 3: finance */
+.crop-tabs a{color:#657268;padding:13px 16px;white-space:nowrap;border-bottom:3px solid transparent;font-weight:600;text-decoration:none}.crop-tabs a.active{color:#216b43;border-bottom-color:#3b8b5a}
+.quick-actions{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}.quick-actions a{text-decoration:none}
+.record-link{color:inherit;text-decoration:none}.record-link:hover{border-color:#9cc59a}
+.detail-list{display:grid;grid-template-columns:max-content 1fr;gap:6px 16px;margin:12px 0 18px;font-size:14px}.detail-list dt{color:#6c7a6f}.detail-list dd{margin:0}
+.data-table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e9e3;border-radius:12px;overflow:hidden;font-size:14px;margin-bottom:18px}
+.data-table th,.data-table td{padding:10px 12px;border-bottom:1px solid #eef1ec;text-align:left}.data-table .num{text-align:right;white-space:nowrap}
+.data-table.report .section th{background:#f3f7f1;color:#3c5943}.data-table .subtotal td{font-weight:700}.data-table .total td{font-weight:800;border-top:2px solid #cfdccb}
+.table-scroll{overflow-x:auto}
+.lines{border:1px dashed #d6e0d4;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px}.lines legend{font-weight:700;font-size:13px}
+.line-row{display:grid;grid-template-columns:2fr 2fr 1fr 1fr 1fr 2fr auto;gap:8px;align-items:end}
+.total-line{margin:0;text-align:right;font-size:14px}.filters{grid-template-columns:repeat(4,minmax(0,1fr))}
+.inline-form{display:flex;gap:8px;align-items:end}.checks{display:flex;gap:14px;border:0;padding:0;align-items:center}.check{flex-direction:row!important;align-items:center}
+.form-card fieldset.full,.form-card label.full,.form-card .full{grid-column:1/-1}
+@media(max-width:760px){.line-row{grid-template-columns:1fr 1fr}.filters{grid-template-columns:1fr 1fr}.detail-list{grid-template-columns:1fr}}

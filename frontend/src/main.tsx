@@ -11,7 +11,16 @@ import { AcceptInvitationPage, ForgotPasswordPage, LoginPage, RegisterPage, Rese
 import AuditPage from './pages/AuditPage';
 import CropPage from './pages/CropPage';
 import FarmsPage from './pages/FarmsPage';
-import FinancePage from './pages/FinancePage';
+import AccountsPage from './finance/AccountsPage';
+import DocumentPage from './finance/DocumentPage';
+import FinanceHome from './finance/FinanceHome';
+import FinanceLayout from './finance/FinanceLayout';
+import FinanceSettingsPage from './finance/FinanceSettingsPage';
+import NewRecordPage from './finance/NewRecordPage';
+import PartiesPage from './finance/PartiesPage';
+import RecordsPage from './finance/RecordsPage';
+import ReportsPage from './finance/ReportsPage';
+import StockPage from './pages/StockPage';
 import MembersPage from './pages/MembersPage';
 import OnboardingPage from './pages/OnboardingPage';
 import PlatformPage from './pages/PlatformPage';
@@ -66,7 +75,17 @@ function App() {
             <Route index element={<Navigate to="farms" replace />} />
             <Route path="farms" element={<FarmsPage />} />
             <Route path="crops" element={<CropPage />} />
-            <Route path="finance" element={<FinancePage />} />
+            <Route path="finance" element={<FinanceLayout />}>
+              <Route index element={<FinanceHome />} />
+              <Route path="records" element={<RecordsPage />} />
+              <Route path="records/:documentId" element={<DocumentPage />} />
+              <Route path="new/:kind" element={<NewRecordPage />} />
+              <Route path="parties" element={<PartiesPage />} />
+              <Route path="accounts" element={<AccountsPage />} />
+              <Route path="reports" element={<ReportsPage />} />
+              <Route path="settings" element={<FinanceSettingsPage />} />
+            </Route>
+            <Route path="stock" element={<StockPage />} />
             <Route path="members" element={<MembersPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="audit" element={<AuditPage />} />
