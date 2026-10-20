@@ -189,7 +189,9 @@
     "claimed": "{{count}} earlier entries on this phone were added to this farm business.",
     "postedToAccounts": "Recorded in your farm accounts.",
     "savedOffline": "No connection. Saved on this phone; it will be recorded when you are back online.",
-    "pendingBadge": "● Waiting to send"
+    "pendingBadge": "● Waiting to send",
+    "stockOffline": "Connect to the internet to see stock.",
+    "refresh": "Refresh"
   },
   "common": {
     "appName": "SmartFarm360",
