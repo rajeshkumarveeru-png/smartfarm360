@@ -13,6 +13,7 @@ import type { Item, Location, Unit } from '../stock/types';
 import { isQuantity, unitChoices } from '../stock/types';
 import type { DocumentSummary, FinanceDocument, Party } from './types';
 import { newIdempotencyKey, useCategoryLabel, useFinanceData } from './useFinanceData';
+import { useAssetChoices } from '../assets/useAssetChoices';
 
 export type RecordKind = 'expense' | 'sale' | 'payment' | 'receipt' | 'transfer' | 'owner' | 'loan' | 'loan-repayment' | 'settlement'
   | 'write-off' | 'opening' | 'depreciation';
@@ -27,11 +28,11 @@ export function isAmount(value: string): boolean {
   return /^\d{1,12}(\.\d{1,2})?$/.test(value.trim()) && Number(value) > 0;
 }
 
-type Line = { categoryId: string; description: string; amount: string; quantity: string; rate: string; costObjectId: string;
+type Line = { categoryId: string; description: string; amount: string; quantity: string; rate: string; costObjectId: string; assetId: string;
   itemId: string; unit: string; locationId: string; lotNo: string; lotExpiry: string };
 type OpeningLine = { kind: string; financialAccountId: string; partyId: string; loanName: string; description: string; amount: string;
   itemId: string; quantity: string; unit: string };
-const emptyLine = (): Line => ({ categoryId: '', description: '', amount: '', quantity: '', rate: '', costObjectId: '', itemId: '', unit: '', locationId: '', lotNo: '', lotExpiry: '' });
+const emptyLine = (): Line => ({ categoryId: '', description: '', amount: '', quantity: '', rate: '', costObjectId: '', assetId: '', itemId: '', unit: '', locationId: '', lotNo: '', lotExpiry: '' });
 const emptyOpening = (): OpeningLine => ({ kind: 'CASH', financialAccountId: '', partyId: '', loanName: '', description: '', amount: '', itemId: '', quantity: '', unit: '' });
 
 /** Stock items, locations and units for item lines; empty when the user cannot see stock. */
@@ -58,6 +59,7 @@ export default function NewRecordPage() {
   const tc = useNs('common');
   const ts = useNs('stock');
   const stock = useStockChoices();
+  const assets = useAssetChoices();
   const categoryLabel = useCategoryLabel();
   const lang = currentLanguage();
   const data = useFinanceData();
@@ -82,7 +84,7 @@ export default function NewRecordPage() {
         financialAccountId: d.financialAccountId ? String(d.financialAccountId) : '', notes: d.notes ?? '', referenceNo: d.referenceNo ?? '' });
       setLines(d.lines.map(l => ({ categoryId: String(l.categoryId ?? ''), description: l.description ?? '', amount: String(l.amount),
         quantity: l.quantity != null ? String(l.quantity) : '', rate: l.rate != null ? String(l.rate) : '', costObjectId: l.costObjectId ? String(l.costObjectId) : '',
-        itemId: l.itemId ? String(l.itemId) : '', unit: l.unit ?? '', locationId: l.locationId ? String(l.locationId) : '', lotNo: l.lotNo ?? '', lotExpiry: '' })));
+        assetId: l.assetId ? String(l.assetId) : '', itemId: l.itemId ? String(l.itemId) : '', unit: l.unit ?? '', locationId: l.locationId ? String(l.locationId) : '', lotNo: l.lotNo ?? '', lotExpiry: '' })));
     }).catch(e => setError(describeError(e)));
   }, [base, draftId]);
 
@@ -154,7 +156,7 @@ export default function NewRecordPage() {
           financialAccountId: !form.partyId && form.financialAccountId ? Number(form.financialAccountId) : null,
           lines: lines.map(l => ({ categoryId: l.categoryId && !(kind === 'expense' && l.itemId) ? Number(l.categoryId) : null, description: l.description || null,
             ...(l.quantity && l.rate ? { quantity: l.quantity, rate: l.rate } : { amount: l.amount, quantity: l.quantity || null }),
-            costObjectId: l.costObjectId ? Number(l.costObjectId) : null,
+            costObjectId: l.costObjectId ? Number(l.costObjectId) : null, assetId: kind === 'expense' && l.assetId ? Number(l.assetId) : null,
             ...(l.itemId ? { itemId: Number(l.itemId), unit: l.unit || null, locationId: l.locationId ? Number(l.locationId) : null,
               lotNo: l.lotNo.trim() || null, lotExpiry: kind === 'expense' && l.lotExpiry ? l.lotExpiry : null } : {}) })),
           notes: form.notes || null, referenceNo: form.referenceNo || null, post,
@@ -243,6 +245,9 @@ export default function NewRecordPage() {
                 <label>{t('amount')}<input inputMode="decimal" disabled={!!(l.quantity && l.rate)} value={l.quantity && l.rate ? lineAmount(l).toFixed(2) : l.amount}
                                            onChange={e => setLines(ls => ls.map((x, j) => (j === i ? { ...x, amount: e.target.value } : x)))} /></label>
                 <label>{t('activity')}<select value={l.costObjectId} onChange={e => setLines(ls => ls.map((x, j) => (j === i ? { ...x, costObjectId: e.target.value } : x)))}>{activityOptions}</select></label>
+                {kind === 'expense' && assets.length > 0 && <label>{t('forAsset')} <small>{tc('optional')}</small><select value={l.assetId}
+                  onChange={e => setLines(ls => ls.map((x, j) => (j === i ? { ...x, assetId: e.target.value } : x)))}>
+                  <option value="">—</option>{assets.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>}
                 {lines.length > 1 && <button type="button" className="text-action" aria-label={tc('remove')} onClick={() => setLines(ls => ls.filter((_, j) => j !== i))}><Trash2 size={16} /></button>}
               </div>
             ))}

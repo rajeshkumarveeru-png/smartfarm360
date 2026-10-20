@@ -33,6 +33,17 @@ import StockHome from './stock/StockHome';
 import StockLayout from './stock/StockLayout';
 import StockRecordPage from './stock/StockRecordPage';
 import StockReportsPage from './stock/StockReportsPage';
+import AssetPage from './assets/AssetPage';
+import AssetsLayout from './assets/AssetsLayout';
+import AssetsPage from './assets/AssetsPage';
+import DepreciationPage from './assets/DepreciationPage';
+import MaintenancePage from './assets/MaintenancePage';
+import AttendancePage from './workforce/AttendancePage';
+import PayPage from './workforce/PayPage';
+import WorkerPage from './workforce/WorkerPage';
+import WorkersPage from './workforce/WorkersPage';
+import WorkforceLayout from './workforce/WorkforceLayout';
+import WorkforceReportsPage from './workforce/WorkforceReportsPage';
 import MembersPage from './pages/MembersPage';
 import OnboardingPage from './pages/OnboardingPage';
 import PlatformPage from './pages/PlatformPage';
@@ -111,6 +122,19 @@ function App() {
               <Route path="locations" element={<LocationsPage />} />
               <Route path="reports" element={<StockReportsPage />} />
               <Route path="new/:kind" element={<StockRecordPage />} />
+            </Route>
+            <Route path="workforce" element={<WorkforceLayout />}>
+              <Route index element={<AttendancePage />} />
+              <Route path="workers" element={<WorkersPage />} />
+              <Route path="workers/:workerId" element={<WorkerPage />} />
+              <Route path="pay" element={<PayPage />} />
+              <Route path="reports" element={<WorkforceReportsPage />} />
+            </Route>
+            <Route path="assets" element={<AssetsLayout />}>
+              <Route index element={<AssetsPage />} />
+              <Route path="depreciation" element={<DepreciationPage />} />
+              <Route path="maintenance" element={<MaintenancePage />} />
+              <Route path=":assetId" element={<AssetPage />} />
             </Route>
             <Route path="members" element={<MembersPage />} />
             <Route path="settings" element={<SettingsPage />} />

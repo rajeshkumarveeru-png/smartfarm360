@@ -16,6 +16,7 @@ import type { StockRecordKind } from './StockHome';
 import type { Item, Lot, StockRecordResult } from './types';
 import { baseUnitLabel, isQuantity, unitChoices } from './types';
 import { useStockData } from './useStockData';
+import { useAssetChoices } from '../assets/useAssetChoices';
 
 const ENDPOINT: Record<StockRecordKind, string> = {
   issue: 'issues', transfer: 'transfers', wastage: 'wastage', count: 'counts', produce: 'produce', 'purchase-return': 'purchase-returns', 'sale-return': 'sale-returns',
@@ -35,6 +36,7 @@ export default function StockRecordPage() {
   const tc = useNs('common');
   const lang = currentLanguage();
   const data = useStockData();
+  const assets = useAssetChoices();
   const fin = `/api/v1/tenants/${tenant.id}/finance`;
   const canSeeFinance = can(tenant, 'FINANCE_READ');
   const isReturn = kind === 'purchase-return' || kind === 'sale-return';
@@ -117,7 +119,7 @@ export default function StockRecordPage() {
       lotExpiry: receives && l.lotExpiry ? l.lotExpiry : null }));
     const costObjectId = form.costObjectId ? Number(form.costObjectId) : null;
     switch (kind) {
-      case 'issue': return { ...base, locationId: location, costObjectId, lines: qtyLines };
+      case 'issue': return { ...base, locationId: location, costObjectId, assetId: form.assetId ? Number(form.assetId) : null, lines: qtyLines };
       case 'produce': return { ...base, locationId: location, costObjectId, lines: qtyLines };
       case 'transfer': return { ...base, fromLocationId: Number(form.fromLocationId), toLocationId: Number(form.toLocationId), lines: qtyLines };
       case 'wastage': return { docDate: form.docDate, locationId: location, reason: form.reason, lines: qtyLines };
@@ -180,6 +182,10 @@ export default function StockRecordPage() {
         {(kind === 'issue' || kind === 'produce') && costObjects.length > 0 && (
           <label>{tf('activity')}<select value={form.costObjectId ?? ''} onChange={e => set('costObjectId', e.target.value)}>
             <option value="">{tf('overhead')}</option>{costObjects.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+        )}
+        {kind === 'issue' && assets.length > 0 && (
+          <label>{tf('forAsset')} <small>{tc('optional')}</small><select value={form.assetId ?? ''} onChange={e => set('assetId', e.target.value)}>
+            <option value="">—</option>{assets.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
         )}
         {kind === 'wastage' && <label className="full">{t('reason')}<input required maxLength={500} value={form.reason ?? ''} onChange={e => set('reason', e.target.value)} /></label>}
         {kind === 'purchase-return' && <>

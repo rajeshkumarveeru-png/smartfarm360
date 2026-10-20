@@ -8,6 +8,8 @@ export const NAV_ITEMS: NavItem[] = [
   { key: 'crops', path: 'crops', permission: 'CROP_READ', module: 'CROP' },
   { key: 'finance', path: 'finance', permission: 'FINANCE_READ' },
   { key: 'stock', path: 'stock', permission: 'INVENTORY_READ' },
+  { key: 'workforce', path: 'workforce', permission: 'WORKFORCE_READ', module: 'WORKFORCE' },
+  { key: 'assets', path: 'assets', permission: 'ASSETS_READ', module: 'ASSETS' },
   { key: 'members', path: 'members', permission: 'MEMBERS_READ' },
   { key: 'audit', path: 'audit', permission: 'AUDIT_READ' },
   { key: 'settings', path: 'settings', permission: 'TENANT_READ' },

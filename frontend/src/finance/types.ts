@@ -19,7 +19,7 @@ export type DocumentSummary = {
 };
 export type DocumentLine = {
   id: number; lineNo: number; categoryId: number | null; categoryCode: string | null; categoryName: string | null; accountCode: string; side: string | null;
-  description: string | null; quantity: number | null; unit: string | null; rate: number | null; amount: number; costObjectId: number | null;
+  description: string | null; quantity: number | null; unit: string | null; rate: number | null; amount: number; costObjectId: number | null; assetId?: number | null;
   costObjectName: string | null; farmId: number | null; partyId: number | null; financialAccountId: number | null; loanId: number | null;
   itemId: number | null; itemName: string | null; locationId: number | null; lotNo: string | null; baseQuantity: number | null;
 };
