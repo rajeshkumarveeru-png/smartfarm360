@@ -9,7 +9,13 @@ import { Loading } from './components/common';
 import { visibleNav } from './lib/nav';
 import { AcceptInvitationPage, ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage } from './pages/AuthPages';
 import AuditPage from './pages/AuditPage';
-import CropPage from './pages/CropPage';
+import ComparisonPage from './crop/ComparisonPage';
+import CropLayout from './crop/CropLayout';
+import CyclePage from './crop/CyclePage';
+import CyclesPage from './crop/CyclesPage';
+import SetupPage from './crop/SetupPage';
+import WeatherPage from './crop/WeatherPage';
+import AllocationPage from './finance/AllocationPage';
 import FarmsPage from './pages/FarmsPage';
 import AccountsPage from './finance/AccountsPage';
 import DocumentPage from './finance/DocumentPage';
@@ -80,7 +86,13 @@ function App() {
           <Route path="/t/:tenantId" element={<TenantRoute />}>
             <Route index element={<Navigate to="farms" replace />} />
             <Route path="farms" element={<FarmsPage />} />
-            <Route path="crops" element={<CropPage />} />
+            <Route path="crops" element={<CropLayout />}>
+              <Route index element={<CyclesPage />} />
+              <Route path="cycles/:cycleId" element={<CyclePage />} />
+              <Route path="setup" element={<SetupPage />} />
+              <Route path="compare/:cropId" element={<ComparisonPage />} />
+              <Route path="weather" element={<WeatherPage />} />
+            </Route>
             <Route path="finance" element={<FinanceLayout />}>
               <Route index element={<FinanceHome />} />
               <Route path="records" element={<RecordsPage />} />
@@ -90,6 +102,7 @@ function App() {
               <Route path="accounts" element={<AccountsPage />} />
               <Route path="reports" element={<ReportsPage />} />
               <Route path="settings" element={<FinanceSettingsPage />} />
+              <Route path="allocation" element={<AllocationPage />} />
             </Route>
             <Route path="stock" element={<StockLayout />}>
               <Route index element={<StockHome />} />

@@ -45,3 +45,7 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{ou
 .check input[type=checkbox]{width:auto;flex:0 0 auto;margin:0}.check{gap:8px;font-size:12px;color:#526456;display:flex;margin:8px 0}
 .plain-list{list-style:none;padding:0;margin:0 0 12px;display:flex;flex-direction:column;gap:6px;font-size:13px}.plain-list li{display:flex;align-items:center;gap:8px}
 .data-table tfoot td{font-weight:700}
+/* Crop screens */
+.stage,.severity{display:inline-block;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;background:#edf1eb;color:#526456;vertical-align:middle}
+.stage-growing{background:#e3f2d7;color:#386a3f}.stage-harvesting{background:#fff4d6;color:#8a6212}.stage-closed{background:#e6eaf2;color:#3d4f6e}.stage-cancelled{background:#f4e9e7;color:#8a4a3e}
+.severity-high{background:#fff0ed;color:#9c3e30}.severity-medium{background:#fff4d6;color:#8a6212}

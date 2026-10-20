@@ -14,7 +14,7 @@ export default function FinanceLayout() {
     { to: `${base}/parties`, label: t('parties') },
     { to: `${base}/accounts`, label: t('accounts') },
     { to: `${base}/reports`, label: t('reports') },
-    ...(can(tenant, 'FINANCE_MANAGE') ? [{ to: `${base}/settings`, label: t('settings') }] : []),
+    ...(can(tenant, 'FINANCE_MANAGE') ? [{ to: `${base}/allocation`, label: t('allocation.tab') }, { to: `${base}/settings`, label: t('settings') }] : []),
   ];
   return (
     <section className="crop-page finance-page">
