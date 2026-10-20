@@ -81,6 +81,16 @@ public abstract class ApiIntegrationTest extends EmbeddedPostgresSupport {
         return body(post("/api/v1/tenants/" + tenantId + "/farms", user, Map.of("name", name)).andExpect(status().isCreated())).get("id").asLong();
     }
 
+    /** System finance category id by code (for example SEEDS, CROP_SALE). */
+    protected long categoryId(String code) {
+        return jdbc.queryForObject("select id from sf_finance_categories where tenant_id is null and code = ?", Long.class, code);
+    }
+
+    /** The tenant's default "Cash in hand" account (created by the finance module on first use). */
+    protected long cashAccountId(User user, long tenantId) throws Exception {
+        return body(get("/api/v1/tenants/" + tenantId + "/finance/accounts", user)).get(0).get("id").asLong();
+    }
+
     protected ResultActions get(String url, User user) throws Exception { return mvc.perform(auth(MockMvcRequestBuilders.get(url), user)); }
     protected ResultActions post(String url, User user, Object body) throws Exception { return mvc.perform(withBody(auth(MockMvcRequestBuilders.post(url), user), body)); }
     protected ResultActions put(String url, User user, Object body) throws Exception { return mvc.perform(withBody(auth(MockMvcRequestBuilders.put(url), user), body)); }

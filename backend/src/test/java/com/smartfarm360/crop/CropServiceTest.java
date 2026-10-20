@@ -1,5 +1,6 @@
 package com.smartfarm360.crop;
 
+import com.smartfarm360.costing.CostObjectService;
 import com.smartfarm360.crop.CropDtos.SeasonRequest;
 import com.smartfarm360.platform.rbac.Permission;
 import com.smartfarm360.platform.security.TenantContext;
@@ -30,7 +31,7 @@ class CropServiceTest {
 
     @BeforeEach void setUp() {
         jdbc = mock(JdbcTemplate.class);
-        service = new CropService(jdbc);
+        service = new CropService(jdbc, mock(CostObjectService.class));
     }
 
     @Test void invalidSeasonRangeIsRejectedBeforeDatabaseWrite() {

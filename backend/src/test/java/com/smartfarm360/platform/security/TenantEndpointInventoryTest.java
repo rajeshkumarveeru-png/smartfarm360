@@ -39,7 +39,7 @@ class TenantEndpointInventoryTest extends EmbeddedPostgresSupport {
             for (String pattern : e.getKey().getPatternValues()) {
                 if (!pattern.startsWith("/api/v1/")) offenders.add(pattern + " (not under /api/v1)");
                 boolean farmData = controller.startsWith("com.smartfarm360.farm.") || controller.startsWith("com.smartfarm360.crop.")
-                        || controller.startsWith("com.smartfarm360.finance.");
+                        || controller.startsWith("com.smartfarm360.finance.") || controller.startsWith("com.smartfarm360.inventory.");
                 if (farmData && !pattern.startsWith("/api/v1/tenants/{tenantId}/")) offenders.add(pattern + " (farm data outside tenant path)");
             }
         }

@@ -1,8 +1,8 @@
 # Finance posting rules (Phase 3)
 
-- Status: **Draft for product-owner review** (2026-10-20). No finance code is written until this is approved.
+- Status: **Approved** (2026-10-20). All decisions D1–D12 accepted as recommended.
 - Implements: [ADR 0004 — Accounting model](../adr/0004-accounting-model.md). Inventory details: [ADR 0005](../adr/0005-inventory-valuation.md).
-- Decisions marked **D1–D12** need an answer; each has a recommendation.
+- Decisions **D1–D12** were approved as recommended on 2026-10-20 (see section 12).
 
 ## 1. Purpose and principles
 
@@ -241,9 +241,9 @@ Every post, reversal, write-off, settlement and lock-date change is audited.
 trigger) · `sf_document_sequences` · `sf_idempotency_keys` · lock date on `sf_tenant_settings`.
 Every table has `tenant_id` and composite tenant foreign keys, as today.
 
-## 12. Decisions needed
+## 12. Decisions (approved as recommended, 2026-10-20)
 
-| # | Question | Recommendation |
+| # | Question | Decision |
 |---|---|---|
 | **D1** | Default fiscal year? | **April–March** (Indian financial year), changeable per tenant |
 | **D2** | Treat household/personal spending from farm money as *owner's drawings*, not an expense? | **Yes.** Otherwise farm profit looks far lower than it is |

@@ -1,6 +1,8 @@
-package com.smartfarm360.finance;
+package com.smartfarm360.inventory;
 
-import com.smartfarm360.finance.FinanceDtos.*;
+import com.smartfarm360.finance.DocumentService;
+import com.smartfarm360.finance.MasterDataService;
+import com.smartfarm360.inventory.InventoryDtos.*;
 import com.smartfarm360.platform.security.CurrentUser;
 import com.smartfarm360.platform.security.TenantContext;
 import org.springframework.http.HttpStatus;
@@ -14,53 +16,20 @@ import java.math.RoundingMode;
 import java.util.*;
 
 /**
- * Phase 1 finance and stock records, unchanged in behaviour apart from tenant/permission handling.
- * Known accounting gaps (double counting, stock without movements) are replaced in Phases 3–4; see docs/PROGRESS.md.
+ * Phase 1 suppliers, stock items and purchases, kept until Phase 4 replaces them with stock movements (ADR 0005).
+ * Since Phase 3 every supplier is also a finance party and every purchase is posted as a bill to Stock (1200),
+ * so payables and cash stay complete.
  */
 @Service
-public class FinanceService {
+public class InventoryService {
     private final JdbcTemplate jdbc;
+    private final DocumentService documents;
+    private final MasterDataService master;
 
-    public FinanceService(JdbcTemplate jdbc) { this.jdbc = jdbc; }
-
-    private void validateFarm(long tenantId, Long farmId) {
-        if (farmId != null && jdbc.queryForObject("select count(*) from sf_farms where id=? and tenant_id=? and active=true", Integer.class, farmId, tenantId) == 0)
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Farm does not belong to this tenant");
-    }
-
-    @Transactional(readOnly = true)
-    public Map<String, Object> summary(TenantContext ctx) {
-        long t = ctx.tenantId();
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("income", jdbc.queryForObject("select coalesce(sum(amount),0) from sf_finance_entries where tenant_id=? and entry_type='INCOME'", BigDecimal.class, t));
-        m.put("expenses", jdbc.queryForObject("select coalesce(sum(amount),0) from sf_finance_entries where tenant_id=? and entry_type='EXPENSE'", BigDecimal.class, t));
-        m.put("inventoryValue", jdbc.queryForObject("select coalesce(sum(quantity_on_hand*average_unit_cost),0) from sf_inventory_items where tenant_id=? and active=true", BigDecimal.class, t));
-        m.put("outstandingPayables", jdbc.queryForObject("select coalesce(sum(total_amount-paid_amount),0) from sf_purchases where tenant_id=?", BigDecimal.class, t));
-        m.put("lowStockItems", jdbc.queryForObject("select count(*) from sf_inventory_items where tenant_id=? and active=true and quantity_on_hand<=reorder_level", Integer.class, t));
-        BigDecimal paidIncome = jdbc.queryForObject("select coalesce(sum(amount),0) from sf_finance_entries where tenant_id=? and entry_type='INCOME' and payment_status='PAID'", BigDecimal.class, t);
-        BigDecimal paidExpenses = jdbc.queryForObject("select coalesce(sum(amount),0) from sf_finance_entries where tenant_id=? and entry_type='EXPENSE' and payment_status='PAID'", BigDecimal.class, t);
-        m.put("netCashRecorded", paidIncome.subtract(paidExpenses));
-        return m;
-    }
-
-    @Transactional(readOnly = true)
-    public List<Map<String, Object>> entries(TenantContext ctx) {
-        return jdbc.queryForList("select id,tenant_id as \"tenantId\",farm_id as \"farmId\",entry_type as \"entryType\",category,description,amount,occurred_on as \"occurredOn\",payment_status as \"paymentStatus\",reference_no as \"referenceNo\",created_at as \"createdAt\" from sf_finance_entries where tenant_id=? order by occurred_on desc,id desc limit 500", ctx.tenantId());
-    }
-
-    @Transactional
-    public Map<String, Object> createEntry(TenantContext ctx, CurrentUser user, FinanceRequest r) {
-        long t = ctx.tenantId();
-        validateFarm(t, r.farmId());
-        String type = r.entryType().trim().toUpperCase(Locale.ROOT);
-        if (!Set.of("INCOME", "EXPENSE").contains(type))
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "entryType must be INCOME or EXPENSE");
-        String status = r.paymentStatus() == null ? "PAID" : r.paymentStatus().trim().toUpperCase(Locale.ROOT);
-        if (!Set.of("PAID", "UNPAID", "PARTIAL").contains(status))
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "paymentStatus must be PAID, UNPAID or PARTIAL");
-        Long id = jdbc.queryForObject("insert into sf_finance_entries(tenant_id,farm_id,entry_type,category,description,amount,occurred_on,payment_status,reference_no,created_by) values(?,?,?,?,?,?,?,?,?,?) returning id",
-                Long.class, t, r.farmId(), type, r.category().trim(), r.description().trim(), r.amount(), r.occurredOn(), status, r.referenceNo(), user.email());
-        return jdbc.queryForMap("select id,tenant_id as \"tenantId\",farm_id as \"farmId\",entry_type as \"entryType\",category,description,amount,occurred_on as \"occurredOn\",payment_status as \"paymentStatus\",reference_no as \"referenceNo\" from sf_finance_entries where id=? and tenant_id=?", id, t);
+    public InventoryService(JdbcTemplate jdbc, DocumentService documents, MasterDataService master) {
+        this.jdbc = jdbc;
+        this.documents = documents;
+        this.master = master;
     }
 
     @Transactional(readOnly = true)
@@ -72,6 +41,7 @@ public class FinanceService {
     public Map<String, Object> createSupplier(TenantContext ctx, SupplierRequest r) {
         long t = ctx.tenantId();
         Long id = jdbc.queryForObject("insert into sf_suppliers(tenant_id,name,phone,village,notes) values(?,?,?,?,?) returning id", Long.class, t, r.name().trim(), r.phone(), r.village(), r.notes());
+        master.partyForLegacySupplier(t, id, r.name(), r.phone(), r.village(), r.notes());
         return jdbc.queryForMap("select id,tenant_id as \"tenantId\",name,phone,village,notes,active from sf_suppliers where id=? and tenant_id=?", id, t);
     }
 
@@ -96,13 +66,14 @@ public class FinanceService {
     @Transactional
     public Map<String, Object> createPurchase(TenantContext ctx, CurrentUser user, PurchaseRequest r) {
         long t = ctx.tenantId();
-        if (r.paidAmount().compareTo(r.quantity().multiply(r.unitCost())) > 0)
+        BigDecimal total = r.quantity().multiply(r.unitCost()).setScale(2, RoundingMode.HALF_UP);
+        if (r.paidAmount().compareTo(total) > 0)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Paid amount cannot exceed purchase total");
-        if (jdbc.queryForList("select id from sf_suppliers where id=? and tenant_id=? and active=true", r.supplierId(), t).isEmpty())
+        List<Map<String, Object>> supplier = jdbc.queryForList("select id,name,phone,village,notes from sf_suppliers where id=? and tenant_id=? and active=true", r.supplierId(), t);
+        if (supplier.isEmpty())
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Supplier does not belong to this tenant");
-        var rows = jdbc.queryForList("select id,quantity_on_hand,average_unit_cost from sf_inventory_items where id=? and tenant_id=? and active=true for update", r.itemId(), t);
+        var rows = jdbc.queryForList("select id,name,unit,quantity_on_hand,average_unit_cost from sf_inventory_items where id=? and tenant_id=? and active=true for update", r.itemId(), t);
         if (rows.isEmpty()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Inventory item does not belong to this tenant");
-        BigDecimal total = r.quantity().multiply(r.unitCost());
         Map<String, Object> item = rows.get(0);
         BigDecimal oldQty = (BigDecimal) item.get("quantity_on_hand");
         BigDecimal oldCost = (BigDecimal) item.get("average_unit_cost");
@@ -112,6 +83,11 @@ public class FinanceService {
         jdbc.update("update sf_inventory_items set quantity_on_hand=?,average_unit_cost=? where id=? and tenant_id=?", newQty, newAvg, r.itemId(), t);
         Long id = jdbc.queryForObject("insert into sf_purchases(tenant_id,supplier_id,item_id,purchase_date,quantity,unit_cost,total_amount,paid_amount,notes,created_by) values(?,?,?,?,?,?,?,?,?,?) returning id",
                 Long.class, t, r.supplierId(), r.itemId(), r.purchaseDate(), r.quantity(), r.unitCost(), total, r.paidAmount(), r.notes(), user.email());
+
+        Map<String, Object> s = supplier.get(0);
+        long partyId = master.partyForLegacySupplier(t, r.supplierId(), (String) s.get("name"), (String) s.get("phone"), (String) s.get("village"), (String) s.get("notes"));
+        documents.recordStockPurchase(ctx, partyId, r.purchaseDate(), (String) item.get("name"), r.quantity(), (String) item.get("unit"),
+                r.unitCost(), total, r.paidAmount(), r.financialAccountId());
         return jdbc.queryForMap("select p.id,p.supplier_id as \"supplierId\",s.name as \"supplierName\",p.item_id as \"itemId\",i.name as \"itemName\",p.purchase_date as \"purchaseDate\",p.quantity,p.unit_cost as \"unitCost\",p.total_amount as \"totalAmount\",p.paid_amount as \"paidAmount\",(p.total_amount-p.paid_amount) as \"outstandingAmount\" from sf_purchases p join sf_suppliers s on s.id=p.supplier_id and s.tenant_id=p.tenant_id join sf_inventory_items i on i.id=p.item_id and i.tenant_id=p.tenant_id where p.id=? and p.tenant_id=?", id, t);
     }
 }

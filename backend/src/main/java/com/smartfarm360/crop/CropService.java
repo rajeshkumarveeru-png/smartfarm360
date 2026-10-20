@@ -1,5 +1,6 @@
 package com.smartfarm360.crop;
 
+import com.smartfarm360.costing.CostObjectService;
 import com.smartfarm360.crop.CropDtos.*;
 import com.smartfarm360.platform.security.TenantContext;
 import org.springframework.http.HttpStatus;
@@ -20,8 +21,12 @@ import java.util.Map;
 @Service
 public class CropService {
     private final JdbcTemplate jdbc;
+    private final CostObjectService costObjects;
 
-    public CropService(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    public CropService(JdbcTemplate jdbc, CostObjectService costObjects) {
+        this.jdbc = jdbc;
+        this.costObjects = costObjects;
+    }
 
     private void farm(long tenantId, Long farmId) {
         if (count("select count(*) from sf_farms where id=? and tenant_id=? and active=true", farmId, tenantId) == 0)
@@ -92,9 +97,12 @@ public class CropService {
         exists("sf_crop_seasons", t, b.seasonId(), "Season");
         if (b.expectedHarvestDate() != null && b.expectedHarvestDate().isBefore(b.plannedSowingDate()))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Expected harvest cannot be before sowing");
-        return insert("insert into sf_cultivation_cycles(tenant_id,farm_id,land_parcel_id,crop_id,variety_id,season_id,name,planned_sowing_date,expected_harvest_date,cultivated_area,area_unit,status) values(?,?,?,?,?,?,?,?,?,?,?,?) returning id",
+        Map<String, Object> created = insert("insert into sf_cultivation_cycles(tenant_id,farm_id,land_parcel_id,crop_id,variety_id,season_id,name,planned_sowing_date,expected_harvest_date,cultivated_area,area_unit,status) values(?,?,?,?,?,?,?,?,?,?,?,?) returning id",
                 t, b.farmId(), b.landParcelId(), b.cropId(), b.varietyId(), b.seasonId(), b.name().trim(), b.plannedSowingDate(),
                 b.expectedHarvestDate(), b.cultivatedArea(), or(b.areaUnit(), "ACRE"), or(b.status(), "PLANNED"));
+        // Every cycle is an activity that costs and sales can be assigned to (finance cost objects).
+        costObjects.forCropCycle(t, ((Number) created.get("id")).longValue(), b.name().trim(), b.farmId());
+        return created;
     }
 
     @Transactional(readOnly = true)

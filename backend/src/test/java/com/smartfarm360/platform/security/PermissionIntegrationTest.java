@@ -35,9 +35,9 @@ class PermissionIntegrationTest extends ApiIntegrationTest {
         User viewer = newUser("viewer");
         addMember(owner, tenant, viewer, "VIEWER");
         get(base() + "/farms", viewer).andExpect(status().isOk());
-        get(base() + "/finance/summary", viewer).andExpect(status().isOk());
         post(base() + "/farms", viewer, Map.of("name", "Nope")).andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
-        post(base() + "/finance/entries", viewer, Map.of()).andExpect(status().isForbidden());
+        get(base() + "/finance/reports/summary", viewer).andExpect(status().isOk());
+        post(base() + "/finance/bills", viewer, Map.of()).andExpect(status().isForbidden());
         get(base() + "/members", viewer).andExpect(status().isForbidden());
         get(base() + "/audit", viewer).andExpect(status().isForbidden());
     }
@@ -49,15 +49,15 @@ class PermissionIntegrationTest extends ApiIntegrationTest {
         post(base() + "/activities", worker, Map.of("cycleId", cycle, "activityType", "WEEDING", "activityDate", LocalDate.now().toString()))
                 .andExpect(status().isCreated());
         post(base() + "/crops", worker, Map.of("name", "Maize")).andExpect(status().isForbidden());
-        get(base() + "/finance/entries", worker).andExpect(status().isForbidden());
+        get(base() + "/finance/documents", worker).andExpect(status().isForbidden());
     }
 
     @Test
     void accountantHandlesMoneyButNotFarmSetup() throws Exception {
         User accountant = newUser("accountant");
         addMember(owner, tenant, accountant, "ACCOUNTANT");
-        post(base() + "/finance/entries", accountant, Map.of("entryType", "EXPENSE", "category", "Seeds", "description", "Seed paddy",
-                "amount", 1200.50, "occurredOn", LocalDate.now().toString())).andExpect(status().isCreated());
+        post(base() + "/finance/bills", accountant, Map.of("docDate", LocalDate.now().toString(), "financialAccountId", cashAccountId(accountant, tenant),
+                "lines", java.util.List.of(Map.of("categoryId", categoryId("SEEDS"), "amount", 1200.50)))).andExpect(status().isCreated());
         get(base() + "/audit", accountant).andExpect(status().isOk());
         post(base() + "/farms", accountant, Map.of("name", "Nope")).andExpect(status().isForbidden());
         post(base() + "/activities", accountant, Map.of("cycleId", cycle, "activityType", "WEEDING", "activityDate", LocalDate.now().toString()))

@@ -17,6 +17,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import javax.sql.DataSource;
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.util.Arrays;
 import java.util.List;
@@ -47,7 +48,11 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
                 "027-smartfarm360-finance-procurement",
                 "028-platform-schema",
                 "029-platform-seed-rbac",
-                "030-platform-backfill");
+                "030-platform-backfill",
+                "031-finance-schema",
+                "032-finance-journal-guards",
+                "033-finance-seed",
+                "034-finance-legacy-migration");
     }
 
     @Test
@@ -62,7 +67,10 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
                 "sf_inventory_items", "sf_purchases",
                 "sf_permissions", "sf_roles", "sf_role_permissions", "sf_membership_roles", "sf_refresh_tokens",
                 "sf_password_reset_tokens", "sf_invitations", "sf_invitation_roles", "sf_tenant_settings",
-                "sf_tenant_modules", "sf_audit_history");
+                "sf_tenant_modules", "sf_audit_history",
+                "sf_ledger_accounts", "sf_finance_categories", "sf_financial_accounts", "sf_parties", "sf_cost_objects", "sf_loans",
+                "sf_finance_documents", "sf_finance_document_lines", "sf_payment_allocations", "sf_journal_entries", "sf_journal_lines",
+                "sf_document_sequences");
     }
 
     @Test
@@ -102,6 +110,63 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
         assertThat(db.queryForObject("select count(*) from sf_tenant_settings where tenant_id = ?", Integer.class, tenant)).isEqualTo(1);
         assertThat(db.queryForObject("select enabled from sf_tenant_modules where tenant_id = ? and module_code = 'CROP'", Boolean.class, tenant)).isTrue();
         assertThat(db.queryForObject("select count(*) from sf_farms where tenant_id = ?", Integer.class, tenant)).as("data preserved").isEqualTo(1);
+    }
+
+    @Test
+    void phaseOneMoneyRecordsBecomeBalancedFinanceDocuments() throws Exception {
+        DataSource legacy = newDatabase("legacy_fin_" + UUID.randomUUID().toString().replace("-", ""));
+        JdbcTemplate db = new JdbcTemplate(legacy);
+        runChangelog(legacy, 6); // schema up to Phase 2 (changesets 025-030)
+
+        long tenant = db.queryForObject("insert into sf_tenants(name, slug) values ('Old farm', 'old-farm') returning id", Long.class);
+        long farm = db.queryForObject("insert into sf_farms(tenant_id, name) values (?, 'Farm') returning id", Long.class, tenant);
+        long parcel = db.queryForObject("insert into sf_land_parcels(tenant_id, farm_id, name, area) values (?, ?, 'F1', 1) returning id", Long.class, tenant, farm);
+        long crop = db.queryForObject("insert into sf_crop_masters(tenant_id, name) values (?, 'Paddy') returning id", Long.class, tenant);
+        long cycle = db.queryForObject("insert into sf_cultivation_cycles(tenant_id, farm_id, land_parcel_id, crop_id, name, planned_sowing_date) " +
+                "values (?, ?, ?, ?, 'Samba', current_date) returning id", Long.class, tenant, farm, parcel, crop);
+        db.update("insert into sf_finance_entries(tenant_id, farm_id, entry_type, category, description, amount, occurred_on, payment_status, created_by) " +
+                "values (?, ?, 'EXPENSE', 'seeds', 'Seed paddy', 1000, '2026-06-01', 'PAID', 'old@farm.test')", tenant, farm);
+        db.update("insert into sf_finance_entries(tenant_id, entry_type, category, description, amount, occurred_on, payment_status, created_by) " +
+                "values (?, 'INCOME', 'Crop sale', 'Paddy to trader', 5000, '2026-06-10', 'UNPAID', 'old@farm.test')", tenant);
+        db.update("insert into sf_finance_entries(tenant_id, entry_type, category, description, amount, occurred_on, payment_status, created_by) " +
+                "values (?, 'EXPENSE', 'Tractor diesel', 'Diesel', 300, '2026-06-12', 'PARTIAL', 'old@farm.test')", tenant);
+        long supplier = db.queryForObject("insert into sf_suppliers(tenant_id, name) values (?, 'Agro depot') returning id", Long.class, tenant);
+        long item = db.queryForObject("insert into sf_inventory_items(tenant_id, name, category, unit) values (?, 'Urea', 'Fertilizer', 'kg') returning id", Long.class, tenant);
+        db.update("insert into sf_purchases(tenant_id, supplier_id, item_id, purchase_date, quantity, unit_cost, total_amount, paid_amount, created_by) " +
+                "values (?, ?, ?, '2026-06-05', 100, 6, 600, 200, 'old@farm.test')", tenant, supplier, item);
+
+        runChangelog(legacy, null);
+
+        assertThat(db.queryForObject("select count(*) from sf_finance_documents where tenant_id = ? and legacy_source is not null", Integer.class, tenant)).isEqualTo(5);
+        assertThat(db.queryForObject("select count(*) from (select entry_id from sf_journal_lines group by entry_id having sum(debit) <> sum(credit)) x", Integer.class)).isZero();
+        assertThat(db.queryForObject("select needs_review from sf_finance_documents where legacy_source = 'sf_finance_entries' and total_amount = 300", Boolean.class)).isTrue();
+        // "seeds" matched the system category; "Tractor diesel" became a tenant category under other expenses
+        assertThat(db.queryForObject("select c.code from sf_finance_document_lines l join sf_finance_categories c on c.id = l.category_id " +
+                "join sf_finance_documents d on d.id = l.document_id where d.total_amount = 1000 and d.legacy_source = 'sf_finance_entries'", String.class)).isEqualTo("SEEDS");
+        assertThat(db.queryForObject("select account_code from sf_finance_categories where tenant_id = ? and name = 'Tractor diesel'", String.class, tenant)).isEqualTo("5600");
+        // Balances: the unknown party holds the unpaid entries; the supplier is owed the unpaid part of the purchase
+        assertThat(db.queryForObject("select coalesce(sum(debit - credit), 0) from sf_journal_lines l join sf_parties p on p.id = l.party_id " +
+                "where p.name = 'Unknown (migrated)' and l.account_code = '1100'", BigDecimal.class)).isEqualByComparingTo("5000");
+        assertThat(db.queryForObject("select coalesce(sum(credit - debit), 0) from sf_journal_lines l join sf_parties p on p.id = l.party_id " +
+                "where p.name = 'Unknown (migrated)' and l.account_code = '2000'", BigDecimal.class)).isEqualByComparingTo("300");
+        assertThat(db.queryForObject("select coalesce(sum(credit - debit), 0) from sf_journal_lines l join sf_parties p on p.id = l.party_id " +
+                "where p.legacy_supplier_id = ? and l.account_code = '2000'", BigDecimal.class, supplier)).isEqualByComparingTo("400");
+        assertThat(db.queryForObject("select coalesce(sum(l.debit - l.credit), 0) from sf_journal_lines l join sf_financial_accounts f on f.id = l.financial_account_id " +
+                "where f.name = 'Cash (migrated)'", BigDecimal.class)).isEqualByComparingTo("-1200");
+        assertThat(db.queryForObject("select coalesce(sum(debit - credit), 0) from sf_journal_lines where account_code = '1200'", BigDecimal.class)).isEqualByComparingTo("600");
+        // Defaults and cost objects
+        assertThat(db.queryForObject("select count(*) from sf_cost_objects where tenant_id = ? and crop_cycle_id = ?", Integer.class, tenant, cycle)).isEqualTo(1);
+        assertThat(db.queryForObject("select count(*) from sf_cost_objects where tenant_id = ? and kind = 'OVERHEAD'", Integer.class, tenant)).isEqualTo(1);
+        assertThat(db.queryForObject("select count(*) from sf_financial_accounts where tenant_id = ? and name = 'Cash in hand'", Integer.class, tenant)).isEqualTo(1);
+        // The old table keeps its rows and becomes read-only
+        assertThat(db.queryForObject("select count(*) from sf_finance_entries", Integer.class)).isEqualTo(3);
+        assertThatThrownBy(() -> db.update("delete from sf_finance_entries")).hasMessageContaining("read-only");
+    }
+
+    @Test
+    void ledgerAccountsMatchTheJavaEnum() {
+        assertThat(jdbc.queryForList("select code from sf_ledger_accounts", String.class))
+                .containsExactlyInAnyOrderElementsOf(Arrays.stream(com.smartfarm360.finance.LedgerAccount.values()).map(com.smartfarm360.finance.LedgerAccount::code).toList());
     }
 
     @Test
@@ -149,13 +214,18 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
                 .isInstanceOf(DataIntegrityViolationException.class)
                 .hasMessageContaining("fk_sf_cycle_farm_tenant");
 
-        // Tenant B cannot attach a finance entry to tenant A's farm.
+        // Tenant B cannot attach a finance record to tenant A's farm.
         assertThatThrownBy(() -> jdbc.update(
-                "insert into sf_finance_entries(tenant_id, farm_id, entry_type, category, description, amount, occurred_on, created_by) "
-                        + "values (?, ?, 'EXPENSE', 'Seeds', 'Cross-tenant', 10.00, current_date, 'test@example.com')",
+                "insert into sf_finance_documents(tenant_id, doc_type, status, doc_date, farm_id, total_amount) "
+                        + "values (?, 'BILL', 'DRAFT', current_date, ?, 10.00)",
                 tenantB, farmA))
                 .isInstanceOf(DataIntegrityViolationException.class)
-                .hasMessageContaining("fk_sf_finance_farm_tenant");
+                .hasMessageContaining("fk_sf_doc_farm");
+        // The Phase 1 finance table is read-only since the finance core migration.
+        assertThatThrownBy(() -> jdbc.update(
+                "insert into sf_finance_entries(tenant_id, entry_type, category, description, amount, occurred_on, created_by) "
+                        + "values (?, 'EXPENSE', 'Seeds', 'x', 10.00, current_date, 'test@example.com')", tenantA))
+                .hasMessageContaining("read-only");
     }
 
     @Test

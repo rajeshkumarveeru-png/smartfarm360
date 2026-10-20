@@ -117,8 +117,8 @@ class CrossTenantIsolationTest extends ApiIntegrationTest {
         post("/api/v1/tenants/" + tenantA + "/cultivation-cycles", a, Map.of("farmId", farmB, "landParcelId", parcelA, "cropId", cropA,
                 "name", "x", "plannedSowingDate", today)).andExpect(status().isNotFound());
         get("/api/v1/tenants/" + tenantA + "/crops/" + cropB + "/varieties", a).andExpect(status().isBadRequest());
-        post("/api/v1/tenants/" + tenantA + "/finance/entries", a, Map.of("entryType", "EXPENSE", "category", "Seeds", "description", "x",
-                "amount", 10, "occurredOn", today, "farmId", farmB)).andExpect(status().isBadRequest());
+        post("/api/v1/tenants/" + tenantA + "/finance/bills", a, Map.of("docDate", today, "farmId", farmB, "financialAccountId", cashAccountId(a, tenantA),
+                "lines", List.of(Map.of("categoryId", categoryId("SEEDS"), "amount", 10)))).andExpect(status().isNotFound());
         post("/api/v1/tenants/" + tenantA + "/purchases", a, Map.of("supplierId", supplierB, "itemId", itemB, "purchaseDate", today,
                 "quantity", 1, "unitCost", 1, "paidAmount", 0)).andExpect(status().isBadRequest());
 
