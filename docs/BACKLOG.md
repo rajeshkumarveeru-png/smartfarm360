@@ -35,6 +35,8 @@ Deferred from Phase 4:
 
 ## Phase 5 — Crop management v2
 
+Design for review: [crop management](crops/crop-management.md) (F1–F12).
+
 - Cost objects; activities consume inventory; harvest batches become inventory lots; sales link to harvests;
   pest/disease observations; weather notes; cost per acre / per unit; crop profitability.
 - Retire `sf_harvest_records.sale_value` from revenue calculations.

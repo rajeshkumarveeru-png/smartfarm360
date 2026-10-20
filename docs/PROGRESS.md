@@ -3,7 +3,8 @@
 ## Current state
 
 - **Phase:** 4 (inventory, purchasing and sales) complete on branch `feature/phase-4-inventory` (based on
-  `feature/phase-3-finance`). Next: Phase 5 (crop management v2).
+  `feature/phase-3-finance`). Phase 5 (crop management v2) started on `feature/phase-5-crops`: the crop management
+  design is awaiting review; no Phase 5 code yet.
 - **Production readiness:** not ready. Authentication, roles, tenant isolation, audit, the finance core and stock with
   movements are in place and tested, but no email provider is configured and hosting/backups are undecided.
 
@@ -24,6 +25,7 @@
 | **Tamil terminology reviewer** | **Open** — required before the first release | ADR 0008 |
 | Finance posting rules, D1–D12 | Approved as recommended (2026-10-20) | [posting rules](finance/posting-rules.md) |
 | Stock movement design, E1–E12 | Approved as recommended (2026-10-20) | [stock movements](inventory/stock-movements.md) |
+| **Crop management design, F1–F12** | **Awaiting review** (draft 2026-10-20) | [crop management](crops/crop-management.md) |
 | **Email provider** | **Open** — Phase 2 ships the `EmailSender` interface with a logging stub, as instructed. Reset and invitation emails are not delivered until a provider is chosen | ADR 0003 |
 
 ## Phase 1 — Baseline and hygiene (2026-10-19)
