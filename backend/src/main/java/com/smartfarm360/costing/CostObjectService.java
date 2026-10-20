@@ -4,6 +4,8 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Optional;
 
 /**
@@ -37,5 +39,27 @@ public class CostObjectService {
                 .param("t", tenantId).param("name", name).param("cycle", cropCycleId).param("farm", farmId).update();
         return jdbc.sql("select id from sf_cost_objects where tenant_id = :t and crop_cycle_id = :cycle")
                 .param("t", tenantId).param("cycle", cropCycleId).query(Long.class).single();
+    }
+
+    /**
+     * Keeps a crop cycle's cost object in step with the cycle: its name, farm, area in acres and the dates it ran,
+     * which overhead allocation uses (P16, crop design F6). {@code activeTo} null means still running.
+     */
+    @Transactional
+    public long updateCropCycle(long tenantId, long cropCycleId, String name, Long farmId, BigDecimal areaAcres,
+                                LocalDate activeFrom, LocalDate activeTo, boolean active) {
+        long id = forCropCycle(tenantId, cropCycleId, name, farmId);
+        jdbc.sql("""
+                        update sf_cost_objects set name = :name, farm_id = :farm, area_acres = :area, active_from = :from, active_to = :to,
+                          active = :active where id = :id and tenant_id = :t""")
+                .param("name", name).param("farm", farmId).param("area", areaAcres).param("from", activeFrom).param("to", activeTo)
+                .param("active", active).param("id", id).param("t", tenantId).update();
+        return id;
+    }
+
+    /** The cost object of a crop cycle, if it has one. */
+    public Optional<Long> forCycle(long tenantId, long cropCycleId) {
+        return jdbc.sql("select id from sf_cost_objects where tenant_id = :t and crop_cycle_id = :cycle")
+                .param("t", tenantId).param("cycle", cropCycleId).query(Long.class).optional();
     }
 }

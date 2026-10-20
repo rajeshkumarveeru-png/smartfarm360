@@ -13,7 +13,7 @@ import java.util.List;
 public interface StockHook {
     /** An item line checked against the item: quantity in the item's base unit, location, and the item's default category. */
     record ResolvedItem(long itemId, String itemName, long locationId, BigDecimal baseQuantity, String unitLabel,
-                        Long saleCategoryId, boolean trackLots) {}
+                        Long saleCategoryId, boolean trackLots, Long lotCostObjectId) {}
 
     /** A posted line that names a stock item. */
     record ItemLine(long lineId, long itemId, long locationId, String lotNo, LocalDate lotExpiry, BigDecimal baseQuantity,

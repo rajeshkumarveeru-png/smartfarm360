@@ -117,10 +117,10 @@ class CrossTenantIsolationTest extends ApiIntegrationTest {
 
         // Cycle on A's farm with B's crop, and on B's farm with A's crop
         post("/api/v1/tenants/" + tenantA + "/cultivation-cycles", a, Map.of("farmId", farmA, "landParcelId", parcelA, "cropId", cropB,
-                "name", "x", "plannedSowingDate", today)).andExpect(status().isBadRequest());
+                "name", "x", "plannedSowingDate", today)).andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("CROP_NOT_FOUND"));
         post("/api/v1/tenants/" + tenantA + "/cultivation-cycles", a, Map.of("farmId", farmB, "landParcelId", parcelA, "cropId", cropA,
                 "name", "x", "plannedSowingDate", today)).andExpect(status().isNotFound());
-        get("/api/v1/tenants/" + tenantA + "/crops/" + cropB + "/varieties", a).andExpect(status().isBadRequest());
+        get("/api/v1/tenants/" + tenantA + "/crops/" + cropB + "/varieties", a).andExpect(status().isNotFound());
         post("/api/v1/tenants/" + tenantA + "/finance/bills", a, Map.of("docDate", today, "farmId", farmB, "financialAccountId", cashAccountId(a, tenantA),
                 "lines", List.of(Map.of("categoryId", categoryId("SEEDS"), "amount", 10)))).andExpect(status().isNotFound());
         // Stock: A cannot buy, sell, use, move, count or read B's item or B's location

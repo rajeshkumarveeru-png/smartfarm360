@@ -25,12 +25,15 @@ public class FinanceController {
     private final MasterDataService master;
     private final ReportService reports;
     private final FinanceSettingsService settings;
+    private final AllocationService allocations;
 
-    public FinanceController(DocumentService documents, MasterDataService master, ReportService reports, FinanceSettingsService settings) {
+    public FinanceController(DocumentService documents, MasterDataService master, ReportService reports, FinanceSettingsService settings,
+                             AllocationService allocations) {
         this.documents = documents;
         this.master = master;
         this.reports = reports;
         this.settings = settings;
+        this.allocations = allocations;
     }
 
     // ---- Settings and master data ----
@@ -229,6 +232,20 @@ public class FinanceController {
     @ResponseStatus(HttpStatus.CREATED)
     public Document depreciation(TenantContext ctx, @Valid @RequestBody DepreciationRequest r, @RequestHeader(name = KEY, required = false) String key) {
         return documents.createDepreciation(ctx, r, key);
+    }
+
+    /** Shows how farm overhead of a period would be spread to the crops growing in it, without posting anything. */
+    @PostMapping("/overhead-allocations/preview")
+    @RequiresPermission(Permission.FINANCE_MANAGE)
+    public AllocationPreview allocationPreview(TenantContext ctx, @Valid @RequestBody OverheadAllocationRequest r) {
+        return allocations.preview(ctx, r.from(), r.to());
+    }
+
+    @PostMapping("/overhead-allocations")
+    @RequiresPermission(Permission.FINANCE_MANAGE)
+    @ResponseStatus(HttpStatus.CREATED)
+    public Document allocate(TenantContext ctx, @Valid @RequestBody OverheadAllocationRequest r, @RequestHeader(name = KEY, required = false) String key) {
+        return allocations.allocate(ctx, r, key);
     }
 
     // ---- Reports ----

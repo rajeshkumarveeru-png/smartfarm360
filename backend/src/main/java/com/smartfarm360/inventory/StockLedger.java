@@ -135,16 +135,17 @@ class StockLedger {
     // ---- Lots ----------------------------------------------------------------------------------------------------
 
     /** The lot for an incoming movement, created on first receipt. A lot's expiry is set once and then kept. */
-    Long receivingLot(ItemService.ItemRow item, String lotNo, LocalDate expiry, LocalDate date) {
+    Long receivingLot(ItemService.ItemRow item, String lotNo, LocalDate expiry, LocalDate date, Long costObjectId) {
         if (!item.trackLots()) {
             if (lotNo != null) throw ApiException.badRequest("LOT_NOT_TRACKED", "This item does not track lots.");
             return null;
         }
         if (lotNo == null) throw ApiException.badRequest("LOT_REQUIRED", "Enter the lot or batch number.");
         jdbc.sql("""
-                        insert into sf_stock_lots (tenant_id, item_id, lot_no, expiry_date, received_on) values (:t, :i, :n, :e, :d)
-                        on conflict (tenant_id, item_id, lot_no) do update set expiry_date = coalesce(sf_stock_lots.expiry_date, excluded.expiry_date)""")
-                .param("t", item.tenantId()).param("i", item.id()).param("n", lotNo).param("e", expiry).param("d", date).update();
+                        insert into sf_stock_lots (tenant_id, item_id, lot_no, expiry_date, received_on, cost_object_id) values (:t, :i, :n, :e, :d, :co)
+                        on conflict (tenant_id, item_id, lot_no) do update set expiry_date = coalesce(sf_stock_lots.expiry_date, excluded.expiry_date),
+                          cost_object_id = coalesce(sf_stock_lots.cost_object_id, excluded.cost_object_id)""")
+                .param("t", item.tenantId()).param("i", item.id()).param("n", lotNo).param("e", expiry).param("d", date).param("co", costObjectId).update();
         return existingLot(item, lotNo);
     }
 

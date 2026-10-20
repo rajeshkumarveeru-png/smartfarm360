@@ -55,7 +55,9 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
                 "034-finance-legacy-migration",
                 "035-stock-schema",
                 "036-stock-guards-and-seed",
-                "037-stock-legacy-migration");
+                "037-stock-legacy-migration",
+                "038-crop-v2-schema",
+                "039-crop-v2-backfill");
     }
 
     @Test
@@ -74,7 +76,8 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
                 "sf_ledger_accounts", "sf_finance_categories", "sf_financial_accounts", "sf_parties", "sf_cost_objects", "sf_loans",
                 "sf_finance_documents", "sf_finance_document_lines", "sf_payment_allocations", "sf_journal_entries", "sf_journal_lines",
                 "sf_document_sequences",
-                "sf_units", "sf_stock_locations", "sf_stock_items", "sf_item_units", "sf_stock_lots", "sf_stock_movements", "sf_stock_balances");
+                "sf_units", "sf_stock_locations", "sf_stock_items", "sf_item_units", "sf_stock_lots", "sf_stock_movements", "sf_stock_balances",
+                "sf_crop_observations", "sf_weather_notes");
     }
 
     @Test
@@ -253,6 +256,52 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
         assertThatThrownBy(() -> db.update("delete from sf_purchases")).hasMessageContaining("read-only");
         assertThatThrownBy(() -> db.update("insert into sf_suppliers(tenant_id, name) values (?, 'x')", tenant)).hasMessageContaining("read-only");
         assertThatThrownBy(() -> db.update("delete from sf_stock_movements")).hasMessageContaining("append-only");
+    }
+
+    @Test
+    void phaseOneCropRecordsAreKeptAsHistoryWithStagesAndAllocationData() throws Exception {
+        DataSource legacy = newDatabase("legacy_crop_" + UUID.randomUUID().toString().replace("-", ""));
+        JdbcTemplate db = new JdbcTemplate(legacy);
+        runChangelog(legacy, 13); // everything before Phase 5 (changesets 025-037)
+
+        long tenant = db.queryForObject("insert into sf_tenants(name, slug) values ('Crop farm', 'crop-farm') returning id", Long.class);
+        long farm = db.queryForObject("insert into sf_farms(tenant_id, name) values (?, 'Farm') returning id", Long.class, tenant);
+        long parcel = db.queryForObject("insert into sf_land_parcels(tenant_id, farm_id, name, area, area_unit) values (?, ?, 'F1', 1, 'HECTARE') returning id",
+                Long.class, tenant, farm);
+        long crop = db.queryForObject("insert into sf_crop_masters(tenant_id, name) values (?, 'Paddy') returning id", Long.class, tenant);
+        String insertCycle = "insert into sf_cultivation_cycles(tenant_id, farm_id, land_parcel_id, crop_id, name, planned_sowing_date, expected_harvest_date, " +
+                "cultivated_area, area_unit, status) values (?, ?, ?, ?, ?, ?::date, ?::date, ?, ?, ?) returning id";
+        long done = db.queryForObject(insertCycle, Long.class, tenant, farm, parcel, crop, "Old samba", "2025-07-01", "2025-11-30", 50, "CENT", "COMPLETED");
+        long growing = db.queryForObject(insertCycle, Long.class, tenant, farm, parcel, crop, "Thaladi", "2026-09-01", null, null, "ACRE", "IN_PROGRESS");
+        long odd = db.queryForObject(insertCycle, Long.class, tenant, farm, parcel, crop, "Typo", "2026-09-01", null, null, "ACRE", "SOMETHING");
+        db.update("insert into sf_farm_activities(tenant_id, cycle_id, activity_type, activity_date, input_name, quantity, quantity_unit, cost) " +
+                "values (?, ?, 'FERTILIZER', '2025-08-01', 'Urea', 50, 'kg', 600)", tenant, done);
+        db.update("insert into sf_harvest_records(tenant_id, cycle_id, harvest_date, quantity, quantity_unit, sale_value) " +
+                "values (?, ?, '2025-11-30', 20, 'bags', 25000)", tenant, done);
+        long linesBefore = db.queryForObject("select count(*) from sf_journal_lines", Long.class);
+
+        runChangelog(legacy, null);
+
+        assertThat(db.queryForObject("select status from sf_cultivation_cycles where id = ?", String.class, done)).isEqualTo("CLOSED");
+        assertThat(db.queryForObject("select closed_on::text from sf_cultivation_cycles where id = ?", String.class, done)).isEqualTo("2025-11-30");
+        assertThat(db.queryForObject("select status from sf_cultivation_cycles where id = ?", String.class, growing)).isEqualTo("GROWING");
+        assertThat(db.queryForObject("select status from sf_cultivation_cycles where id = ?", String.class, odd)).isEqualTo("PLANNED");
+        // Kept as history: memo values unchanged, nothing posted, nothing put into stock (D7, F4)
+        assertThat(db.queryForObject("select legacy_memo from sf_farm_activities where cycle_id = ?", Boolean.class, done)).isTrue();
+        assertThat(db.queryForObject("select cost from sf_farm_activities where cycle_id = ?", BigDecimal.class, done)).isEqualByComparingTo("600");
+        assertThat(db.queryForObject("select legacy from sf_harvest_records where cycle_id = ?", Boolean.class, done)).isTrue();
+        assertThat(db.queryForObject("select sale_value from sf_harvest_records where cycle_id = ?", BigDecimal.class, done)).isEqualByComparingTo("25000");
+        assertThat(db.queryForObject("select count(*) from sf_journal_lines", Long.class)).isEqualTo(linesBefore);
+        assertThat(db.queryForObject("select count(*) from sf_stock_movements", Long.class)).isZero();
+        // Every cycle is a cost object with its area in acres and dates, for overhead allocation
+        Map<String, Object> co = db.queryForMap("select area_acres, active_from::text as f, active_to::text as t from sf_cost_objects where crop_cycle_id = ?", done);
+        assertThat((BigDecimal) co.get("area_acres")).isEqualByComparingTo("0.5");
+        assertThat(co.get("f")).isEqualTo("2025-07-01");
+        assertThat(co.get("t")).isEqualTo("2025-11-30");
+        assertThat(db.queryForObject("select area_acres from sf_cost_objects where crop_cycle_id = ?", BigDecimal.class, growing))
+                .isEqualByComparingTo("2.4711");
+        assertThatThrownBy(() -> db.update("update sf_cultivation_cycles set status = 'IN_PROGRESS' where id = ?", growing))
+                .hasMessageContaining("ck_sf_cycle_status");
     }
 
     @Test

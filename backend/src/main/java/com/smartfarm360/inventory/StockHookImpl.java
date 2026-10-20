@@ -38,7 +38,11 @@ class StockHookImpl implements StockHook {
         if (!item.trackLots() && lotNo != null) throw ApiException.badRequest("LOT_NOT_TRACKED", "This item does not track lots.");
         long location = items.activeLocation(ctx.tenantId(), locationId);
         ItemService.Converted converted = items.toBase(item, quantity, unit);
-        return new ResolvedItem(item.id(), item.name(), location, converted.baseQuantity(), converted.unitLabel(), item.saleCategoryId(), item.trackLots());
+        // A lot from a harvest remembers its crop cycle, so a sale from it is assigned to that cycle by default (crop design F5)
+        Long lotCostObject = lotNo == null ? null : jdbc.sql("select cost_object_id from sf_stock_lots where tenant_id = :t and item_id = :i and lot_no = :n")
+                .param("t", ctx.tenantId()).param("i", item.id()).param("n", lotNo).query((rs, i) -> (Long) rs.getObject(1)).optional().orElse(null);
+        return new ResolvedItem(item.id(), item.name(), location, converted.baseQuantity(), converted.unitLabel(), item.saleCategoryId(), item.trackLots(),
+                lotCostObject);
     }
 
     @Override
@@ -50,7 +54,7 @@ class StockHookImpl implements StockHook {
             ItemService.ItemRow item = items.itemRow(t, l.itemId(), false);
             switch (type) {
                 case BILL, OPENING_BALANCE -> ledger.receive(t, documentId, l.lineId(), type == DocType.BILL ? "PURCHASE" : "OPENING", item.id(),
-                        l.locationId(), ledger.receivingLot(item, l.lotNo(), l.lotExpiry(), date), l.baseQuantity(), l.amount(), date, l.costObjectId(), null);
+                        l.locationId(), ledger.receivingLot(item, l.lotNo(), l.lotExpiry(), date, null), l.baseQuantity(), l.amount(), date, l.costObjectId(), null);
                 case SALE -> {
                     StockLedger.Moved m = ledger.issue(t, documentId, l.lineId(), "SALE", item.id(), l.locationId(), ledger.issuingLot(item, l.lotNo()),
                             l.baseQuantity(), date, l.costObjectId());

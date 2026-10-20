@@ -72,6 +72,13 @@ public class ReportService {
 
     @Transactional(readOnly = true)
     public IncomeStatement incomeStatement(TenantContext ctx, LocalDate from, LocalDate to, Long farmId, Long costObjectId, String basis) {
+        return incomeStatement(ctx, from, to, farmId, costObjectId, basis, false);
+    }
+
+    /** {@code withoutAllocations}: leave out overhead allocation records (P16), to show an activity's own costs. */
+    @Transactional(readOnly = true)
+    public IncomeStatement incomeStatement(TenantContext ctx, LocalDate from, LocalDate to, Long farmId, Long costObjectId, String basis,
+                                           boolean withoutAllocations) {
         checkRange(from, to);
         if (farmId != null) master.requireFarm(ctx.tenantId(), farmId);
         if (costObjectId != null) master.requireCostObject(ctx.tenantId(), costObjectId);
@@ -89,7 +96,8 @@ public class ReportService {
                         join sf_finance_documents d on d.id = e.document_id
                         left join sf_finance_categories c on c.id = l.category_id
                         where l.tenant_id = :t and e.entry_date between :from and :to and l.account_code in (:codes)
-                          and (cast(:farm as bigint) is null or l.farm_id = :farm) and (cast(:co as bigint) is null or l.cost_object_id = :co)""" + docFilter + """
+                          and (cast(:farm as bigint) is null or l.farm_id = :farm) and (cast(:co as bigint) is null or l.cost_object_id = :co)""" + docFilter
+                        + (withoutAllocations ? " and d.doc_type <> 'ALLOCATION'" : "") + """
                         group by l.account_code, l.category_id, c.code, c.name""")
                 .param("t", ctx.tenantId()).param("from", from).param("to", to).param("codes", PROFIT_AND_LOSS_CODES)
                 .param("farm", farmId).param("co", costObjectId)
@@ -146,6 +154,23 @@ public class ReportService {
         BigDecimal netProfit = operatingProfit.add(otherTotal).subtract(interest).subtract(losses);
         return new IncomeStatement(from, to, cash ? "CASH" : "ACCRUAL", true, farmId, costObjectId, sorted(revenue), revenueTotal,
                 sorted(costs), costTotal, operatingProfit, sorted(other), otherTotal, interest, losses, netProfit);
+    }
+
+    /** Overhead allocated to an activity in a period (net of reversals), by expense category. */
+    @Transactional(readOnly = true)
+    public List<AmountRow> allocatedOverhead(TenantContext ctx, long costObjectId, LocalDate from, LocalDate to) {
+        checkRange(from, to);
+        return jdbc.sql("""
+                        select l.account_code, l.category_id, c.code, c.name, sum(l.debit - l.credit)
+                        from sf_journal_lines l join sf_journal_entries e on e.id = l.entry_id
+                        join sf_finance_documents d on d.id = e.document_id
+                        left join sf_finance_categories c on c.id = l.category_id
+                        where l.tenant_id = :t and l.cost_object_id = :co and d.doc_type = 'ALLOCATION' and e.entry_date between :from and :to
+                        group by l.account_code, l.category_id, c.code, c.name having sum(l.debit - l.credit) <> 0
+                        order by l.account_code, l.category_id""")
+                .param("t", ctx.tenantId()).param("co", costObjectId).param("from", from).param("to", to)
+                .query((rs, i) -> new AmountRow(rs.getString(1), (Long) rs.getObject(2), rs.getString(3), rs.getString(4), rs.getBigDecimal(5)))
+                .list();
     }
 
     private static void add(Map<String, BigDecimal> totals, Map<String, AmountRow> meta, AmountRow r, BigDecimal amount) {

@@ -21,7 +21,8 @@ public enum DocType {
     STOCK_COUNT("COUNT"),
     PRODUCE_RECEIPT("PROD"),
     PURCHASE_RETURN("PRET"),
-    SALE_RETURN("SRET");
+    SALE_RETURN("SRET"),
+    ALLOCATION("ALLOC");
 
     private final String prefix;
 

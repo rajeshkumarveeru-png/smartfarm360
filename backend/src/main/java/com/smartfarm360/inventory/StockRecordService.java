@@ -168,7 +168,7 @@ public class StockRecordService {
                             r.docDate(), null);
                     loss = loss.add(m.value().negate());
                 } else if (difference.signum() > 0) {
-                    if (lot == null && l.item().trackLots()) lot = ledger.receivingLot(l.item(), l.lotNo(), null, r.docDate());
+                    if (lot == null && l.item().trackLots()) lot = ledger.receivingLot(l.item(), l.lotNo(), null, r.docDate(), null);
                     BigDecimal value = ledger.gainValue(ctx.tenantId(), l.item().id(), difference);
                     ledger.receive(ctx.tenantId(), id, null, "COUNT_GAIN", l.item().id(), location, lot, difference, value, r.docDate(), null, null);
                     gain = gain.add(value);
@@ -205,7 +205,7 @@ public class StockRecordService {
                 r.notes(), null, List.of()), key, r, (id, lineIds) -> {
             lock(ctx, lines);
             for (Resolved l : lines) {
-                ledger.receive(ctx.tenantId(), id, null, "PRODUCE", l.item().id(), location, ledger.receivingLot(l.item(), l.lotNo(), l.lotExpiry(), r.docDate()),
+                ledger.receive(ctx.tenantId(), id, null, "PRODUCE", l.item().id(), location, ledger.receivingLot(l.item(), l.lotNo(), l.lotExpiry(), r.docDate(), r.costObjectId()),
                         l.baseQuantity(), BigDecimal.ZERO, r.docDate(), r.costObjectId(), null);
             }
             return List.of();
@@ -304,7 +304,7 @@ public class StockRecordService {
                         StockRecordLine rl = recordLines.get(i);
                         parts.add(new JournalPart(s.accountCode(), rl.amount(), BigDecimal.ZERO, s.categoryId(), null, null, s.costObjectId(), s.farmId()));
                         BigDecimal value = returnValue(ctx.tenantId(), r.originalDocumentId(), l.item().id(), l.baseQuantity());
-                        Long lot = l.item().trackLots() ? ledger.receivingLot(l.item(), l.lotNo(), null, r.docDate()) : null;
+                        Long lot = l.item().trackLots() ? ledger.receivingLot(l.item(), l.lotNo(), null, r.docDate(), null) : null;
                         ledger.receive(ctx.tenantId(), id, lineIds.get(i), "CUSTOMER_RETURN", l.item().id(), rl.locationId(), lot, l.baseQuantity(), value,
                                 r.docDate(), s.costObjectId(), null);
                         parts.add(new JournalPart(LedgerAccount.STOCK.code(), value, BigDecimal.ZERO, null, null, null, null, s.farmId()));

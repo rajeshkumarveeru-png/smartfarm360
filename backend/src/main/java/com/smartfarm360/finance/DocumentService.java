@@ -206,7 +206,8 @@ public class DocumentService {
         Long categoryId = l.categoryId() != null ? l.categoryId() : item.saleCategoryId();
         if (categoryId == null) throw ApiException.badRequest("CATEGORY_REQUIRED", "Choose the sale category for this item.");
         Category c = invoiceCategory(ctx, type, categoryId);
-        return new NewLine(c.id(), c.accountCode(), null, description, l.quantity(), item.unitLabel(), rate, amount, l.costObjectId(),
+        Long costObject = l.costObjectId() != null ? l.costObjectId() : item.lotCostObjectId();
+        return new NewLine(c.id(), c.accountCode(), null, description, l.quantity(), item.unitLabel(), rate, amount, costObject,
                 l.farmId(), null, null, null, item.itemId(), item.locationId(), trim(l.lotNo()), null, item.baseQuantity());
     }
 
@@ -477,6 +478,35 @@ public class DocumentService {
             }
             allocateOldestFirst(ctx, id, r.partyId(), target, remaining);
         }
+        return document(ctx, id);
+    }
+
+    /** One activity's share of one overhead cost (shown as the allocation record's lines). */
+    record AllocationLine(String accountCode, Long categoryId, long costObjectId, Long farmId, BigDecimal amount) {}
+
+    /** An earlier record made with this idempotency key and the same request, if any. */
+    @Transactional(readOnly = true)
+    public Optional<Document> replayed(TenantContext ctx, String key, DocType type, Object request) {
+        return replay(ctx, key, type, request);
+    }
+
+    /** Posts an overhead allocation (P16) for a period, dated its last day. */
+    @Transactional
+    Document recordAllocation(TenantContext ctx, LocalDate from, LocalDate to, BigDecimal total, List<AllocationLine> lines,
+                              List<JournalPart> parts, String notes, String key, Object request) {
+        settings.ensureDefaults(ctx.tenantId());
+        settings.requireOpen(ctx.tenantId(), to);
+        long id = jdbc.sql("""
+                        insert into sf_finance_documents (tenant_id, doc_type, status, doc_date, total_amount, notes, period_from, period_to,
+                          idempotency_key, request_hash, created_by)
+                        values (:t, 'ALLOCATION', 'DRAFT', :date, :total, :notes, :from, :to, :key, :hash, :u) returning id""")
+                .param("t", ctx.tenantId()).param("date", to).param("total", money(total)).param("notes", trim(notes)).param("from", from)
+                .param("to", to).param("key", key).param("hash", hash(DocType.ALLOCATION, request)).param("u", ctx.userId())
+                .query(Long.class).single();
+        insertLines(ctx, id, lines.stream().map(l -> new NewLine(l.categoryId(), l.accountCode(), "DEBIT", null, null, null, null, l.amount(),
+                l.costObjectId(), l.farmId(), null, null, null)).toList());
+        posting.write(ctx.tenantId(), id, to, "POSTING", posting.fromParts(ctx.tenantId(), parts, costObjects.overhead(ctx.tenantId())));
+        markPosted(ctx, id, DocType.ALLOCATION, to, money(total));
         return document(ctx, id);
     }
 

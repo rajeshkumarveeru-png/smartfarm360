@@ -131,6 +131,18 @@ public final class FinanceDtos {
 
     public record ReverseRequest(LocalDate reversalDate) {}
 
+    /** Spreads farm overhead of a period to the crop cycles growing in it (P16, crop design F6). Posted on {@code to}. */
+    public record OverheadAllocationRequest(@NotNull LocalDate from, @NotNull LocalDate to, @Size(max = 500) String notes) {}
+
+    /** One activity's share: its weight is area (acres) × days growing in the period. */
+    public record AllocationShare(long costObjectId, String name, BigDecimal areaAcres, long days, BigDecimal weight, BigDecimal amount) {}
+
+    /** Overhead of one expense category (and farm, when the cost named one) and how it is spread. Empty shares: nothing to spread it to. */
+    public record AllocationGroup(String accountCode, Long categoryId, String categoryCode, String categoryName, Long farmId, BigDecimal amount,
+                                  List<AllocationShare> shares) {}
+
+    public record AllocationPreview(LocalDate from, LocalDate to, List<AllocationGroup> groups, BigDecimal allocated, BigDecimal notAllocated) {}
+
     public record DocumentLine(long id, int lineNo, Long categoryId, String categoryCode, String categoryName, String accountCode,
                                String side, String description, BigDecimal quantity, String unit, BigDecimal rate, BigDecimal amount,
                                Long costObjectId, String costObjectName, Long farmId, Long partyId, Long financialAccountId, Long loanId,

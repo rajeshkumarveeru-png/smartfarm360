@@ -4,10 +4,10 @@ import java.util.Arrays;
 import java.util.stream.Collectors;
 
 /** CSV rows (RFC 4180) that spreadsheet programs open safely: text starting with a formula character is prefixed with '. */
-final class Csv {
+public final class Csv {
     private Csv() {}
 
-    static String row(String... cells) {
+    public static String row(String... cells) {
         return Arrays.stream(cells).map(Csv::cell).collect(Collectors.joining(",")) + "\r\n";
     }
 

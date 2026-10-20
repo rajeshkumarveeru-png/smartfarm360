@@ -16,7 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Helpers for stock API tests. After every test the stock invariants are checked for the test's tenant: on-hand
  * equals the sum of movements, per location and lot as well, and Stock (1200) equals the value of stock on hand.
  */
-abstract class StockTestSupport extends FinanceTestSupport {
+public abstract class StockTestSupport extends FinanceTestSupport {
 
     protected String s(String path) { return "/api/v1/tenants/" + tenant + "/stock" + path; }
 
@@ -64,7 +64,7 @@ abstract class StockTestSupport extends FinanceTestSupport {
     }
 
     @AfterEach
-    void stockInvariantsHold() {
+    protected void stockInvariantsHold() {
         if (tenant == 0) return;
         assertThat(jdbc.queryForObject("""
                 select count(*) from sf_stock_items i where i.tenant_id = ? and (i.on_hand_quantity, i.on_hand_value) <>
