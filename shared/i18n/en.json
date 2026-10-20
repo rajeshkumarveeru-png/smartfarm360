@@ -117,7 +117,11 @@
     "cropsNotEnabled": "Crop records are not switched on for this farm business, or your role cannot see them.",
     "cropsOffline": "Connect to the internet to see and record crop work.",
     "cropCost": "Cost so far",
-    "cropSaved": "Recorded."
+    "cropSaved": "Recorded.",
+    "saving": "Saving…",
+    "nothingChanged": "Nothing has changed.",
+    "workforceNotEnabled": "Workers are not switched on for this farm business, or your role cannot see them.",
+    "workforceOffline": "Attendance needs a connection. Try again when you are online."
   },
   "common": {
     "appName": "SmartFarm360",
