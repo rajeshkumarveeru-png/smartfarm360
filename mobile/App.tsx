@@ -4,9 +4,11 @@ import {
   ScrollView, StatusBar, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
-import { FarmEntry, EntryKind, loadEntries, saveEntry } from './src/storage/entries';
-import { API_BASE_URL, isApiConfigured } from './src/services/api';
-import { Language, TranslationKey, translations } from './src/i18n/translations';
+import { FarmEntry, EntryKind, claimLegacyEntries, loadEntries, newEntryId, saveEntry, scopeKey } from './src/storage/entries';
+import { API_BASE_URL, apiRequest, isApiConfigured, onSessionEnded, refreshSession, signIn, signOut, type User } from './src/services/api';
+import { Language, TranslationKey, tr, translations } from './src/i18n/translations';
+import { loadTenants, rememberSelectedTenant, restoreSelectedTenant, type TenantSummary } from './src/auth/session';
+import { LoginScreen, TenantPicker } from './src/screens/AuthScreens';
 
 type Tab = 'home' | 'records' | 'crops' | 'livestock' | 'more';
 const expenseCategories: TranslationKey[] = ['seed','fertilizer','labour','feed','veterinary','irrigation','transport','other'];
@@ -14,8 +16,51 @@ const incomeCategories: TranslationKey[] = ['milk','cropSale','eggs','livestockS
 const money = (n: number) => `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 const today = () => new Date().toISOString().slice(0, 10);
 
+type Session = { user: User; tenants: TenantSummary[]; tenant: TenantSummary | null };
+
+/** Sign-in and tenant selection gate in front of the farm screens. */
 export default function App() {
   const [language, setLanguage] = useState<Language>('ta');
+  const [status, setStatus] = useState<'loading' | 'signedOut' | 'signedIn'>('loading');
+  const [session, setSession] = useState<Session | null>(null);
+
+  const begin = useCallback(async (user: User) => {
+    setLanguage(user.preferredLanguage);
+    const tenants = await loadTenants();
+    setSession({ user, tenants, tenant: await restoreSelectedTenant(user.id, tenants) });
+    setStatus('signedIn');
+  }, []);
+
+  useEffect(() => {
+    onSessionEnded(() => { setSession(null); setStatus('signedOut'); });
+    refreshSession()
+      .then(restored => (restored ? begin(restored.user) : setStatus('signedOut')))
+      .catch(() => setStatus('signedOut'));
+  }, [begin]);
+
+  const changeLanguage = (lang: Language) => {
+    setLanguage(lang);
+    if (session) void apiRequest('/api/v1/auth/me', { method: 'PATCH', body: { preferredLanguage: lang } }).catch(() => undefined);
+  };
+  const doSignOut = async () => { await signOut(); setSession(null); setStatus('signedOut'); };
+
+  if (status === 'loading') return <SafeAreaView style={styles.safe}><ActivityIndicator size="large" color="#28734A" style={{ marginTop: 80 }} /></SafeAreaView>;
+  if (status === 'signedOut' || !session) {
+    return <LoginScreen language={language} onLanguage={changeLanguage} onSubmit={async (email, password) => { const s = await signIn(email, password); await begin(s.user); }} />;
+  }
+  if (!session.tenant) {
+    return <TenantPicker language={language} tenants={session.tenants} onSignOut={() => void doSignOut()}
+                         onPick={tenant => { void rememberSelectedTenant(session.user.id, tenant.id); setSession({ ...session, tenant }); }} />;
+  }
+  return <FarmHome key={`${session.user.id}/${session.tenant.id}`} user={session.user} tenant={session.tenant} language={language}
+                   onLanguage={changeLanguage} onSignOut={() => void doSignOut()} onSwitchTenant={() => setSession({ ...session, tenant: null })} />;
+}
+
+function FarmHome({ user, tenant, language, onLanguage, onSignOut, onSwitchTenant }: {
+  user: User; tenant: TenantSummary; language: Language; onLanguage: (l: Language) => void; onSignOut: () => void; onSwitchTenant: () => void;
+}) {
+  const setLanguage = onLanguage;
+  const storageKey = scopeKey(user.id, tenant.id);
   const [tab, setTab] = useState<Tab>('home');
   const [entries, setEntries] = useState<FarmEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,10 +74,13 @@ export default function App() {
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const rows = await loadEntries();
+    const claimed = await claimLegacyEntries(storageKey);
+    if (claimed > 0) Alert.alert(t('appName'), tr(language, 'mobile.claimed', { count: String(claimed) }));
+    const rows = await loadEntries(storageKey);
     setEntries(rows.sort((a,b) => b.createdAt.localeCompare(a.createdAt)));
     setLoading(false);
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per user/tenant scope
+  }, [storageKey]);
   useEffect(() => { void refresh(); }, [refresh]);
 
   const totals = useMemo(() => {
@@ -53,19 +101,19 @@ export default function App() {
       Alert.alert(t('appName'), t('required')); return;
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      Alert.alert(t('appName'), 'Use YYYY-MM-DD for the date.'); return;
+      Alert.alert(t('appName'), t('dateFormat')); return;
     }
     setSaving(true);
     const entry: FarmEntry = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      id: newEntryId(),
       kind: modal!, amount: Math.round(value * 100) / 100, description: description.trim(),
       category: category as string, date, createdAt: new Date().toISOString(), syncStatus: 'local-only',
     };
     try {
-      await saveEntry(entry); setModal(null); await refresh();
+      await saveEntry(storageKey, entry); setModal(null); await refresh();
       Alert.alert(t('appName'), t('saved'));
     } catch {
-      Alert.alert(t('appName'), 'Could not save this entry. Please try again.');
+      Alert.alert(t('appName'), t('saveFailed'));
     } finally { setSaving(false); }
   };
 
@@ -83,7 +131,7 @@ export default function App() {
       <View style={styles.hero}><View style={styles.heroTop}><Text style={styles.brand}>{t('appName')}</Text><Pressable onPress={() => setLanguage(language === 'ta' ? 'en' : 'ta')} style={styles.languagePill}><Text style={styles.languageText}>{language === 'ta' ? 'EN' : 'தமிழ்'}</Text></Pressable></View><Text style={styles.heroTitle}>{t('greeting')}</Text><Text style={styles.heroSub}>{t('subtitle')}</Text><View style={styles.leafBadge}><Text style={styles.leafEmoji}>🌱</Text><Text style={styles.leafText}>{t('month')}</Text></View></View>
       <View style={styles.metricsGrid}><Metric label={t('revenue')} value={money(totals.income)} tone="green"/><Metric label={t('expenses')} value={money(totals.expenses)} tone="red"/><Metric label={t('net')} value={money(totals.net)} tone={totals.net < 0 ? 'red' : 'dark'}/></View>
       <Text style={styles.sectionTitle}>{t('quickActions')}</Text><View style={styles.actionsRow}><Pressable style={styles.actionCard} onPress={() => openEntry('expense')}><Text style={styles.actionIcon}>↘</Text><Text style={styles.actionTitle}>{t('addExpense')}</Text></Pressable><Pressable style={[styles.actionCard, styles.incomeAction]} onPress={() => openEntry('income')}><Text style={[styles.actionIcon, styles.incomeIcon]}>↗</Text><Text style={styles.actionTitle}>{t('addIncome')}</Text></Pressable></View>
-      <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>{t('recent')}</Text><Pressable onPress={() => setTab('records')}><Text style={styles.seeAll}>View all →</Text></Pressable></View>
+      <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>{t('recent')}</Text><Pressable onPress={() => setTab('records')}><Text style={styles.seeAll}>{t('viewAll')}</Text></Pressable></View>
       {entries.length === 0 ? <View style={styles.emptyCard}><Text style={styles.emptyEmoji}>🧾</Text><Text style={styles.emptyText}>{t('noEntries')}</Text></View> : entries.slice(0,5).map(e => <EntryRow key={e.id} entry={e} language={language} />)}
       <View style={styles.noteCard}><Text style={styles.noteTitle}>ℹ️ {t('localMode')}</Text><Text style={styles.noteText}>{t('safety')}</Text></View>
     </>
@@ -91,7 +139,7 @@ export default function App() {
   const renderRecords = () => <><ScreenTitle title={t('records')} subtitle={`${entries.length} · ${t('totalEntries')}`}/><View style={styles.actionsRow}><View style={{flex:1}}><Button title={`＋ ${t('expense')}`} onPress={() => openEntry('expense')}/></View><View style={{flex:1}}><Button title={`＋ ${t('income')}`} onPress={() => openEntry('income')} variant="secondary"/></View></View>{entries.length === 0 ? <View style={styles.emptyCard}><Text style={styles.emptyEmoji}>📒</Text><Text style={styles.emptyText}>{t('noEntries')}</Text></View> : entries.map(e => <EntryRow key={e.id} entry={e} language={language}/>)}</>;
   const renderCrops = () => <><ScreenTitle title={t('cropOverview')} subtitle={t('cropHelp')}/><View style={styles.featureHero}><Text style={styles.featureEmoji}>🌾</Text><Text style={styles.featureHeading}>{t('crops')}</Text><Text style={styles.featureCopy}>{t('comingSoon')}</Text></View><View style={styles.infoCard}><Text style={styles.infoLabel}>{t('land')}</Text><Text style={styles.infoValue}>—</Text></View><View style={styles.infoCard}><Text style={styles.infoLabel}>{t('activeCycles')}</Text><Text style={styles.infoValue}>—</Text></View><View style={styles.infoCard}><Text style={styles.infoLabel}>{t('planned')}</Text><Text style={styles.infoValue}>—</Text></View><Text style={styles.smallNote}>{t('noFarmData')}</Text></>;
   const renderLivestock = () => <><ScreenTitle title={t('livestockOverview')} subtitle={t('livestockHelp')}/><View style={styles.featureHero}><Text style={styles.featureEmoji}>🐄</Text><Text style={styles.featureHeading}>{t('livestock')}</Text><Text style={styles.featureCopy}>{t('comingSoon')}</Text></View><View style={styles.infoCard}><Text style={styles.infoLabel}>{t('animals')}</Text><Text style={styles.infoValue}>—</Text></View><View style={styles.infoCard}><Text style={styles.infoLabel}>{t('production')}</Text><Text style={styles.infoValue}>—</Text></View><View style={styles.infoCard}><Text style={styles.infoLabel}>{t('feedCost')}</Text><Text style={styles.infoValue}>—</Text></View><Text style={styles.smallNote}>{t('noFarmData')}</Text></>;
-  const renderMore = () => <><ScreenTitle title={t('more')} subtitle={t('modules')}/>{['🌱  '+t('crops'),'🐄  '+t('livestock'),'🐓  Poultry','🐟  Aquaculture','♻️  Organic resources','👩🏽‍🌾  Workers','🚜  Equipment','📊  Reports'].map((x,i)=><View style={styles.moduleRow} key={i}><Text style={styles.moduleText}>{x}</Text><Text style={styles.moduleStatus}>{i < 2 ? '›' : '·'}</Text></View>)}<Text style={styles.sectionTitle}>{t('settings')}</Text><View style={styles.infoCard}><Text style={styles.infoLabel}>{t('farmProfile')}</Text><Text style={styles.featureCopy}>{t('profileDesc')}</Text></View><View style={styles.infoCard}><Text style={styles.infoLabel}>{t('sync')}</Text><Text style={styles.infoValue}>{isApiConfigured ? t('apiConfigured') : t('apiMissing')}</Text><Text style={styles.smallNote}>{API_BASE_URL || t('localMode')}</Text></View><Button title={language === 'ta' ? 'Switch to English' : 'தமிழுக்கு மாற்றவும்'} onPress={() => setLanguage(language === 'ta' ? 'en' : 'ta')} variant="outline"/></>;
+  const renderMore = () => <><ScreenTitle title={t('more')} subtitle={t('modules')}/>{['🌱  '+t('crops'),'🐄  '+t('livestock'),'🐓  '+tr(language,'modules.POULTRY'),'🐟  '+tr(language,'modules.AQUACULTURE'),'♻️  '+tr(language,'modules.ORGANIC'),'👩🏽‍🌾  '+tr(language,'modules.WORKFORCE'),'🚜  '+tr(language,'modules.ASSETS')].map((x,i)=><View style={styles.moduleRow} key={i}><Text style={styles.moduleText}>{x}</Text><Text style={styles.moduleStatus}>{i < 2 ? '›' : '·'}</Text></View>)}<Text style={styles.sectionTitle}>{t('settings')}</Text><View style={styles.infoCard}><Text style={styles.infoLabel}>{t('farmProfile')}</Text><Text style={styles.featureCopy}>{t('profileDesc')}</Text></View><View style={styles.infoCard}><Text style={styles.infoLabel}>{t('sync')}</Text><Text style={styles.infoValue}>{isApiConfigured ? t('apiConfigured') : t('apiMissing')}</Text><Text style={styles.smallNote}>{API_BASE_URL || t('localMode')}</Text></View><Button title={language === 'ta' ? 'Switch to English' : 'தமிழுக்கு மாற்றவும்'} onPress={() => setLanguage(language === 'ta' ? 'en' : 'ta')} variant="outline"/><View style={styles.infoCard}><Text style={styles.infoLabel}>{tr(language, 'nav.switchTenant')}</Text><Text style={styles.infoValue}>{tenant.name}</Text><Text style={styles.smallNote}>{tr(language, 'auth.signedInAs', { email: user.email })}</Text></View><View style={{gap:10}}><Button title={tr(language, 'mobileAuth.switchTenant')} onPress={onSwitchTenant} variant="secondary"/><Button title={tr(language, 'auth.signOut')} onPress={onSignOut} variant="outline"/></View></>;
 
   const screen = tab === 'home' ? renderHome() : tab === 'records' ? renderRecords() : tab === 'crops' ? renderCrops() : tab === 'livestock' ? renderLivestock() : renderMore();
   return <SafeAreaView style={styles.safe}><ExpoStatusBar style="dark"/><StatusBar barStyle="dark-content" backgroundColor="#F5F7F0"/><View style={styles.appBody}><ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>{loading ? <ActivityIndicator size="large" color="#28734A" style={{marginTop:60}}/> : screen}</ScrollView><View style={styles.tabBar}>{([['home','⌂',t('dashboard')],['records','▤',t('records')],['crops','♧',t('crops')],['livestock','♙',t('livestock')],['more','•••',t('more')]] as [Tab,string,string][]).map(([key,icon,label])=><Pressable key={key} onPress={() => setTab(key)} style={styles.tabItem}><Text style={[styles.tabIcon,tab===key && styles.activeTabIcon]}>{icon}</Text><Text numberOfLines={1} style={[styles.tabLabel,tab===key && styles.activeTabLabel]}>{label}</Text>{tab===key && <View style={styles.activeDot}/>}</Pressable>)}</View></View>
@@ -102,7 +150,7 @@ export default function App() {
 function EntryRow({entry,language}:{entry:FarmEntry;language:Language}) {
   const tr = translations[language]; const isIncome = entry.kind === 'income';
   const categoryLabel = (tr as Record<string,string>)[entry.category] || entry.category;
-  return <View style={styles.entryRow}><View style={[styles.entryGlyph,isIncome ? styles.entryGlyphIncome : styles.entryGlyphExpense]}><Text style={[styles.entryGlyphText,isIncome ? styles.green : styles.red]}>{isIncome ? '↗' : '↘'}</Text></View><View style={styles.entryInfo}><Text style={styles.entryDescription} numberOfLines={1}>{entry.description}</Text><Text style={styles.entryMeta}>{categoryLabel} · {entry.date}</Text></View><View style={styles.entryAmountWrap}><Text style={[styles.entryAmount,isIncome ? styles.green : styles.red]}>{isIncome ? '+' : '−'}{money(entry.amount)}</Text><Text style={styles.entrySync}>{entry.syncStatus === 'local-only' ? '● Local' : '✓ Synced'}</Text></View></View>;
+  return <View style={styles.entryRow}><View style={[styles.entryGlyph,isIncome ? styles.entryGlyphIncome : styles.entryGlyphExpense]}><Text style={[styles.entryGlyphText,isIncome ? styles.green : styles.red]}>{isIncome ? '↗' : '↘'}</Text></View><View style={styles.entryInfo}><Text style={styles.entryDescription} numberOfLines={1}>{entry.description}</Text><Text style={styles.entryMeta}>{categoryLabel} · {entry.date}</Text></View><View style={styles.entryAmountWrap}><Text style={[styles.entryAmount,isIncome ? styles.green : styles.red]}>{isIncome ? '+' : '−'}{money(entry.amount)}</Text><Text style={styles.entrySync}>{entry.syncStatus === 'local-only' ? tr.localBadge : tr.syncedBadge}</Text></View></View>;
 }
 
 const styles = StyleSheet.create({

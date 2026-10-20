@@ -6,8 +6,21 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "splash": { "backgroundColor": "#F5F7F0" },
-    "ios": { "supportsTablet": true, "bundleIdentifier": "com.smartfarm360.mobile" },
-    "android": { "package": "com.smartfarm360.mobile", "adaptiveIcon": { "backgroundColor": "#F5F7F0" } }
+    "splash": {
+      "backgroundColor": "#F5F7F0"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.smartfarm360.mobile"
+    },
+    "android": {
+      "package": "com.smartfarm360.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#F5F7F0"
+      }
+    },
+    "plugins": [
+      "expo-secure-store"
+    ]
   }
 }

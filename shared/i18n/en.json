@@ -234,7 +234,13 @@
     "required": "Enter an amount and description.",
     "saved": "Entry saved on this device.",
     "noFarmData": "No farm records yet",
-    "profileDesc": "Farm name, location, land area and preferred language can be configured when the farm setup module is connected."
+    "profileDesc": "Farm name, location, land area and preferred language can be configured when the farm setup module is connected.",
+    "dateFormat": "Use YYYY-MM-DD for the date.",
+    "saveFailed": "Could not save this entry. Please try again.",
+    "viewAll": "View all →",
+    "localBadge": "● On this phone",
+    "syncedBadge": "✓ Synced",
+    "claimed": "{{count}} earlier entries on this phone were added to this farm business."
   },
   "common": {
     "appName": "SmartFarm360",
