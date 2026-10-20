@@ -3,7 +3,8 @@
 ## Current state
 
 - **Phase:** 2 (platform foundation) complete on branch `feature/phase-2-platform` (based on `feature/phase-1-foundation`).
-  Next: Phase 3 (finance core).
+  Phase 3 (finance core) started on `feature/phase-3-finance`: [posting rules](finance/posting-rules.md) are awaiting
+  product-owner review; no finance code has been written yet.
 - **Production readiness:** not ready. Authentication, roles, tenant isolation and audit are in place and tested, but no
   email provider is configured, hosting/backups are undecided, and the Phase 1 finance and stock records still have the
   accounting gaps listed under Known gaps (fixed in Phases 3–5).

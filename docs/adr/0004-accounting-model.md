@@ -1,6 +1,6 @@
 # ADR 0004 — Accounting model
 
-- Status: Accepted (2026-10-19). Detailed posting rules are written and reviewed at the start of Phase 3.
+- Status: Accepted (2026-10-19). Detailed posting rules: [docs/finance/posting-rules.md](../finance/posting-rules.md) (draft, awaiting review).
 
 ## Context
 
