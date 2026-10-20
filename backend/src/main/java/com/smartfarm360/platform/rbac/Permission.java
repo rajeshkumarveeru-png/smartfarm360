@@ -1,0 +1,22 @@
+package com.smartfarm360.platform.rbac;
+
+/**
+ * Tenant-level permissions. Codes must match the rows seeded into {@code sf_permissions}
+ * (changeset 029); a migration test enforces this.
+ */
+public enum Permission {
+    TENANT_READ,
+    TENANT_MANAGE,
+    MEMBERS_READ,
+    MEMBERS_MANAGE,
+    AUDIT_READ,
+    FARM_READ,
+    FARM_WRITE,
+    CROP_READ,
+    CROP_WRITE,
+    CROP_ACTIVITY_WRITE,
+    FINANCE_READ,
+    FINANCE_WRITE,
+    INVENTORY_READ,
+    INVENTORY_WRITE
+}

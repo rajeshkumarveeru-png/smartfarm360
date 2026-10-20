@@ -1,5 +1,7 @@
 package com.smartfarm360.migration;
 
+import com.smartfarm360.platform.rbac.Permission;
+import com.smartfarm360.platform.rbac.RoleCode;
 import com.smartfarm360.support.EmbeddedPostgresSupport;
 import liquibase.Contexts;
 import liquibase.LabelExpression;
@@ -16,7 +18,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -40,7 +44,10 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
         assertThat(applied).containsExactly(
                 "025-smartfarm360-foundation",
                 "026-smartfarm360-crop-operations",
-                "027-smartfarm360-finance-procurement");
+                "027-smartfarm360-finance-procurement",
+                "028-platform-schema",
+                "029-platform-seed-rbac",
+                "030-platform-backfill");
     }
 
     @Test
@@ -52,7 +59,74 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
                 "sf_users", "sf_tenants", "sf_tenant_memberships", "sf_farms", "sf_land_parcels",
                 "sf_crop_masters", "sf_crop_varieties", "sf_crop_seasons", "sf_cultivation_cycles",
                 "sf_farm_activities", "sf_harvest_records", "sf_finance_entries", "sf_suppliers",
-                "sf_inventory_items", "sf_purchases");
+                "sf_inventory_items", "sf_purchases",
+                "sf_permissions", "sf_roles", "sf_role_permissions", "sf_membership_roles", "sf_refresh_tokens",
+                "sf_password_reset_tokens", "sf_invitations", "sf_invitation_roles", "sf_tenant_settings",
+                "sf_tenant_modules", "sf_audit_history");
+    }
+
+    @Test
+    void seededPermissionsAndRolesMatchTheJavaEnums() {
+        assertThat(jdbc.queryForList("select code from sf_permissions", String.class))
+                .containsExactlyInAnyOrderElementsOf(Arrays.stream(Permission.values()).map(Enum::name).toList());
+        assertThat(jdbc.queryForList("select code from sf_roles where tenant_id is null", String.class))
+                .containsExactlyInAnyOrderElementsOf(Arrays.stream(RoleCode.values()).map(Enum::name).toList());
+        // Owners and farm administrators hold every permission; viewers hold only read permissions.
+        assertThat(permissionsOf("TENANT_OWNER")).hasSize(Permission.values().length);
+        assertThat(permissionsOf("VIEWER")).allMatch(p -> p.endsWith("_READ")).doesNotContain("AUDIT_READ", "MEMBERS_READ");
+    }
+
+    @Test
+    void legacyMembershipRolesAreMappedWhenUpgradingAnExistingDatabase() throws Exception {
+        DataSource legacy = newDatabase("legacy_" + UUID.randomUUID().toString().replace("-", ""));
+        JdbcTemplate db = new JdbcTemplate(legacy);
+        runChangelog(legacy, 3); // the schema as it was before Phase 2 (changesets 025-027)
+
+        long tenant = db.queryForObject("insert into sf_tenants(name, slug) values ('Legacy', 'legacy') returning id", Long.class);
+        Map<String, String> expected = Map.of("OWNER", "TENANT_OWNER", "ADMIN", "FARM_ADMIN", "FARM_MANAGER", "FARM_MANAGER", "SOMETHING_ELSE", "VIEWER");
+        for (String legacyRole : expected.keySet()) {
+            long user = db.queryForObject("insert into sf_users(email, password_hash, display_name) values (?, 'x', 'u') returning id",
+                    Long.class, legacyRole.toLowerCase() + "@legacy.test");
+            db.update("insert into sf_tenant_memberships(tenant_id, user_id, role) values (?, ?, ?)", tenant, user, legacyRole);
+        }
+        db.update("insert into sf_farms(tenant_id, name) values (?, 'Old farm')", tenant);
+
+        runChangelog(legacy, null);
+
+        for (Map.Entry<String, String> e : expected.entrySet()) {
+            assertThat(db.queryForList("""
+                    select r.code from sf_membership_roles mr join sf_roles r on r.id = mr.role_id
+                    join sf_tenant_memberships m on m.id = mr.membership_id where m.role = ?""", String.class, e.getKey()))
+                    .as("legacy role %s", e.getKey()).containsExactly(e.getValue());
+        }
+        assertThat(db.queryForObject("select count(*) from sf_tenant_settings where tenant_id = ?", Integer.class, tenant)).isEqualTo(1);
+        assertThat(db.queryForObject("select enabled from sf_tenant_modules where tenant_id = ? and module_code = 'CROP'", Boolean.class, tenant)).isTrue();
+        assertThat(db.queryForObject("select count(*) from sf_farms where tenant_id = ?", Integer.class, tenant)).as("data preserved").isEqualTo(1);
+    }
+
+    @Test
+    void landParcelCannotPointAtAnotherTenantsFarm() {
+        long tenantA = tenant();
+        long tenantB = tenant();
+        long farmA = jdbc.queryForObject("insert into sf_farms(tenant_id, name) values (?, 'Farm A') returning id", Long.class, tenantA);
+        assertThatThrownBy(() -> jdbc.update("insert into sf_land_parcels(tenant_id, farm_id, name, area) values (?, ?, 'x', 1)", tenantB, farmA))
+                .isInstanceOf(DataIntegrityViolationException.class).hasMessageContaining("fk_sf_parcel_farm_tenant");
+    }
+
+    private List<String> permissionsOf(String role) {
+        return jdbc.queryForList("select rp.permission_code from sf_role_permissions rp join sf_roles r on r.id = rp.role_id where r.code = ?",
+                String.class, role);
+    }
+
+    /** Applies {@code count} changesets (all when null) to the given database. */
+    private static void runChangelog(DataSource target, Integer count) throws Exception {
+        try (Connection connection = target.getConnection()) {
+            Database database = DatabaseFactory.getInstance().findCorrectDatabaseImplementation(new JdbcConnection(connection));
+            try (Liquibase liquibase = new Liquibase(CHANGELOG, new ClassLoaderResourceAccessor(), database)) {
+                if (count == null) liquibase.update(new Contexts(), new LabelExpression());
+                else liquibase.update(count, new Contexts(), new LabelExpression());
+            }
+        }
     }
 
     @Test

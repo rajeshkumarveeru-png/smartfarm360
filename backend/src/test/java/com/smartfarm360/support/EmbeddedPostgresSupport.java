@@ -4,8 +4,12 @@ import io.zonky.test.db.postgres.embedded.EmbeddedPostgres;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
+import javax.sql.DataSource;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
 
 /**
  * Starts one real, empty PostgreSQL server per test JVM (no Docker required).
@@ -32,5 +36,14 @@ public abstract class EmbeddedPostgresSupport {
         registry.add("spring.datasource.username", () -> "postgres");
         registry.add("spring.datasource.password", () -> "postgres");
         registry.add("app.bootstrap-admin.enabled", () -> "false");
+        registry.add("app.auth.jwt-secret", () -> "test-only-signing-secret-at-least-32-bytes!!");
+    }
+
+    /** Creates a separate, empty database on the same server (for migration scenarios that must not share state). */
+    protected static DataSource newDatabase(String name) throws SQLException {
+        try (Connection c = POSTGRES.getPostgresDatabase().getConnection(); Statement s = c.createStatement()) {
+            s.execute("create database " + name);
+        }
+        return POSTGRES.getDatabase("postgres", name);
     }
 }
