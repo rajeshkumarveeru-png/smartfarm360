@@ -71,7 +71,9 @@ export default function NewRecordPage() {
       .then(p => setOpenDocs(p.items.filter(d => d.openAmount > 0).reverse())).catch(() => setOpenDocs([]));
   }, [base, kind, form.partyId]);
 
-  const categories = useMemo(() => data.categories.filter(c => c.active && (kind === 'sale' ? c.kind === 'INCOME' : c.kind !== 'INCOME')), [data.categories, kind]);
+  // Expenses first, then farm-asset purchases
+  const categories = useMemo(() => data.categories.filter(c => c.active && (kind === 'sale' ? c.kind === 'INCOME' : c.kind !== 'INCOME'))
+    .sort((a, b) => Number(a.kind === 'ASSET') - Number(b.kind === 'ASSET')), [data.categories, kind]);
   const accounts = data.accounts.filter(a => a.active);
   const party = data.parties.find(p => String(p.id) === form.partyId);
   const lineAmount = (l: Line) => (l.quantity && l.rate ? Math.round(Number(l.quantity) * Number(l.rate) * 100) / 100 : Number(l.amount || 0));

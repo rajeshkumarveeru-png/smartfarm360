@@ -540,10 +540,10 @@ public class DocumentService {
         params.put("party", partyId);
         params.put("from", from);
         params.put("to", to);
-        long total = jdbc.sql("select count(*) from sf_finance_documents d" + where).params(params).query(Long.class).single();
+        long total = jdbc.sql("select count(*) from sf_finance_documents d " + where).params(params).query(Long.class).single();
         params.put("limit", size);
         params.put("offset", (long) page * size);
-        List<DocumentSummary> items = jdbc.sql(SUMMARY_SELECT + where + " order by d.doc_date desc, d.id desc limit :limit offset :offset")
+        List<DocumentSummary> items = jdbc.sql(SUMMARY_SELECT + " " + where + " order by d.doc_date desc, d.id desc limit :limit offset :offset")
                 .params(params).query((rs, i) -> summary(rs)).list();
         return PageResponse.of(items, page, size, total);
     }

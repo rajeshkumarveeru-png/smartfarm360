@@ -266,3 +266,24 @@ idempotency, legacy migration, and reports (income statement, cash flow, receiva
 activity profitability) on web and mobile in Tamil and English. Tests include section 8 as a golden scenario,
 journal-balance and immutability checks, duplicate-payment tests, rollback tests, cross-tenant tests and the
 legacy-migration totals check.
+
+## 14. Implementation notes (Phase 3, 2026-10-20)
+
+How the build follows this document, and where it deliberately does less or more:
+
+- **Activity on lines.** A profit-and-loss line without an activity is posted to the tenant's *Farm overhead* cost
+  object, so "unallocated overhead" in reports is exactly the overhead object's total.
+- **Default cash account.** Every tenant gets a "Cash in hand" account on first use of finance.
+- **Paid now** creates a separate payment or receipt record, matched to the bill or sale in the same transaction.
+- **Depreciation** is a manual record (owner/accountant) until the Phase 6 asset register calculates schedules.
+- **Overhead allocation (P16) and internal transfers (P17)** are not built yet. Their posting rule is fixed here;
+  they arrive with crop costing (Phase 5) and organic resources (Phase 11).
+- **Dues ageing** ages each open bill or sale from its due date (or record date). Anything on a party's balance that
+  is not an open bill or sale (opening balances, unmatched payments) is shown as *not linked* or *advance*.
+- **Cash-basis view** counts party bills and sales in proportion to what has been paid, received or settled
+  (write-offs excluded); cash records without a party and loan interest count on their date; depreciation is excluded.
+- **Stock purchases** from the Phase 1 stock screen post as bills to Stock (1200), with the paid part as a payment.
+- **Mobile quick entries** post as cash bills or sales; entries made offline wait on the phone and are retried with
+  their entry id as the idempotency key.
+- **Checks in the database:** the journal is append-only (triggers) and each entry must balance at commit (deferred
+  constraint trigger); the old `sf_finance_entries` table is read-only.

@@ -3,7 +3,7 @@
 Multi-tenant integrated farming management for farmers in India — crops, dairy, poultry, goat/sheep,
 aquaculture, organic manure, labour, equipment, processing and trading. Tamil and English.
 
-> **Status: early development (Phase 2 of 14 complete).** Not production-ready. See
+> **Status: early development (Phase 3 of 14 complete).** Not production-ready. See
 > [docs/PROGRESS.md](docs/PROGRESS.md) for what is implemented, verified and still missing.
 
 ## Repository layout
@@ -94,6 +94,12 @@ npm run dist
 
 Produces `release/SmartFarm360-<version>-Portable.exe`. The desktop app still needs a reachable PostgreSQL
 configured in `config/application.properties`.
+
+## Finance
+
+Money is recorded as farmer-friendly records (bills, sales, payments, loans…) that post to an append-only journal.
+The rules, decisions and a worked example are in [docs/finance/posting-rules.md](docs/finance/posting-rules.md);
+`GoldenScenarioTest` checks the example's figures.
 
 ## Database migrations
 

@@ -31,7 +31,7 @@ describe('layout navigation', () => {
     renderAt({ ...base, roles: ['WORKER'], permissions: ['TENANT_READ', 'FARM_READ', 'CROP_READ', 'CROP_ACTIVITY_WRITE'] });
     expect(screen.getByRole('link', { name: 'Farms & land' })).toHaveAttribute('href', '/t/7/farms');
     expect(screen.getByRole('link', { name: 'Crops' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Finance & stock' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Finance' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Members' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Platform admin' })).not.toBeInTheDocument();
   });

@@ -88,7 +88,7 @@ function IncomeView({ r }: { r: IncomeStatement }) {
         <tr className="subtotal"><td>{t('totalCosts')}</td><td className="num">{formatMoney(r.operatingCostTotal, lang)}</td></tr>
         <tr className="total"><td>{t('operatingProfit')}</td><td className="num">{formatMoney(r.operatingProfit, lang)}</td></tr>
         {r.otherIncome.length > 0 && <><tr className="section"><th colSpan={2}>{t('otherIncome')}</th></tr>{rows(r.otherIncome)}</>}
-        <tr><td>{t('interest')}</td><td className="num">−{formatMoney(r.interest, lang)}</td></tr>
+        <tr><td>{t('ledger.5900')}</td><td className="num">−{formatMoney(r.interest, lang)}</td></tr>
         <tr><td>{t('losses')}</td><td className="num">−{formatMoney(r.losses, lang)}</td></tr>
         <tr className="total"><td>{t('netProfit')}</td><td className="num">{formatMoney(r.netProfit, lang)}</td></tr>
       </tbody>

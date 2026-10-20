@@ -97,7 +97,7 @@ export default function DocumentPage() {
                 <td>{l.categoryId ? categoryLabel({ code: l.categoryCode, name: l.categoryName }) : t(`ledger.${l.accountCode}`)}</td>
                 <td>{l.description ?? ''}</td>
                 <td>{l.quantity != null ? `${formatNumber(l.quantity, lang)} ${l.unit ?? ''} × ${formatMoney(l.rate, lang)}` : ''}</td>
-                <td>{l.costObjectName ?? ''}</td>
+                <td>{l.costObjectName ?? (/^[45]/.test(l.accountCode) ? t('overhead') : '')}</td>
                 <td className="num">{formatMoney(l.amount, lang)}</td>
               </tr>
             ))}

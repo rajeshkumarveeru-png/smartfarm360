@@ -15,14 +15,14 @@ Deferred from Phase 2 (not blocking Phase 3):
 - Drop the unused `sf_tenant_memberships.role` column (contract step).
 - Mobile registration and password reset screens.
 
-## Phase 3 — Finance core
+## Phase 3 — Finance core ✅ (see PROGRESS.md)
 
-- Written posting rules (ADR 0004) reviewed before code.
-- Chart of accounts, categories, cash/bank accounts, documents with lines and states, payments and allocations,
-  receivables/payables, recurring expenses, loans and interest, worker advances (ledger side), attachments (ADR 0009).
-- Idempotency keys on money-creating writes.
-- Migrate `sf_finance_entries` into posted documents (forward-only, verified).
-- **Accept when:** calculation unit tests, rollback tests, duplicate-payment tests and journal balance invariants pass.
+Deferred from Phase 3:
+- Overhead allocation runs (P16) → Phase 5; internal transfers of produce/manure (P17) → Phases 5 and 11.
+- Asset register with depreciation schedules (manual depreciation records exist) → Phase 6.
+- Recurring expenses, worker advances and wages → Phase 6.
+- CSV/XLSX/PDF exports of reports → Phase 7.
+- GST (D12) → with processing and trading.
 
 ## Phase 4 — Inventory, purchasing and sales
 

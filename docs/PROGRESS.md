@@ -2,12 +2,11 @@
 
 ## Current state
 
-- **Phase:** 2 (platform foundation) complete on branch `feature/phase-2-platform` (based on `feature/phase-1-foundation`).
-  Phase 3 (finance core) started on `feature/phase-3-finance`: [posting rules](finance/posting-rules.md) are awaiting
-  product-owner review; no finance code has been written yet.
-- **Production readiness:** not ready. Authentication, roles, tenant isolation and audit are in place and tested, but no
-  email provider is configured, hosting/backups are undecided, and the Phase 1 finance and stock records still have the
-  accounting gaps listed under Known gaps (fixed in Phases 3–5).
+- **Phase:** 3 (finance core) complete on branch `feature/phase-3-finance` (based on `feature/phase-2-platform`).
+  Next: Phase 4 (inventory, purchasing and sales).
+- **Production readiness:** not ready. Authentication, roles, tenant isolation, audit and the finance core are in place
+  and tested, but no email provider is configured, hosting/backups are undecided, and stock quantities still change
+  without movement records (Phase 4).
 
 ## Decisions
 
@@ -24,6 +23,7 @@
 | **Hosting / deployment target** | **Open** — needed before Phase 14 (and before choosing S3/email providers) | — |
 | **Desktop (Electron) scope** | **Open** — kept working as is; needs a decision because it requires a local PostgreSQL | — |
 | **Tamil terminology reviewer** | **Open** — required before the first release | ADR 0008 |
+| Finance posting rules, D1–D12 | Approved as recommended (2026-10-20) | [posting rules](finance/posting-rules.md) |
 | **Email provider** | **Open** — Phase 2 ships the `EmailSender` interface with a logging stub, as instructed. Reset and invitation emails are not delivered until a provider is chosen | ADR 0003 |
 
 ## Phase 1 — Baseline and hygiene (2026-10-19)
@@ -142,6 +142,61 @@ Not verified: GitHub Actions (nothing pushed); Electron packaging (`npm run dist
 - Without `APP_JWT_SECRET` a random key is used and everyone is signed out on restart.
 - Static hosting of the web app needs an SPA fallback to `index.html` (the Electron server already does this).
 
+## Phase 3 — Finance core (2026-10-20)
+
+Commits on `feature/phase-3-finance`: `8b64fac` (posting rules), `49e8332` (backend), `f54d0f7` (web), `21c7b7b` (mobile),
+plus the verification and docs commit.
+
+### Features completed
+
+- **Approved posting rules** implemented: system ledger (29 accounts), 30 Tamil/English categories plus tenant categories,
+  cash/bank/UPI accounts, one parties list (D11), loans, cost objects (crop cycles + farm overhead).
+- **Records:** bills and sales (lines, quantity × rate rounded per line, drafts, paid now), payments and receipts with
+  matching to open bills/sales, transfers, owner money in/out (drawings, D2), loans and repayments (principal vs
+  interest), settlements with a trader, write-offs, opening balances, manual depreciation.
+- **Controls:** append-only journal and balance check in the database, reversal instead of editing, lock date (D9),
+  April–March numbering (D1), idempotency keys, row locks so concurrent payments cannot over-pay a bill, audit of every
+  post, reversal, match and settings change.
+- **Reports:** profit and loss (accrual and cash basis, D10; subsidies below operating profit, D4), cash flow
+  (operating/investing/financing), dues with ageing and advances, balances, activity profitability, dashboard summary.
+- **Web:** finance overview, records, record detail, a form for every record type, parties, cash & bank and loans,
+  reports, finance settings; the old screen became *Stock & purchases* and purchases now post bills to Stock.
+- **Mobile:** home shows real month figures and the cash/bank total; quick entries post to the accounts and wait on
+  the phone when offline, then retry with the same idempotency key.
+
+### Database migrations
+
+`005-finance-core.yaml`: `031-finance-schema`, `032-finance-journal-guards`, `033-finance-seed`,
+`034-finance-legacy-migration` (moves Phase 1 entries and purchases into documents and journal, verifies counts and
+totals inside the changeset, makes `sf_finance_entries` read-only). Applied to the local database on 2026-10-20 after a
+`pg_dump` backup; the local database had no legacy finance rows.
+
+A defect found by the new migration test was fixed before the changeset was ever applied outside tests: the category
+uniqueness constraint allowed only one custom category per tenant.
+
+### APIs added
+
+All under `/api/v1/tenants/{tenantId}/finance`: settings, categories, accounts, parties, loans, cost-objects, documents
+(list, detail, edit draft, post, cancel, reverse, allocations), bills, sales, payments, receipts, transfers, owner-money,
+loans, loan-repayments, settlements, write-offs, opening-balances, depreciation, allocations/{id}, and reports
+(income-statement, cash-flow, dues, balances, activity, summary). Removed: `/finance/entries`, `/finance/summary`.
+New permissions: `FINANCE_REVERSE`, `FINANCE_MANAGE` (owner, farm admin, accountant).
+
+### Tests and evidence
+
+| Command | Result |
+|---|---|
+| `backend: gradlew clean test bootJar` | Passed: **237 tests, 0 failures**, including the golden June scenario (every figure in section 8 of the posting rules), 15 finance rule tests (lifecycle, lock date, allocation checks, rollback, idempotency, two concurrent payments, rounding, database guards, list filters, every read endpoint), finance isolation and permissions, the legacy-data migration test, and 166 generated cross-tenant cases (83 tenant endpoints) |
+| `frontend: npm run lint`, `tsc --noEmit`, `npm run build` | Passed |
+| `frontend: npx vitest run` | Passed: **26 tests**; the catalog test now reads the backend source and fails if any error code or audit action lacks English or Tamil text |
+| `mobile: tsc --noEmit`, `npx jest --ci`, `expo install --check` | Passed: **15 tests** |
+| Manual browser check (backend :8081 on local PostgreSQL 18, Vite :5174) | Overview in Tamil → English; cash expense ₹1,250.50 → `BILL/2026-27/0001` paid; party added; sale 20 × ₹2,250 with ₹20,000 received → partly paid, ₹25,000 open, receipt matched; overview: revenue ₹45,000, profit ₹43,749.50, cash ₹18,749.50, to receive ₹25,000; cash-basis P&L ₹18,749.50. Backend log: 0 errors, no secrets |
+
+The browser check found a real bug the tests had missed (the records list built invalid SQL). It was fixed, and list
+and read-endpoint tests were added.
+
+Not verified: GitHub Actions (nothing pushed); Electron packaging; a real phone.
+
 ## Known gaps and defects
 
 Security and platform:
@@ -152,11 +207,12 @@ Security and platform:
 - No account deletion or tenant data export yet (Phase 14). Mobile has no registration or password reset (use web).
 - Tamil strings are unreviewed (`shared/i18n/ta.json` → `_meta.reviewStatus`).
 
-Finance and inventory (Phases 3–5, unchanged Phase 1 behaviour):
-- Stock quantities change without movement records; crop activities do not consume stock.
-- Purchases are not expenses; activity costs and harvest `sale_value` are separate money stores → double counting risk.
-- `PARTIAL` payment status has no paid amount; "net cash" ignores purchase payments; summary is all-time only.
-- Average unit cost rounded to 2 dp; units are free text; crop/finance responses are untyped maps without paging.
+Finance and stock:
+- Stock quantities still change without movement records and crop activities do not consume stock (Phase 4–5).
+- Crop activity `cost` and harvest `sale_value` remain memo fields outside the accounts (D7); they are replaced in Phase 5.
+- No overhead allocation runs or internal transfers yet (P16/P17); depreciation is entered by hand until Phase 6.
+- No report exports yet (Phase 7). Crop and stock API responses are still untyped maps without paging.
+- Removing a match after a later report date is not reflected historically in dues ageing (matches have no history).
 
 Clients:
 - Mobile entries are still device-only (sync is Phase 13); "coming soon" crop/livestock screens remain.

@@ -214,6 +214,40 @@ class FinanceRulesTest extends FinanceTestSupport {
     }
 
     @Test
+    void everyFinanceReadEndpointAnswers() throws Exception {
+        long bill = invoice("bills", "2026-07-02", trader, null, line("SEEDS", 100, null)).at("/summary/id").asLong();
+        for (String path : List.of("/settings", "/categories", "/accounts", "/accounts?asOf=2026-07-31", "/parties", "/parties/" + trader,
+                "/loans", "/cost-objects", "/documents", "/documents/" + bill, "/reports/income-statement?from=2026-07-01&to=2026-07-31",
+                "/reports/income-statement?from=2026-07-01&to=2026-07-31&basis=CASH", "/reports/cash-flow?from=2026-07-01&to=2026-07-31",
+                "/reports/dues", "/reports/dues?asOf=2026-09-15", "/reports/balances", "/reports/activity?from=2026-07-01&to=2026-07-31",
+                "/reports/summary")) {
+            get(f(path), owner).andExpect(status().isOk());
+        }
+        // Ageing: due on the record date (no due date), so on 15 Sep it is 75 days old
+        JsonNode dues = report("dues?asOf=2026-09-15");
+        money(dues.at("/payables/0/days61to90"), "100");
+        money(dues.get("payableTotal"), "100");
+        get(f("/reports/cash-flow?from=2026-07-31&to=2026-07-01"), owner).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_DATE_RANGE"));
+    }
+
+    @Test
+    void recordsCanBeListedAndFilteredByTypeStatusPartyAndDate() throws Exception {
+        invoice("bills", "2026-07-02", trader, null, line("SEEDS", 100, null));
+        invoice("sales", "2026-07-03", trader, null, line("CROP_SALE", 300, null));
+        invoice("bills", "2026-08-01", null, cash, line("LABOUR", 50, null));
+        post(f("/bills"), owner, Map.of("docDate", "2026-07-04", "partyId", trader, "post", false, "lines", List.of(line("SEEDS", 1, null))));
+
+        get(f("/documents"), owner).andExpect(status().isOk()).andExpect(jsonPath("$.totalItems").value(4))
+                .andExpect(jsonPath("$.items[0].docDate").value("2026-08-01"));
+        get(f("/documents?type=BILL&status=POSTED"), owner).andExpect(jsonPath("$.totalItems").value(2));
+        get(f("/documents?partyId=" + trader + "&from=2026-07-01&to=2026-07-31"), owner).andExpect(jsonPath("$.totalItems").value(3));
+        get(f("/documents?status=DRAFT"), owner).andExpect(jsonPath("$.items[0].number").doesNotExist());
+        get(f("/documents?size=2&page=1"), owner).andExpect(jsonPath("$.items.length()").value(2)).andExpect(jsonPath("$.totalPages").value(2));
+        get(f("/documents?size=500"), owner).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_PAGE"));
+    }
+
+    @Test
     void aTenantCanHaveManyOwnCategoriesButNotTwoWithTheSameName() throws Exception {
         post(f("/categories"), owner, Map.of("name", "Tractor diesel", "kind", "EXPENSE", "accountCode", "5000")).andExpect(status().isCreated());
         post(f("/categories"), owner, Map.of("name", "Drone spraying", "kind", "EXPENSE", "accountCode", "5600")).andExpect(status().isCreated());
