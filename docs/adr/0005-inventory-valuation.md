@@ -1,6 +1,7 @@
 # ADR 0005 — Inventory movements and valuation
 
 - Status: Accepted (2026-10-19)
+- Detailed design: [stock movement design](../inventory/stock-movements.md) (draft for review, 2026-10-20)
 
 ## Context
 

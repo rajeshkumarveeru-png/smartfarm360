@@ -3,7 +3,8 @@
 ## Current state
 
 - **Phase:** 3 (finance core) complete on branch `feature/phase-3-finance` (based on `feature/phase-2-platform`).
-  Next: Phase 4 (inventory, purchasing and sales).
+  Phase 4 (inventory, purchasing and sales) started on `feature/phase-4-inventory`: the stock movement design is
+  awaiting review; no Phase 4 code yet.
 - **Production readiness:** not ready. Authentication, roles, tenant isolation, audit and the finance core are in place
   and tested, but no email provider is configured, hosting/backups are undecided, and stock quantities still change
   without movement records (Phase 4).
@@ -24,6 +25,7 @@
 | **Desktop (Electron) scope** | **Open** — kept working as is; needs a decision because it requires a local PostgreSQL | — |
 | **Tamil terminology reviewer** | **Open** — required before the first release | ADR 0008 |
 | Finance posting rules, D1–D12 | Approved as recommended (2026-10-20) | [posting rules](finance/posting-rules.md) |
+| **Stock movement design, E1–E12** | **Awaiting review** (draft 2026-10-20) | [stock movements](inventory/stock-movements.md) |
 | **Email provider** | **Open** — Phase 2 ships the `EmailSender` interface with a logging stub, as instructed. Reset and invitation emails are not delivered until a provider is chosen | ADR 0003 |
 
 ## Phase 1 — Baseline and hygiene (2026-10-19)
