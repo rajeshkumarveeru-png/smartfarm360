@@ -37,6 +37,13 @@ export async function saveEntry(key: string, entry: FarmEntry): Promise<void> {
   await AsyncStorage.setItem(key, JSON.stringify([entry, ...entries]));
 }
 
+/** Removes entries (for example once they are recorded in the accounts). */
+export async function removeEntries(key: string, ids: string[]): Promise<void> {
+  if (!ids.length) return;
+  const remaining = (await loadEntries(key)).filter(e => !ids.includes(e.id));
+  await AsyncStorage.setItem(key, JSON.stringify(remaining));
+}
+
 /** Moves pre-sign-in entries into the given scope exactly once. Returns how many were moved. */
 export async function claimLegacyEntries(key: string): Promise<number> {
   const legacy = await loadEntries(LEGACY_KEY);

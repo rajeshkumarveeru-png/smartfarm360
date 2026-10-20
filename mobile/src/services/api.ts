@@ -24,7 +24,7 @@ let sessionEnded: () => void = () => {};
 
 export function onSessionEnded(handler: () => void) { sessionEnded = handler; }
 
-async function raw(path: string, init: { method?: string; body?: unknown; token?: string | null } = {}): Promise<Response> {
+async function raw(path: string, init: { method?: string; body?: unknown; token?: string | null; headers?: Record<string, string> } = {}): Promise<Response> {
   if (!isApiConfigured) throw new ApiError(0, 'API_NOT_CONFIGURED', 'SmartFarm360 API is not configured.');
   try {
     return await fetch(`${API_BASE_URL}${path}`, {
@@ -33,6 +33,7 @@ async function raw(path: string, init: { method?: string; body?: unknown; token?
         Accept: 'application/json',
         ...(init.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
         ...(init.token ? { Authorization: `Bearer ${init.token}` } : {}),
+        ...(init.headers ?? {}),
       },
       body: init.body === undefined ? undefined : JSON.stringify(init.body),
     });
@@ -91,7 +92,7 @@ export async function signOut() {
   if (stored) await raw('/api/v1/auth/logout', { method: 'POST', body: { refreshToken: stored } }).catch(() => undefined);
 }
 
-export async function apiRequest<T>(path: string, init: { method?: string; body?: unknown } = {}, retry = true): Promise<T> {
+export async function apiRequest<T>(path: string, init: { method?: string; body?: unknown; headers?: Record<string, string> } = {}, retry = true): Promise<T> {
   const response = await raw(path, { ...init, token: accessToken });
   if (response.status === 401 && retry) {
     if (await refreshSession()) return apiRequest<T>(path, init, false);

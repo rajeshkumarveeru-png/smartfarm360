@@ -240,7 +240,10 @@
     "viewAll": "View all →",
     "localBadge": "● On this phone",
     "syncedBadge": "✓ Synced",
-    "claimed": "{{count}} earlier entries on this phone were added to this farm business."
+    "claimed": "{{count}} earlier entries on this phone were added to this farm business.",
+    "postedToAccounts": "Recorded in your farm accounts.",
+    "savedOffline": "No connection. Saved on this phone; it will be recorded when you are back online.",
+    "pendingBadge": "● Waiting to send"
   },
   "common": {
     "appName": "SmartFarm360",

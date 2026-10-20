@@ -4,7 +4,9 @@ import {
   ScrollView, StatusBar, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
-import { FarmEntry, EntryKind, claimLegacyEntries, loadEntries, newEntryId, saveEntry, scopeKey } from './src/storage/entries';
+import { FarmEntry, EntryKind, claimLegacyEntries, loadEntries, newEntryId, removeEntries, saveEntry, scopeKey } from './src/storage/entries';
+import { FinanceContext, isOffline, loadFinance, postEntry, syncPending } from './src/finance/quickEntry';
+import { errorText } from './src/screens/AuthScreens';
 import { API_BASE_URL, apiRequest, isApiConfigured, onSessionEnded, refreshSession, signIn, signOut, type User } from './src/services/api';
 import { Language, TranslationKey, tr, translations } from './src/i18n/translations';
 import { loadTenants, rememberSelectedTenant, restoreSelectedTenant, type TenantSummary } from './src/auth/session';
@@ -70,13 +72,34 @@ function FarmHome({ user, tenant, language, onLanguage, onSignOut, onSwitchTenan
   const [category, setCategory] = useState<TranslationKey>('other');
   const [date, setDate] = useState(today());
   const [saving, setSaving] = useState(false);
+  const [finance, setFinance] = useState<FinanceContext | null>(null);
+  const canRead = tenant.permissions.includes('FINANCE_READ');
+  const canPost = tenant.permissions.includes('FINANCE_WRITE');
   const t = useCallback((key: TranslationKey) => translations[language][key], [language]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     const claimed = await claimLegacyEntries(storageKey);
     if (claimed > 0) Alert.alert(t('appName'), tr(language, 'mobile.claimed', { count: String(claimed) }));
-    const rows = await loadEntries(storageKey);
+    let rows = await loadEntries(storageKey);
+    if (canRead) {
+      try {
+        let context = await loadFinance(tenant.id, today());
+        // Entries saved while offline are retried; their ids are idempotency keys, so a retry never doubles them.
+        const pending = rows.filter(e => e.syncStatus === 'pending');
+        if (canPost && pending.length) {
+          const done = await syncPending(tenant.id, pending, context);
+          if (done.length) {
+            await removeEntries(storageKey, done);
+            rows = await loadEntries(storageKey);
+            context = await loadFinance(tenant.id, today());
+          }
+        }
+        setFinance(context);
+      } catch {
+        setFinance(null); // offline or unavailable: show what is on the phone
+      }
+    }
     setEntries(rows.sort((a,b) => b.createdAt.localeCompare(a.createdAt)));
     setLoading(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per user/tenant scope
@@ -88,8 +111,9 @@ function FarmHome({ user, tenant, language, onLanguage, onSignOut, onSwitchTenan
     const rows = entries.filter(e => e.date.startsWith(month));
     const income = rows.filter(e => e.kind === 'income').reduce((s,e) => s + e.amount, 0);
     const expenses = rows.filter(e => e.kind === 'expense').reduce((s,e) => s + e.amount, 0);
+    if (finance) return { income: Number(finance.summary.monthRevenue), expenses: Number(finance.summary.monthCosts), net: Number(finance.summary.cashTotal) };
     return { income, expenses, net: income - expenses };
-  }, [entries]);
+  }, [entries, finance]);
 
   const openEntry = (kind: EntryKind) => {
     setModal(kind); setAmount(''); setDescription(''); setDate(today());
@@ -110,6 +134,19 @@ function FarmHome({ user, tenant, language, onLanguage, onSignOut, onSwitchTenan
       category: category as string, date, createdAt: new Date().toISOString(), syncStatus: 'local-only',
     };
     try {
+      if (canPost && finance) {
+        try {
+          await postEntry(tenant.id, entry, finance);
+          setModal(null); await refresh();
+          Alert.alert(t('appName'), t('postedToAccounts'));
+          return;
+        } catch (e) {
+          if (!isOffline(e)) { Alert.alert(t('appName'), errorText(language, e)); return; }
+          await saveEntry(storageKey, { ...entry, syncStatus: 'pending' }); setModal(null); await refresh();
+          Alert.alert(t('appName'), t('savedOffline'));
+          return;
+        }
+      }
       await saveEntry(storageKey, entry); setModal(null); await refresh();
       Alert.alert(t('appName'), t('saved'));
     } catch {
@@ -129,7 +166,7 @@ function FarmHome({ user, tenant, language, onLanguage, onSignOut, onSwitchTenan
   const renderHome = () => (
     <>
       <View style={styles.hero}><View style={styles.heroTop}><Text style={styles.brand}>{t('appName')}</Text><Pressable onPress={() => setLanguage(language === 'ta' ? 'en' : 'ta')} style={styles.languagePill}><Text style={styles.languageText}>{language === 'ta' ? 'EN' : 'தமிழ்'}</Text></Pressable></View><Text style={styles.heroTitle}>{t('greeting')}</Text><Text style={styles.heroSub}>{t('subtitle')}</Text><View style={styles.leafBadge}><Text style={styles.leafEmoji}>🌱</Text><Text style={styles.leafText}>{t('month')}</Text></View></View>
-      <View style={styles.metricsGrid}><Metric label={t('revenue')} value={money(totals.income)} tone="green"/><Metric label={t('expenses')} value={money(totals.expenses)} tone="red"/><Metric label={t('net')} value={money(totals.net)} tone={totals.net < 0 ? 'red' : 'dark'}/></View>
+      <View style={styles.metricsGrid}><Metric label={t('revenue')} value={money(totals.income)} tone="green"/><Metric label={t('expenses')} value={money(totals.expenses)} tone="red"/><Metric label={finance ? tr(language, 'fin.cashAndBank') : t('net')} value={money(totals.net)} tone={totals.net < 0 ? 'red' : 'dark'}/></View>
       <Text style={styles.sectionTitle}>{t('quickActions')}</Text><View style={styles.actionsRow}><Pressable style={styles.actionCard} onPress={() => openEntry('expense')}><Text style={styles.actionIcon}>↘</Text><Text style={styles.actionTitle}>{t('addExpense')}</Text></Pressable><Pressable style={[styles.actionCard, styles.incomeAction]} onPress={() => openEntry('income')}><Text style={[styles.actionIcon, styles.incomeIcon]}>↗</Text><Text style={styles.actionTitle}>{t('addIncome')}</Text></Pressable></View>
       <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>{t('recent')}</Text><Pressable onPress={() => setTab('records')}><Text style={styles.seeAll}>{t('viewAll')}</Text></Pressable></View>
       {entries.length === 0 ? <View style={styles.emptyCard}><Text style={styles.emptyEmoji}>🧾</Text><Text style={styles.emptyText}>{t('noEntries')}</Text></View> : entries.slice(0,5).map(e => <EntryRow key={e.id} entry={e} language={language} />)}
@@ -150,7 +187,7 @@ function FarmHome({ user, tenant, language, onLanguage, onSignOut, onSwitchTenan
 function EntryRow({entry,language}:{entry:FarmEntry;language:Language}) {
   const tr = translations[language]; const isIncome = entry.kind === 'income';
   const categoryLabel = (tr as Record<string,string>)[entry.category] || entry.category;
-  return <View style={styles.entryRow}><View style={[styles.entryGlyph,isIncome ? styles.entryGlyphIncome : styles.entryGlyphExpense]}><Text style={[styles.entryGlyphText,isIncome ? styles.green : styles.red]}>{isIncome ? '↗' : '↘'}</Text></View><View style={styles.entryInfo}><Text style={styles.entryDescription} numberOfLines={1}>{entry.description}</Text><Text style={styles.entryMeta}>{categoryLabel} · {entry.date}</Text></View><View style={styles.entryAmountWrap}><Text style={[styles.entryAmount,isIncome ? styles.green : styles.red]}>{isIncome ? '+' : '−'}{money(entry.amount)}</Text><Text style={styles.entrySync}>{entry.syncStatus === 'local-only' ? tr.localBadge : tr.syncedBadge}</Text></View></View>;
+  return <View style={styles.entryRow}><View style={[styles.entryGlyph,isIncome ? styles.entryGlyphIncome : styles.entryGlyphExpense]}><Text style={[styles.entryGlyphText,isIncome ? styles.green : styles.red]}>{isIncome ? '↗' : '↘'}</Text></View><View style={styles.entryInfo}><Text style={styles.entryDescription} numberOfLines={1}>{entry.description}</Text><Text style={styles.entryMeta}>{categoryLabel} · {entry.date}</Text></View><View style={styles.entryAmountWrap}><Text style={[styles.entryAmount,isIncome ? styles.green : styles.red]}>{isIncome ? '+' : '−'}{money(entry.amount)}</Text><Text style={styles.entrySync}>{entry.syncStatus === 'pending' ? tr.pendingBadge : entry.syncStatus === 'local-only' ? tr.localBadge : tr.syncedBadge}</Text></View></View>;
 }
 
 const styles = StyleSheet.create({
