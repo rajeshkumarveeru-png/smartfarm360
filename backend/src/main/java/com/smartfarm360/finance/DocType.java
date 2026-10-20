@@ -1,6 +1,6 @@
 package com.smartfarm360.finance;
 
-/** Finance record types (posting rules, section 4) and their number prefixes. */
+/** Finance record types (posting rules, section 4; stock movement design, section 6) and their number prefixes. */
 public enum DocType {
     BILL("BILL"),
     SALE("SALE"),
@@ -14,7 +14,14 @@ public enum DocType {
     SETTLEMENT("SETL"),
     WRITE_OFF("WOFF"),
     OPENING_BALANCE("OPEN"),
-    DEPRECIATION("DEPR");
+    DEPRECIATION("DEPR"),
+    STOCK_ISSUE("ISSUE"),
+    STOCK_TRANSFER("STRF"),
+    WASTAGE("WASTE"),
+    STOCK_COUNT("COUNT"),
+    PRODUCE_RECEIPT("PROD"),
+    PURCHASE_RETURN("PRET"),
+    SALE_RETURN("SRET");
 
     private final String prefix;
 
@@ -25,19 +32,27 @@ public enum DocType {
     /** Bills and sales carry lines, can be drafts, and are settled through allocations. */
     public boolean isInvoice() { return this == BILL || this == SALE; }
 
+    /** Records created by the stock module; they always move stock and post at once. */
+    public boolean isStockRecord() {
+        return this == STOCK_ISSUE || this == STOCK_TRANSFER || this == WASTAGE || this == STOCK_COUNT || this == PRODUCE_RECEIPT
+                || this == PURCHASE_RETURN || this == SALE_RETURN;
+    }
+
     /** Records that settle bills or sales through allocations. */
-    public boolean allocates() { return this == PAYMENT || this == RECEIPT || this == SETTLEMENT || this == WRITE_OFF; }
+    public boolean allocates() {
+        return this == PAYMENT || this == RECEIPT || this == SETTLEMENT || this == WRITE_OFF || this == PURCHASE_RETURN || this == SALE_RETURN;
+    }
 
     /** Whether a settling record of this type may be allocated to a target of the given type. */
     public boolean canSettle(DocType target) {
         return switch (this) {
-            case PAYMENT -> target == BILL;
-            case RECEIPT, WRITE_OFF -> target == SALE;
+            case PAYMENT, PURCHASE_RETURN -> target == BILL;
+            case RECEIPT, WRITE_OFF, SALE_RETURN -> target == SALE;
             case SETTLEMENT -> target == BILL || target == SALE;
             default -> false;
         };
     }
 
-    /** Settlement by these counts as "paid" for the cash-basis view; write-offs do not. */
+    /** Settlement by these counts as "paid" for the cash-basis view; write-offs and returns do not. */
     public boolean countsAsPaid() { return this == PAYMENT || this == RECEIPT || this == SETTLEMENT; }
 }

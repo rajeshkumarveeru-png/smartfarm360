@@ -52,7 +52,10 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
                 "031-finance-schema",
                 "032-finance-journal-guards",
                 "033-finance-seed",
-                "034-finance-legacy-migration");
+                "034-finance-legacy-migration",
+                "035-stock-schema",
+                "036-stock-guards-and-seed",
+                "037-stock-legacy-migration");
     }
 
     @Test
@@ -70,7 +73,8 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
                 "sf_tenant_modules", "sf_audit_history",
                 "sf_ledger_accounts", "sf_finance_categories", "sf_financial_accounts", "sf_parties", "sf_cost_objects", "sf_loans",
                 "sf_finance_documents", "sf_finance_document_lines", "sf_payment_allocations", "sf_journal_entries", "sf_journal_lines",
-                "sf_document_sequences");
+                "sf_document_sequences",
+                "sf_units", "sf_stock_locations", "sf_stock_items", "sf_item_units", "sf_stock_lots", "sf_stock_movements", "sf_stock_balances");
     }
 
     @Test
@@ -135,7 +139,7 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
         db.update("insert into sf_purchases(tenant_id, supplier_id, item_id, purchase_date, quantity, unit_cost, total_amount, paid_amount, created_by) " +
                 "values (?, ?, ?, '2026-06-05', 100, 6, 600, 200, 'old@farm.test')", tenant, supplier, item);
 
-        runChangelog(legacy, null);
+        runChangelog(legacy, 4); // the Phase 3 finance changesets (031-034); the Phase 4 stock migration is tested below
 
         assertThat(db.queryForObject("select count(*) from sf_finance_documents where tenant_id = ? and legacy_source is not null", Integer.class, tenant)).isEqualTo(5);
         assertThat(db.queryForObject("select count(*) from (select entry_id from sf_journal_lines group by entry_id having sum(debit) <> sum(credit)) x", Integer.class)).isZero();
@@ -161,6 +165,94 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
         // The old table keeps its rows and becomes read-only
         assertThat(db.queryForObject("select count(*) from sf_finance_entries", Integer.class)).isEqualTo(3);
         assertThatThrownBy(() -> db.update("delete from sf_finance_entries")).hasMessageContaining("read-only");
+    }
+
+    @Test
+    void phaseOneStockBecomesItemsWithMovementsThatMatchTheLedger() throws Exception {
+        DataSource legacy = newDatabase("legacy_stock_" + UUID.randomUUID().toString().replace("-", ""));
+        JdbcTemplate db = new JdbcTemplate(legacy);
+        runChangelog(legacy, 6); // up to Phase 2
+
+        long tenant = db.queryForObject("insert into sf_tenants(name, slug) values ('Stock farm', 'stock-farm') returning id", Long.class);
+        long supplier = db.queryForObject("insert into sf_suppliers(tenant_id, name) values (?, 'Agro depot') returning id", Long.class, tenant);
+        // Urea: 20 kg typed in at Rs 5, then 100 kg bought at Rs 6. Phase 1 rounded the average to 5.83.
+        long urea = db.queryForObject("insert into sf_inventory_items(tenant_id, name, category, unit, quantity_on_hand, average_unit_cost) " +
+                "values (?, 'Urea', 'Fertilizer', ' Kg. ', 120, 5.83) returning id", Long.class, tenant);
+        db.update("insert into sf_purchases(tenant_id, supplier_id, item_id, purchase_date, quantity, unit_cost, total_amount, paid_amount, created_by) " +
+                "values (?, ?, ?, '2026-06-05', 100, 6, 600, 0, 'old@farm.test')", tenant, supplier, urea);
+        // Seed in "bag", a unit the catalog does not know; nothing bought since it was typed in
+        db.update("insert into sf_inventory_items(tenant_id, name, category, unit, quantity_on_hand, average_unit_cost) " +
+                "values (?, 'Paddy seed', 'Seeds', 'bag', 5, 800)", tenant);
+        // Neem oil: the Phase 1 quantity is lower than what was bought (data typed in by hand)
+        long neem = db.queryForObject("insert into sf_inventory_items(tenant_id, name, category, unit, quantity_on_hand, average_unit_cost) " +
+                "values (?, 'Neem oil', 'Pesticide', 'ltr', 2, 300) returning id", Long.class, tenant);
+        db.update("insert into sf_purchases(tenant_id, supplier_id, item_id, purchase_date, quantity, unit_cost, total_amount, paid_amount, created_by) " +
+                "values (?, ?, ?, '2026-06-07', 10, 300, 3000, 0, 'old@farm.test')", tenant, supplier, neem);
+        long lowerUrea = db.queryForObject("insert into sf_inventory_items(tenant_id, name, category, unit) values (?, 'urea', 'Fertilizer', 'kg') returning id",
+                Long.class, tenant);
+
+        runChangelog(legacy, 4); // Phase 3 finance migration
+        // A purchase made on the Phase 3 stock screen: 30 kg at Rs 7, posted as a bill to Stock (1200)
+        db.update("update sf_inventory_items set quantity_on_hand = 150, average_unit_cost = 6.06 where id = ?", urea);
+        db.update("insert into sf_purchases(tenant_id, supplier_id, item_id, purchase_date, quantity, unit_cost, total_amount, paid_amount, created_by) " +
+                "values (?, ?, ?, '2026-07-01', 30, 7, 210, 0, 'old@farm.test')", tenant, supplier, urea);
+        long party = db.queryForObject("select id from sf_parties where legacy_supplier_id = ?", Long.class, supplier);
+        long bill = db.queryForObject("insert into sf_finance_documents(tenant_id, doc_type, status, number, doc_date, party_id, total_amount, posted_at) " +
+                "values (?, 'BILL', 'POSTED', 'BILL/2026-27/0001', '2026-07-01', ?, 210, now()) returning id", Long.class, tenant, party);
+        db.update("insert into sf_finance_document_lines(tenant_id, document_id, line_no, account_code, description, quantity, unit, rate, amount) " +
+                "values (?, ?, 1, '1200', 'Urea', 30, ' Kg. ', 7, 210)", tenant, bill);
+        long entry = db.queryForObject("insert into sf_journal_entries(tenant_id, document_id, entry_date, kind) values (?, ?, '2026-07-01', 'POSTING') returning id",
+                Long.class, tenant, bill);
+        db.update("insert into sf_journal_lines(tenant_id, entry_id, account_code, debit, credit, party_id) " +
+                "values (?, ?, '1200', 210, 0, null), (?, ?, '2000', 0, 210, ?)", tenant, entry, tenant, entry, party);
+
+        runChangelog(legacy, null);
+
+        assertThat(db.queryForList("select name from sf_stock_items where tenant_id = ? order by legacy_item_id", String.class, tenant))
+                .containsExactly("Urea", "Paddy seed", "Neem oil", "urea (" + lowerUrea + ")");
+        Map<String, Object> u = db.queryForMap("select base_unit_code, on_hand_quantity, on_hand_value from sf_stock_items where legacy_item_id = ?", urea);
+        assertThat(u.get("base_unit_code")).isEqualTo("kg");
+        assertThat((BigDecimal) u.get("on_hand_quantity")).isEqualByComparingTo("150");
+        // 150 x 6.06 = 909.00: purchases 600 + 210, and the 20 kg typed in Phase 1 open at 99.00 (from its rounded average)
+        assertThat((BigDecimal) u.get("on_hand_value")).isEqualByComparingTo("909");
+        assertThat(db.queryForList("select m.movement_type || ' ' || round(m.quantity) || ' ' || m.value from sf_stock_movements m " +
+                "join sf_stock_items i on i.id = m.item_id where i.legacy_item_id = ? order by m.movement_date, m.id", String.class, urea))
+                .containsExactly("PURCHASE 100 600.00", "OPENING 20 99.00", "PURCHASE 30 210.00");
+        assertThat(db.queryForObject("select item_id is not null from sf_finance_document_lines where document_id = ?", Boolean.class, bill)).isTrue();
+
+        Map<String, Object> seed = db.queryForMap("select base_unit_code, custom_unit_name, on_hand_value, needs_review from sf_stock_items where name = 'Paddy seed'");
+        assertThat(seed.get("base_unit_code")).isEqualTo("piece");
+        assertThat(seed.get("custom_unit_name")).isEqualTo("bag");
+        assertThat(seed.get("needs_review")).isEqualTo(true);
+        assertThat((BigDecimal) seed.get("on_hand_value")).isEqualByComparingTo("4000");
+
+        // Neem oil: 10 bought, 2 left. The 8 missing litres become a stock loss to review, at their cost.
+        Map<String, Object> n = db.queryForMap("select base_unit_code, on_hand_quantity, on_hand_value, needs_review from sf_stock_items where legacy_item_id = ?", neem);
+        assertThat(n.get("base_unit_code")).isEqualTo("litre");
+        assertThat((BigDecimal) n.get("on_hand_quantity")).isEqualByComparingTo("2");
+        assertThat((BigDecimal) n.get("on_hand_value")).isEqualByComparingTo("600");
+        assertThat(n.get("needs_review")).isEqualTo(true);
+        assertThat(db.queryForObject("select coalesce(sum(debit - credit), 0) from sf_journal_lines where tenant_id = ? and account_code = '5980'",
+                BigDecimal.class, tenant)).isEqualByComparingTo("2400");
+        assertThat(db.queryForObject("select needs_review from sf_finance_documents where legacy_source = 'stock-shortfall'", Boolean.class)).isTrue();
+
+        // The ledger agrees with the store: 909 + 4000 + 600 + 0
+        assertThat(db.queryForObject("select coalesce(sum(debit - credit), 0) from sf_journal_lines where tenant_id = ? and account_code = '1200'",
+                BigDecimal.class, tenant)).isEqualByComparingTo("5509");
+        assertThat(db.queryForObject("select coalesce(sum(credit - debit), 0) from sf_journal_lines where tenant_id = ? and account_code = '3900'",
+                BigDecimal.class, tenant)).isEqualByComparingTo("4099");
+        assertThat(db.queryForObject("select count(*) from (select entry_id from sf_journal_lines group by entry_id having sum(debit) <> sum(credit)) x",
+                Integer.class)).isZero();
+        assertThat(db.queryForObject("select count(*) from sf_stock_items i where on_hand_quantity <> " +
+                "(select coalesce(sum(quantity), 0) from sf_stock_balances b where b.item_id = i.id)", Integer.class)).isZero();
+        assertThat(db.queryForObject("select count(*) from sf_stock_locations where tenant_id = ? and is_default", Integer.class, tenant)).isEqualTo(1);
+
+        // The Phase 1 stock tables keep their rows and become read-only; movements are append-only
+        assertThat(db.queryForObject("select count(*) from sf_purchases", Integer.class)).isEqualTo(3);
+        assertThatThrownBy(() -> db.update("update sf_inventory_items set quantity_on_hand = 0")).hasMessageContaining("read-only");
+        assertThatThrownBy(() -> db.update("delete from sf_purchases")).hasMessageContaining("read-only");
+        assertThatThrownBy(() -> db.update("insert into sf_suppliers(tenant_id, name) values (?, 'x')", tenant)).hasMessageContaining("read-only");
+        assertThatThrownBy(() -> db.update("delete from sf_stock_movements")).hasMessageContaining("append-only");
     }
 
     @Test

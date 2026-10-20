@@ -6,9 +6,11 @@ export type CostObject = { id: number; kind: 'OVERHEAD' | 'CROP_CYCLE'; name: st
 export type FinanceSettings = { lockDate: string | null; fiscalYearStartMonth: number };
 
 export type DocType = 'BILL' | 'SALE' | 'PAYMENT' | 'RECEIPT' | 'TRANSFER' | 'OWNER_IN' | 'OWNER_OUT' | 'LOAN_RECEIVED' | 'LOAN_REPAYMENT'
-  | 'SETTLEMENT' | 'WRITE_OFF' | 'OPENING_BALANCE' | 'DEPRECIATION';
+  | 'SETTLEMENT' | 'WRITE_OFF' | 'OPENING_BALANCE' | 'DEPRECIATION'
+  | 'STOCK_ISSUE' | 'STOCK_TRANSFER' | 'WASTAGE' | 'STOCK_COUNT' | 'PRODUCE_RECEIPT' | 'PURCHASE_RETURN' | 'SALE_RETURN';
 export const DOC_TYPES: DocType[] = ['BILL', 'SALE', 'PAYMENT', 'RECEIPT', 'TRANSFER', 'OWNER_IN', 'OWNER_OUT', 'LOAN_RECEIVED', 'LOAN_REPAYMENT',
-  'SETTLEMENT', 'WRITE_OFF', 'OPENING_BALANCE', 'DEPRECIATION'];
+  'SETTLEMENT', 'WRITE_OFF', 'OPENING_BALANCE', 'DEPRECIATION',
+  'STOCK_ISSUE', 'STOCK_TRANSFER', 'WASTAGE', 'STOCK_COUNT', 'PRODUCE_RECEIPT', 'PURCHASE_RETURN', 'SALE_RETURN'];
 
 export type DocumentSummary = {
   id: number; type: DocType; status: 'DRAFT' | 'POSTED' | 'REVERSED' | 'CANCELLED'; number: string | null; docDate: string; dueDate: string | null;
@@ -19,13 +21,18 @@ export type DocumentLine = {
   id: number; lineNo: number; categoryId: number | null; categoryCode: string | null; categoryName: string | null; accountCode: string; side: string | null;
   description: string | null; quantity: number | null; unit: string | null; rate: number | null; amount: number; costObjectId: number | null;
   costObjectName: string | null; farmId: number | null; partyId: number | null; financialAccountId: number | null; loanId: number | null;
+  itemId: number | null; itemName: string | null; locationId: number | null; lotNo: string | null; baseQuantity: number | null;
 };
+/** A stock movement shown on a record (quantity in the item's base unit, value in rupees; negative is stock going out). */
+export type StockMovement = { id: number; itemId: number; itemName: string; baseUnit: string; locationId: number; locationName: string; lotNo: string | null;
+  movementType: string; quantity: number; value: number; unitCost: number; costObjectId: number | null };
 export type Allocation = { id: number; sourceDocumentId: number; sourceNumber: string; sourceType: DocType; targetDocumentId: number; targetNumber: string;
   targetType: DocType; amount: number; allocationDate: string };
 export type FinanceDocument = {
   summary: DocumentSummary; farmId: number | null; financialAccountId: number | null; toFinancialAccountId: number | null; toFinancialAccountName: string | null;
   loanId: number | null; loanName: string | null; principalAmount: number | null; interestAmount: number | null; notes: string | null; referenceNo: string | null;
-  reversalDate: string | null; postedAt: string | null; lines: DocumentLine[]; allocations: Allocation[];
+  reversalDate: string | null; postedAt: string | null; originalDocumentId: number | null; lines: DocumentLine[]; allocations: Allocation[];
+  movements: StockMovement[];
 };
 
 export type AmountRow = { accountCode: string; categoryId: number | null; categoryCode: string | null; categoryName: string | null; amount: number };

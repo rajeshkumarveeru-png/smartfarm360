@@ -8,6 +8,9 @@ import { ErrorBanner, Loading } from '../components/common';
 import { currentLanguage, useNs } from '../i18n';
 import { describeError } from '../lib/errors';
 import { formatMoney, today } from '../lib/format';
+import { can } from '../lib/nav';
+import type { Item, Location, Unit } from '../stock/types';
+import { isQuantity, unitChoices } from '../stock/types';
 import type { DocumentSummary, FinanceDocument, Party } from './types';
 import { newIdempotencyKey, useCategoryLabel, useFinanceData } from './useFinanceData';
 
@@ -24,9 +27,26 @@ export function isAmount(value: string): boolean {
   return /^\d{1,12}(\.\d{1,2})?$/.test(value.trim()) && Number(value) > 0;
 }
 
-type Line = { categoryId: string; description: string; amount: string; quantity: string; rate: string; costObjectId: string };
-type OpeningLine = { kind: string; financialAccountId: string; partyId: string; loanName: string; description: string; amount: string };
-const emptyLine = (): Line => ({ categoryId: '', description: '', amount: '', quantity: '', rate: '', costObjectId: '' });
+type Line = { categoryId: string; description: string; amount: string; quantity: string; rate: string; costObjectId: string;
+  itemId: string; unit: string; locationId: string; lotNo: string; lotExpiry: string };
+type OpeningLine = { kind: string; financialAccountId: string; partyId: string; loanName: string; description: string; amount: string;
+  itemId: string; quantity: string; unit: string };
+const emptyLine = (): Line => ({ categoryId: '', description: '', amount: '', quantity: '', rate: '', costObjectId: '', itemId: '', unit: '', locationId: '', lotNo: '', lotExpiry: '' });
+const emptyOpening = (): OpeningLine => ({ kind: 'CASH', financialAccountId: '', partyId: '', loanName: '', description: '', amount: '', itemId: '', quantity: '', unit: '' });
+
+/** Stock items, locations and units for item lines; empty when the user cannot see stock. */
+function useStockChoices() {
+  const tenant = useTenant();
+  const [state, setState] = useState<{ items: Item[]; locations: Location[]; units: Unit[] }>({ items: [], locations: [], units: [] });
+  useEffect(() => {
+    if (!can(tenant, 'INVENTORY_READ')) return;
+    const base = `/api/v1/tenants/${tenant.id}/stock`;
+    Promise.all([api<Item[]>(`${base}/items`), api<Location[]>(`${base}/locations`), api<Unit[]>(`${base}/units`)])
+      .then(([items, locations, units]) => setState({ items, locations: locations.filter(l => l.active), units }))
+      .catch(() => undefined);
+  }, [tenant]);
+  return state;
+}
 
 export default function NewRecordPage() {
   const tenant = useTenant();
@@ -36,6 +56,8 @@ export default function NewRecordPage() {
   const navigate = useNavigate();
   const t = useNs('fin');
   const tc = useNs('common');
+  const ts = useNs('stock');
+  const stock = useStockChoices();
   const categoryLabel = useCategoryLabel();
   const lang = currentLanguage();
   const data = useFinanceData();
@@ -45,7 +67,7 @@ export default function NewRecordPage() {
   const [key, setKey] = useState(newIdempotencyKey);
   const [form, setForm] = useState<Record<string, string>>({ docDate: today(), direction: 'IN' });
   const [lines, setLines] = useState<Line[]>([emptyLine()]);
-  const [openingLines, setOpeningLines] = useState<OpeningLine[]>([{ kind: 'CASH', financialAccountId: '', partyId: '', loanName: '', description: '', amount: '' }]);
+  const [openingLines, setOpeningLines] = useState<OpeningLine[]>([emptyOpening()]);
   const [openDocs, setOpenDocs] = useState<DocumentSummary[]>([]);
   const [allocations, setAllocations] = useState<Record<number, string>>({});
   const [error, setError] = useState('');
@@ -59,7 +81,8 @@ export default function NewRecordPage() {
       setForm({ docDate: d.summary.docDate, dueDate: d.summary.dueDate ?? '', partyId: d.summary.partyId ? String(d.summary.partyId) : '',
         financialAccountId: d.financialAccountId ? String(d.financialAccountId) : '', notes: d.notes ?? '', referenceNo: d.referenceNo ?? '' });
       setLines(d.lines.map(l => ({ categoryId: String(l.categoryId ?? ''), description: l.description ?? '', amount: String(l.amount),
-        quantity: l.quantity != null ? String(l.quantity) : '', rate: l.rate != null ? String(l.rate) : '', costObjectId: l.costObjectId ? String(l.costObjectId) : '' })));
+        quantity: l.quantity != null ? String(l.quantity) : '', rate: l.rate != null ? String(l.rate) : '', costObjectId: l.costObjectId ? String(l.costObjectId) : '',
+        itemId: l.itemId ? String(l.itemId) : '', unit: l.unit ?? '', locationId: l.locationId ? String(l.locationId) : '', lotNo: l.lotNo ?? '', lotExpiry: '' })));
     }).catch(e => setError(describeError(e)));
   }, [base, draftId]);
 
@@ -96,7 +119,12 @@ export default function NewRecordPage() {
     if (isInvoice) {
       if (!form.partyId && !form.financialAccountId) return t('errors.partyOrAccount');
       for (const l of lines) {
-        if (!l.categoryId) return t('errors.category');
+        const item = stock.items.find(i => String(i.id) === l.itemId);
+        if (item) {
+          if (!isQuantity(l.quantity)) return ts('errors.quantity');
+          if (kind === 'sale' && !l.categoryId && !item.saleCategoryId) return t('errors.category');
+          if (item.trackLots && !l.lotNo.trim()) return ts('errors.lot');
+        } else if (!l.categoryId) return t('errors.category');
         const ok = l.quantity || l.rate ? isAmount(String(lineAmount(l))) : isAmount(l.amount);
         if (!ok) return t('errors.amount');
       }
@@ -104,7 +132,10 @@ export default function NewRecordPage() {
       if (form.paidNow && !form.paidFrom) return t('errors.account');
       return null;
     }
-    if (kind === 'opening') return openingLines.every(l => isAmount(l.amount)) ? null : t('errors.amount');
+    if (kind === 'opening') {
+      return openingLines.every(l => (l.kind === 'STOCK' ? !!l.itemId && isQuantity(l.quantity) && (l.amount === '0' || isAmount(l.amount)) : isAmount(l.amount)))
+        ? null : t('errors.amount');
+    }
     if (kind === 'loan-repayment') {
       const p = form.principal || '0', i = form.interest || '0';
       if (!form.loanId || !form.financialAccountId) return tc('required');
@@ -121,9 +152,11 @@ export default function NewRecordPage() {
         return {
           docDate: date, dueDate: form.dueDate || null, partyId: form.partyId ? Number(form.partyId) : null,
           financialAccountId: !form.partyId && form.financialAccountId ? Number(form.financialAccountId) : null,
-          lines: lines.map(l => ({ categoryId: Number(l.categoryId), description: l.description || null,
-            ...(l.quantity && l.rate ? { quantity: l.quantity, rate: l.rate } : { amount: l.amount }),
-            costObjectId: l.costObjectId ? Number(l.costObjectId) : null })),
+          lines: lines.map(l => ({ categoryId: l.categoryId && !(kind === 'expense' && l.itemId) ? Number(l.categoryId) : null, description: l.description || null,
+            ...(l.quantity && l.rate ? { quantity: l.quantity, rate: l.rate } : { amount: l.amount, quantity: l.quantity || null }),
+            costObjectId: l.costObjectId ? Number(l.costObjectId) : null,
+            ...(l.itemId ? { itemId: Number(l.itemId), unit: l.unit || null, locationId: l.locationId ? Number(l.locationId) : null,
+              lotNo: l.lotNo.trim() || null, lotExpiry: kind === 'expense' && l.lotExpiry ? l.lotExpiry : null } : {}) })),
           notes: form.notes || null, referenceNo: form.referenceNo || null, post,
           paidNow: post && form.partyId && form.paidNow ? { financialAccountId: Number(form.paidFrom), amount: form.paidNow } : null,
         };
@@ -139,7 +172,8 @@ export default function NewRecordPage() {
       case 'depreciation': return { docDate: date, amount: form.amount, costObjectId: form.costObjectId ? Number(form.costObjectId) : null, notes: form.notes || null };
       case 'opening': return { docDate: date, notes: form.notes || null, lines: openingLines.map(l => ({ kind: l.kind, amount: l.amount,
         financialAccountId: l.financialAccountId ? Number(l.financialAccountId) : null, partyId: l.partyId ? Number(l.partyId) : null,
-        loanName: l.loanName || null, description: l.description || null })) };
+        loanName: l.loanName || null, description: l.description || null,
+        ...(l.kind === 'STOCK' ? { itemId: Number(l.itemId), quantity: l.quantity, unit: l.unit || null } : {}) })) };
     }
   }
 
@@ -183,8 +217,26 @@ export default function NewRecordPage() {
             <legend>{t('lines')}</legend>
             {lines.map((l, i) => (
               <div className="line-row" key={i}>
-                <label>{t('category')}<select value={l.categoryId} onChange={e => setLines(ls => ls.map((x, j) => (j === i ? { ...x, categoryId: e.target.value } : x)))}>
-                  <option value="">—</option>{categories.map(c => <option key={c.id} value={c.id}>{categoryLabel(c)}</option>)}</select></label>
+                {stock.items.length > 0 && <label>{ts('item')} <small>{tc('optional')}</small><select value={l.itemId} onChange={e => {
+                  const item = stock.items.find(x => String(x.id) === e.target.value);
+                  setLines(ls => ls.map((x, j) => (j === i ? { ...x, itemId: e.target.value, unit: item?.baseUnit ?? '', lotNo: '', lotExpiry: '',
+                    categoryId: kind === 'sale' && item?.saleCategoryId && !x.categoryId ? String(item.saleCategoryId) : x.categoryId } : x)));
+                }}><option value="">—</option>{stock.items.filter(x => x.active).map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}
+                {!(kind === 'expense' && l.itemId) && <label>{t('category')}<select value={l.categoryId} onChange={e => setLines(ls => ls.map((x, j) => (j === i ? { ...x, categoryId: e.target.value } : x)))}>
+                  <option value="">—</option>{categories.map(c => <option key={c.id} value={c.id}>{categoryLabel(c)}</option>)}</select></label>}
+                {(() => {
+                  const item = stock.items.find(x => String(x.id) === l.itemId);
+                  if (!item) return null;
+                  const update = (patch: Partial<Line>) => setLines(ls => ls.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+                  return <>
+                    <label>{ts('unitLabel')}<select value={l.unit} onChange={e => update({ unit: e.target.value })}>
+                      {unitChoices(item, stock.units).map(u => <option key={u.value} value={u.value}>{u.label ?? ts(`unit.${u.value}`)}</option>)}</select></label>
+                    {stock.locations.length > 1 && <label>{ts('location')}<select value={l.locationId} onChange={e => update({ locationId: e.target.value })}>
+                      <option value="">{ts('defaultLocationOption')}</option>{stock.locations.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}
+                    {item.trackLots && <label>{ts('lot')}<input maxLength={60} value={l.lotNo} onChange={e => update({ lotNo: e.target.value })} /></label>}
+                    {item.trackLots && kind === 'expense' && <label>{ts('expiry')} <small>{tc('optional')}</small><input type="date" value={l.lotExpiry} onChange={e => update({ lotExpiry: e.target.value })} /></label>}
+                  </>;
+                })()}
                 <label>{t('description')}<input maxLength={240} value={l.description} onChange={e => setLines(ls => ls.map((x, j) => (j === i ? { ...x, description: e.target.value } : x)))} /></label>
                 <label>{t('quantity')}<input inputMode="decimal" value={l.quantity} onChange={e => setLines(ls => ls.map((x, j) => (j === i ? { ...x, quantity: e.target.value } : x)))} /></label>
                 <label>{t('rate')}<input inputMode="decimal" value={l.rate} onChange={e => setLines(ls => ls.map((x, j) => (j === i ? { ...x, rate: e.target.value } : x)))} /></label>
@@ -270,17 +322,27 @@ export default function NewRecordPage() {
               return (
                 <div className="line-row" key={i}>
                   <label>{t('openingKind')}<select value={l.kind} onChange={e => update({ kind: e.target.value })}>
-                    {['CASH', 'RECEIVABLE', 'PAYABLE', 'LOAN', 'ASSET'].map(k => <option key={k} value={k}>{t(`opening.${k}`)}</option>)}</select></label>
+                    {['CASH', 'RECEIVABLE', 'PAYABLE', 'LOAN', 'ASSET', ...(stock.items.length ? ['STOCK'] : [])].map(k => <option key={k} value={k}>{t(`opening.${k}`)}</option>)}</select></label>
+                  {l.kind === 'STOCK' && (() => {
+                    const item = stock.items.find(x => String(x.id) === l.itemId);
+                    return <>
+                      <label>{ts('item')}<select value={l.itemId} onChange={e => update({ itemId: e.target.value, unit: stock.items.find(x => String(x.id) === e.target.value)?.baseUnit ?? '' })}>
+                        <option value="">—</option>{stock.items.filter(x => x.active && !x.trackLots).map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+                      <label>{ts('quantity')}<input inputMode="decimal" value={l.quantity} onChange={e => update({ quantity: e.target.value })} /></label>
+                      {item && <label>{ts('unitLabel')}<select value={l.unit} onChange={e => update({ unit: e.target.value })}>
+                        {unitChoices(item, stock.units).map(u => <option key={u.value} value={u.value}>{u.label ?? ts(`unit.${u.value}`)}</option>)}</select></label>}
+                    </>;
+                  })()}
                   {l.kind === 'CASH' && <label>{t('account')}<select value={l.financialAccountId} onChange={e => update({ financialAccountId: e.target.value })}>{accountOptions}</select></label>}
                   {['RECEIVABLE', 'PAYABLE', 'LOAN'].includes(l.kind) && <label>{t('party')}<select value={l.partyId} onChange={e => update({ partyId: e.target.value })}>{partyOptions()}</select></label>}
                   {l.kind === 'LOAN' && <label>{t('loanName')}<input value={l.loanName} onChange={e => update({ loanName: e.target.value })} /></label>}
                   {l.kind === 'ASSET' && <label>{t('description')}<input value={l.description} onChange={e => update({ description: e.target.value })} /></label>}
-                  <label>{t('amount')}<input inputMode="decimal" value={l.amount} onChange={e => update({ amount: e.target.value })} /></label>
+                  <label>{l.kind === 'STOCK' ? ts('openingValue') : t('amount')}<input inputMode="decimal" value={l.amount} onChange={e => update({ amount: e.target.value })} /></label>
                   {openingLines.length > 1 && <button type="button" className="text-action" aria-label={tc('remove')} onClick={() => setOpeningLines(ls => ls.filter((_, j) => j !== i))}><Trash2 size={16} /></button>}
                 </div>
               );
             })}
-            <button type="button" className="secondary" onClick={() => setOpeningLines(ls => [...ls, { kind: 'CASH', financialAccountId: '', partyId: '', loanName: '', description: '', amount: '' }])}>
+            <button type="button" className="secondary" onClick={() => setOpeningLines(ls => [...ls, emptyOpening()])}>
               <Plus size={16} />{t('addLine')}</button>
           </fieldset>
         )}

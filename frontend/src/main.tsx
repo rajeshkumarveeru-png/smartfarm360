@@ -20,7 +20,13 @@ import NewRecordPage from './finance/NewRecordPage';
 import PartiesPage from './finance/PartiesPage';
 import RecordsPage from './finance/RecordsPage';
 import ReportsPage from './finance/ReportsPage';
-import StockPage from './pages/StockPage';
+import ItemPage from './stock/ItemPage';
+import ItemsPage from './stock/ItemsPage';
+import LocationsPage from './stock/LocationsPage';
+import StockHome from './stock/StockHome';
+import StockLayout from './stock/StockLayout';
+import StockRecordPage from './stock/StockRecordPage';
+import StockReportsPage from './stock/StockReportsPage';
 import MembersPage from './pages/MembersPage';
 import OnboardingPage from './pages/OnboardingPage';
 import PlatformPage from './pages/PlatformPage';
@@ -85,7 +91,14 @@ function App() {
               <Route path="reports" element={<ReportsPage />} />
               <Route path="settings" element={<FinanceSettingsPage />} />
             </Route>
-            <Route path="stock" element={<StockPage />} />
+            <Route path="stock" element={<StockLayout />}>
+              <Route index element={<StockHome />} />
+              <Route path="items" element={<ItemsPage />} />
+              <Route path="items/:itemId" element={<ItemPage />} />
+              <Route path="locations" element={<LocationsPage />} />
+              <Route path="reports" element={<StockReportsPage />} />
+              <Route path="new/:kind" element={<StockRecordPage />} />
+            </Route>
             <Route path="members" element={<MembersPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="audit" element={<AuditPage />} />

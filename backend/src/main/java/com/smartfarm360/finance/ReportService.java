@@ -79,7 +79,10 @@ public class ReportService {
         Map<String, BigDecimal> totals = new LinkedHashMap<>();   // key: account|category
         Map<String, AmountRow> meta = new HashMap<>();
 
-        String docFilter = cash ? " and ((d.doc_type in ('BILL', 'SALE') and d.party_id is null) or d.doc_type = 'LOAN_REPAYMENT')" : "";
+        // Cash basis counts money paid and received for categories: cash bills and sales, cash refunds of sales, and loan interest.
+        // Stock bought is not a cost in either view, and stock used or sold (5700) is not cash, so it is left out here.
+        String docFilter = cash ? " and ((d.doc_type in ('BILL', 'SALE', 'SALE_RETURN') and d.party_id is null) or d.doc_type = 'LOAN_REPAYMENT')"
+                + " and l.account_code <> '5700'" : "";
         jdbc.sql("""
                         select l.account_code, l.category_id, c.code, c.name, sum(l.credit - l.debit) as net
                         from sf_journal_lines l join sf_journal_entries e on e.id = l.entry_id

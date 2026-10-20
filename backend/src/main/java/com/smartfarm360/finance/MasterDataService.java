@@ -151,14 +151,6 @@ public class MasterDataService {
         return party(ctx, id);
     }
 
-    /** Used by the stock module so legacy suppliers stay usable as parties until Phase 4 replaces them. */
-    @Transactional
-    public long partyForLegacySupplier(long tenantId, long supplierId, String name, String phone, String village, String notes) {
-        return jdbc.sql("select id from sf_parties where legacy_supplier_id = :s and tenant_id = :t")
-                .param("s", supplierId).param("t", tenantId).query(Long.class).optional()
-                .orElseGet(() -> insertParty(tenantId, name, phone, village, notes, false, true, false, supplierId));
-    }
-
     private long insertParty(long tenantId, String name, String phone, String village, String notes, boolean customer, boolean supplier,
                              boolean lender, Long legacySupplierId) {
         return jdbc.sql("""

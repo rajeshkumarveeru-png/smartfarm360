@@ -106,9 +106,13 @@ class CrossTenantIsolationTest extends ApiIntegrationTest {
         long tenantB = newTenant(b, "Ref B");
         long farmB = newFarm(b, tenantB, "B farm");
         long cropB = body(post("/api/v1/tenants/" + tenantB + "/crops", b, Map.of("name", "Groundnut"))).get("id").asLong();
-        long supplierB = body(post("/api/v1/tenants/" + tenantB + "/suppliers", b, Map.of("name", "B supplier"))).get("id").asLong();
-        long itemB = body(post("/api/v1/tenants/" + tenantB + "/inventory/items", b, Map.of("name", "Urea", "category", "Fertilizer",
-                "unit", "kg", "quantityOnHand", 10, "reorderLevel", 1, "averageUnitCost", 5))).get("id").asLong();
+        String stockB = "/api/v1/tenants/" + tenantB + "/stock";
+        long itemB = body(post(stockB + "/items", b, Map.of("name", "Urea", "kind", "INPUT", "baseUnit", "kg"))).get("id").asLong();
+        post(stockB + "/produce", b, Map.of("docDate", LocalDate.now().toString(), "lines", List.of(Map.of("itemId", itemB, "quantity", 10))))
+                .andExpect(status().isBadRequest()); // urea is not farm produce
+        post("/api/v1/tenants/" + tenantB + "/finance/bills", b, Map.of("docDate", LocalDate.now().toString(), "financialAccountId", cashAccountId(b, tenantB),
+                "lines", List.of(Map.of("itemId", itemB, "quantity", 10, "rate", 5)))).andExpect(status().isCreated());
+        long locationB = body(get(stockB + "/locations", b)).get(0).get("id").asLong();
         String today = LocalDate.now().toString();
 
         // Cycle on A's farm with B's crop, and on B's farm with A's crop
@@ -119,11 +123,29 @@ class CrossTenantIsolationTest extends ApiIntegrationTest {
         get("/api/v1/tenants/" + tenantA + "/crops/" + cropB + "/varieties", a).andExpect(status().isBadRequest());
         post("/api/v1/tenants/" + tenantA + "/finance/bills", a, Map.of("docDate", today, "farmId", farmB, "financialAccountId", cashAccountId(a, tenantA),
                 "lines", List.of(Map.of("categoryId", categoryId("SEEDS"), "amount", 10)))).andExpect(status().isNotFound());
-        post("/api/v1/tenants/" + tenantA + "/purchases", a, Map.of("supplierId", supplierB, "itemId", itemB, "purchaseDate", today,
-                "quantity", 1, "unitCost", 1, "paidAmount", 0)).andExpect(status().isBadRequest());
+        // Stock: A cannot buy, sell, use, move, count or read B's item or B's location
+        String stockA = "/api/v1/tenants/" + tenantA + "/stock";
+        post("/api/v1/tenants/" + tenantA + "/finance/bills", a, Map.of("docDate", today, "financialAccountId", cashAccountId(a, tenantA),
+                "lines", List.of(Map.of("itemId", itemB, "quantity", 1, "rate", 1)))).andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("STOCK_ITEM_NOT_FOUND"));
+        post("/api/v1/tenants/" + tenantA + "/finance/sales", a, Map.of("docDate", today, "financialAccountId", cashAccountId(a, tenantA),
+                "lines", List.of(Map.of("itemId", itemB, "quantity", 1, "rate", 1, "categoryId", categoryId("CROP_SALE"))))).andExpect(status().isNotFound());
+        post(stockA + "/issues", a, Map.of("docDate", today, "lines", List.of(Map.of("itemId", itemB, "quantity", 1)))).andExpect(status().isNotFound());
+        post(stockA + "/wastage", a, Map.of("docDate", today, "reason", "x", "lines", List.of(Map.of("itemId", itemB, "quantity", 1))))
+                .andExpect(status().isNotFound());
+        post(stockA + "/counts", a, Map.of("docDate", today, "lines", List.of(Map.of("itemId", itemB, "countedQuantity", 0)))).andExpect(status().isNotFound());
+        post(stockA + "/issues", a, Map.of("docDate", today, "locationId", locationB, "lines", List.of(Map.of("itemId", itemB, "quantity", 1))))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("LOCATION_NOT_FOUND"));
+        get(stockA + "/items/" + itemB, a).andExpect(status().isNotFound());
+        get(stockA + "/items/" + itemB + "/movements", a).andExpect(status().isNotFound());
+        patch(stockA + "/items/" + itemB, a, Map.of("name", "Taken")).andExpect(status().isNotFound());
+        patch(stockA + "/locations/" + locationB, a, Map.of("name", "Taken")).andExpect(status().isNotFound());
+        assertThat(body(get(stockA + "/items", a)).size()).isZero();
 
-        assertThat(jdbc.queryForObject("select quantity_on_hand from sf_inventory_items where id = ?", java.math.BigDecimal.class, itemB))
+        assertThat(jdbc.queryForObject("select on_hand_quantity from sf_stock_items where id = ?", java.math.BigDecimal.class, itemB))
                 .isEqualByComparingTo("10");
+        assertThat(jdbc.queryForObject("select name from sf_stock_items where id = ?", String.class, itemB)).isEqualTo("Urea");
+        assertThat(jdbc.queryForObject("select count(*) from sf_stock_movements where tenant_id = ?", Integer.class, tenantA)).isZero();
         assertThat(jdbc.queryForObject("select count(*) from sf_cultivation_cycles where tenant_id = ?", Integer.class, tenantA)).isZero();
     }
 

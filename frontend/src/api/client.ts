@@ -78,6 +78,34 @@ export async function api<T>(path: string, init: Init = {}, retry = true): Promi
   return (text ? JSON.parse(text) : undefined) as T;
 }
 
+/**
+ * Downloads a file (CSV export) with the same authentication and refresh as {@link api}, and saves it under
+ * {@code filename}. Exports carry tenant data, so they are never opened through a plain link.
+ */
+export async function download(path: string, filename: string, retry = true): Promise<void> {
+  const headers: Record<string, string> = {};
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+  let response: Response;
+  try {
+    response = await fetch(`${BASE}${path}`, { headers, credentials: 'include' });
+  } catch {
+    throw new ApiError(0, 'NETWORK', 'Network error');
+  }
+  if (response.status === 401 && retry) {
+    if (await refreshSession()) return download(path, filename, false);
+    sessionEnded();
+  }
+  if (!response.ok) throw await toApiError(response);
+  const url = URL.createObjectURL(await response.blob());
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 /** Sign-out also needs the refresh header so the server can revoke the cookie's token family. */
 export async function logoutRequest() {
   try {

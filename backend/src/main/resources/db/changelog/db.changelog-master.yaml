@@ -9,3 +9,5 @@ databaseChangeLog:
       file: db/changelog/004-platform-foundation.yaml
   - include:
       file: db/changelog/005-finance-core.yaml
+  - include:
+      file: db/changelog/006-stock-core.yaml

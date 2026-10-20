@@ -272,19 +272,25 @@ class FinanceRulesTest extends FinanceTestSupport {
     }
 
     @Test
-    void stockPurchasesFromTheStockScreenArePostedAsBillsToStock() throws Exception {
+    void stockBoughtOnABillIsPostedToStockNotExpense() throws Exception {
         String base = "/api/v1/tenants/" + tenant;
-        long supplier = body(post(base + "/suppliers", owner, Map.of("name", "Agro depot")).andExpect(status().isCreated())).get("id").asLong();
-        long item = body(post(base + "/inventory/items", owner, Map.of("name", "Urea", "category", "Fertilizer", "unit", "kg",
-                "quantityOnHand", 0, "reorderLevel", 10, "averageUnitCost", 0)).andExpect(status().isCreated())).get("id").asLong();
-        post(base + "/purchases", owner, Map.of("supplierId", supplier, "itemId", item, "purchaseDate", "2026-07-02",
-                "quantity", 50, "unitCost", 6, "paidAmount", 100)).andExpect(status().isCreated());
+        long supplier = party("Agro depot");
+        long item = body(post(base + "/stock/items", owner, Map.of("name", "Urea", "kind", "INPUT", "baseUnit", "kg", "reorderLevel", 10))
+                .andExpect(status().isCreated())).get("id").asLong();
+        post(f("/bills"), owner, Map.of("docDate", "2026-07-02", "partyId", supplier,
+                "lines", List.of(Map.of("itemId", item, "quantity", 50, "rate", 6)),
+                "paidNow", Map.of("financialAccountId", cash, "amount", 100))).andExpect(status().isCreated());
 
         JsonNode party = StreamSupportHelper.find(body(get(f("/parties"), owner)), "name", "Agro depot");
         money(party.get("payable"), "200");
         // Bought stock is not an expense until used (ADR 0005).
         money(report("income-statement?from=2026-07-01&to=2026-07-31").get("operatingCostTotal"), "0");
         money(report("cash-flow?from=2026-07-01&to=2026-07-31").get("operating"), "-100");
+        // The quantity is in stock at its cost, and the ledger agrees with the store.
+        JsonNode stock = body(get(base + "/stock/items/" + item, owner));
+        money(stock.get("quantity"), "50");
+        money(stock.get("value"), "300");
+        money(body(get(base + "/stock/reports/reconciliation", owner)).get("difference"), "0");
     }
 
     /** Small helper to find a node in a JSON array by a text field. */

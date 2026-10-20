@@ -49,12 +49,23 @@ public final class FinanceDtos {
 
     // ---- Documents ------------------------------------------------------------------------------------------
 
-    /** Either {@code amount}, or {@code quantity} and {@code rate} (amount = quantity × rate rounded to the paisa). */
-    public record LineRequest(@NotNull Long categoryId, @Size(max = 240) String description,
-                              @Positive @Digits(integer = 14, fraction = 4) BigDecimal quantity, @Size(max = 20) String unit,
+    /**
+     * Either {@code amount}, or {@code quantity} and {@code rate} (amount = quantity × rate rounded to the paisa).
+     * A line is a category line, or (with {@code itemId}) a stock item line: on a bill it adds stock at the line's
+     * cost; on a sale it takes stock out at average cost and the category defaults to the item's sale category.
+     * {@code unit} is the item's base unit, a unit of the same kind, or one of the item's pack units.
+     */
+    public record LineRequest(Long categoryId, @Size(max = 240) String description,
+                              @Positive @Digits(integer = 14, fraction = 4) BigDecimal quantity, @Size(max = 30) String unit,
                               @PositiveOrZero @Digits(integer = 14, fraction = 4) BigDecimal rate,
                               @Positive @Digits(integer = 12, fraction = 2) BigDecimal amount,
-                              Long costObjectId, Long farmId) {}
+                              Long costObjectId, Long farmId, Long itemId, Long locationId, @Size(max = 60) String lotNo,
+                              LocalDate lotExpiry) {
+        public LineRequest(Long categoryId, String description, BigDecimal quantity, String unit, BigDecimal rate, BigDecimal amount,
+                           Long costObjectId, Long farmId) {
+            this(categoryId, description, quantity, unit, rate, amount, costObjectId, farmId, null, null, null, null);
+        }
+    }
 
     public record PaidNow(@NotNull Long financialAccountId, @NotNull @Positive @Digits(integer = 12, fraction = 2) BigDecimal amount) {}
 
@@ -98,10 +109,19 @@ public final class FinanceDtos {
     public record WriteOffRequest(@NotNull LocalDate docDate, @NotNull Long partyId,
                                   @NotNull @Positive @Digits(integer = 12, fraction = 2) BigDecimal amount, @Size(max = 500) String notes) {}
 
-    /** kind: CASH (financialAccountId), RECEIVABLE / PAYABLE (partyId), LOAN (partyId = lender, loanName), ASSET. */
-    public record OpeningLine(@NotNull @Pattern(regexp = "CASH|RECEIVABLE|PAYABLE|LOAN|ASSET") String kind, Long financialAccountId,
+    /**
+     * kind: CASH (financialAccountId), RECEIVABLE / PAYABLE (partyId), LOAN (partyId = lender, loanName), ASSET, or
+     * STOCK (itemId, quantity, unit, optional locationId and lot; amount is the stock's value and may be 0 for farm produce).
+     */
+    public record OpeningLine(@NotNull @Pattern(regexp = "CASH|RECEIVABLE|PAYABLE|LOAN|ASSET|STOCK") String kind, Long financialAccountId,
                               Long partyId, @Size(max = 140) String loanName, @Size(max = 240) String description,
-                              @NotNull @Positive @Digits(integer = 12, fraction = 2) BigDecimal amount) {}
+                              @NotNull @PositiveOrZero @Digits(integer = 12, fraction = 2) BigDecimal amount,
+                              Long itemId, @Positive @Digits(integer = 14, fraction = 4) BigDecimal quantity, @Size(max = 30) String unit,
+                              Long locationId, @Size(max = 60) String lotNo, LocalDate lotExpiry) {
+        public OpeningLine(String kind, Long financialAccountId, Long partyId, String loanName, String description, BigDecimal amount) {
+            this(kind, financialAccountId, partyId, loanName, description, amount, null, null, null, null, null, null);
+        }
+    }
 
     public record OpeningBalanceRequest(@NotNull LocalDate docDate, @NotEmpty @Size(max = 200) List<@Valid OpeningLine> lines,
                                         @Size(max = 500) String notes) {}
@@ -113,7 +133,8 @@ public final class FinanceDtos {
 
     public record DocumentLine(long id, int lineNo, Long categoryId, String categoryCode, String categoryName, String accountCode,
                                String side, String description, BigDecimal quantity, String unit, BigDecimal rate, BigDecimal amount,
-                               Long costObjectId, String costObjectName, Long farmId, Long partyId, Long financialAccountId, Long loanId) {}
+                               Long costObjectId, String costObjectName, Long farmId, Long partyId, Long financialAccountId, Long loanId,
+                               Long itemId, String itemName, Long locationId, String lotNo, BigDecimal baseQuantity) {}
 
     public record Allocation(long id, long sourceDocumentId, String sourceNumber, String sourceType, long targetDocumentId,
                              String targetNumber, String targetType, BigDecimal amount, LocalDate allocationDate) {}
@@ -127,5 +148,6 @@ public final class FinanceDtos {
     public record Document(DocumentSummary summary, Long farmId, Long financialAccountId, Long toFinancialAccountId,
                            String toFinancialAccountName, Long loanId, String loanName, BigDecimal principalAmount,
                            BigDecimal interestAmount, String notes, String referenceNo, LocalDate reversalDate, Instant postedAt,
-                           List<DocumentLine> lines, List<Allocation> allocations) {}
+                           Long originalDocumentId, List<DocumentLine> lines, List<Allocation> allocations,
+                           List<StockHook.Movement> movements) {}
 }

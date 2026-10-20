@@ -27,8 +27,18 @@ public class PostingEngine {
     record JournalLine(String accountCode, BigDecimal debit, BigDecimal credit, Long categoryId, Long financialAccountId,
                        Long partyId, Long costObjectId, Long farmId, Long loanId) {}
 
-    /** The journal lines for a document; {@code overheadId} is used for profit-and-loss lines without an activity. */
+    /**
+     * The journal lines for a document; {@code overheadId} is used for profit-and-loss lines without an activity.
+     * Lines of zero (stock items carried at nil value) are left out; a record of only such lines has no journal.
+     */
     List<JournalLine> journal(Doc d, List<Line> lines, long overheadId) {
+        if (d.total().signum() == 0) return new ArrayList<>();
+        List<JournalLine> out = rawJournal(d, lines.stream().filter(l -> l.amount().signum() != 0).toList(), overheadId);
+        requireBalanced(out);
+        return out;
+    }
+
+    private List<JournalLine> rawJournal(Doc d, List<Line> lines, long overheadId) {
         List<JournalLine> out = new ArrayList<>();
         switch (d.type()) {
             case BILL -> {
@@ -96,7 +106,19 @@ public class PostingEngine {
                 if (net.signum() < 0) out.add(debit(LedgerAccount.OPENING_BALANCES.code(), net.negate(), null, null, null, null, null, null));
             }
         }
-        requireBalanced(out);
+        return out;
+    }
+
+    /** Lines supplied by the stock module, with cash account codes resolved and overhead for unassigned profit-and-loss lines. */
+    List<JournalLine> fromParts(long tenantId, List<JournalPart> parts, long overheadId) {
+        List<JournalLine> out = new ArrayList<>();
+        for (JournalPart p : parts) {
+            if (p.debit().signum() == 0 && p.credit().signum() == 0) continue;
+            String code = p.accountCode() != null ? p.accountCode() : cashCode(tenantId, p.financialAccountId());
+            boolean profitAndLoss = LedgerAccount.find(code).map(LedgerAccount::isProfitAndLoss).orElse(false);
+            Long costObject = profitAndLoss ? (p.costObjectId() == null ? overheadId : p.costObjectId()) : null;
+            out.add(new JournalLine(code, p.debit(), p.credit(), p.categoryId(), p.financialAccountId(), p.partyId(), costObject, p.farmId(), null));
+        }
         return out;
     }
 
@@ -118,8 +140,11 @@ public class PostingEngine {
         return entryId;
     }
 
-    /** Writes the mirror image of a document's posting entry (posting rule P18). */
-    void reverse(long tenantId, long documentId, LocalDate date) {
+    /**
+     * Writes the mirror image of a document's posting entry (posting rule P18), plus any correcting lines from the
+     * stock module. A record without a posting entry (stock moved at nil value) gets none unless corrections exist.
+     */
+    void reverse(long tenantId, long documentId, LocalDate date, List<JournalLine> corrections) {
         List<JournalLine> original = jdbc.sql("""
                         select l.account_code, l.debit, l.credit, l.category_id, l.financial_account_id, l.party_id, l.cost_object_id, l.farm_id, l.loan_id
                         from sf_journal_lines l join sf_journal_entries e on e.id = l.entry_id
@@ -128,11 +153,13 @@ public class PostingEngine {
                 .query((rs, i) -> new JournalLine(rs.getString(1), rs.getBigDecimal(3), rs.getBigDecimal(2), (Long) rs.getObject(4),
                         (Long) rs.getObject(5), (Long) rs.getObject(6), (Long) rs.getObject(7), (Long) rs.getObject(8), (Long) rs.getObject(9)))
                 .list();
-        if (original.isEmpty()) throw new IllegalStateException("Document " + documentId + " has no posting entry");
-        write(tenantId, documentId, date, "REVERSAL", original);
+        List<JournalLine> lines = new ArrayList<>(original);
+        lines.addAll(corrections);
+        if (lines.isEmpty()) return;
+        write(tenantId, documentId, date, "REVERSAL", lines);
     }
 
-    private String cashCode(long tenantId, Long financialAccountId) {
+    String cashCode(long tenantId, Long financialAccountId) {
         return jdbc.sql("select account_code from sf_financial_accounts where id = :id and tenant_id = :t")
                 .param("id", financialAccountId).param("t", tenantId).query(String.class).single();
     }

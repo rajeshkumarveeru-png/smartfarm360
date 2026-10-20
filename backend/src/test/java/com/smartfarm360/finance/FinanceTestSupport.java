@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** Helpers for finance API tests: a fresh tenant per test, and short ways to record common records. */
-abstract class FinanceTestSupport extends ApiIntegrationTest {
+public abstract class FinanceTestSupport extends ApiIntegrationTest {
     protected User owner;
     protected long tenant;
     protected long cash;

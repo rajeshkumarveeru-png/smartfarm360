@@ -17,6 +17,7 @@ export default function DocumentPage() {
   const { documentId } = useParams();
   const t = useNs('fin');
   const tc = useNs('common');
+  const ts = useNs('stock');
   const categoryLabel = useCategoryLabel();
   const lang = currentLanguage();
   const base = `/api/v1/tenants/${tenant.id}/finance`;
@@ -105,6 +106,26 @@ export default function DocumentPage() {
         </table>
       )}
 
+      {doc.movements.length > 0 && (
+        <>
+          <h3>{ts('stockMovements')}</h3>
+          <table className="data-table">
+            <thead><tr><th>{ts('item')}</th><th>{ts('where')}</th><th>{ts('movementLabel')}</th><th className="num">{ts('quantity')}</th><th className="num">{ts('value')}</th></tr></thead>
+            <tbody>
+              {doc.movements.map(m => (
+                <tr key={m.id}>
+                  <td><Link to={`/t/${tenant.id}/stock/items/${m.itemId}`}>{m.itemName}</Link></td>
+                  <td>{m.locationName}{m.lotNo ? ` (${m.lotNo})` : ''}</td>
+                  <td>{ts(`movement.${m.movementType}`)}</td>
+                  <td className="num">{m.quantity > 0 ? '+' : ''}{formatNumber(m.quantity, lang, 4)} {ts(`unit.${m.baseUnit}`, { defaultValue: m.baseUnit })}</td>
+                  <td className="num">{formatMoney(m.value, lang)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+
       {doc.allocations.length > 0 && (
         <>
           <h3>{t('matches')}</h3>
@@ -143,6 +164,12 @@ export default function DocumentPage() {
           <button className="secondary" onClick={() => void act(`/documents/${s.id}/cancel`)}>{t('cancelDraft')}</button>
           <button className="primary" onClick={() => void act(`/documents/${s.id}/post`)}>{t('post')}</button>
         </>}
+        {s.status === 'POSTED' && canWrite && s.type === 'SALE' && doc.movements.length > 0 && (
+          <Link className="secondary" to={`/t/${tenant.id}/stock/new/sale-return?original=${s.id}`}>{ts('kind.sale-return')}</Link>
+        )}
+        {s.status === 'POSTED' && canWrite && s.type === 'BILL' && s.partyId && doc.movements.length > 0 && (
+          <Link className="secondary" to={`/t/${tenant.id}/stock/new/purchase-return?original=${s.id}&party=${s.partyId}`}>{ts('kind.purchase-return')}</Link>
+        )}
         {s.status === 'POSTED' && canReverse && (
           <form className="inline-form" onSubmit={e => {
             e.preventDefault();
