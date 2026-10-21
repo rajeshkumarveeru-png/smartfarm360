@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -136,6 +137,48 @@ public class ReportService {
                     });
         }
 
+        return assemble(from, to, cash ? "CASH" : "ACCRUAL", farmId, costObjectId, totals, meta);
+    }
+
+    /**
+     * Accrual income statements for each calendar month of a range (clipped to the range), from one grouped query: the
+     * same lines and the same {@link #assemble} as {@link #incomeStatement}, so the months add up to the period
+     * (dashboard and reports design, H4, H5).
+     */
+    @Transactional(readOnly = true)
+    public List<IncomeStatement> accrualByMonth(TenantContext ctx, LocalDate from, LocalDate to, Long farmId) {
+        checkRange(from, to);
+        if (farmId != null) master.requireFarm(ctx.tenantId(), farmId);
+        Map<YearMonth, Map<String, BigDecimal>> totals = new TreeMap<>();
+        Map<String, AmountRow> meta = new HashMap<>();
+        jdbc.sql("""
+                        select cast(date_trunc('month', e.entry_date) as date) as month, l.account_code, l.category_id, c.code, c.name,
+                               sum(l.credit - l.debit) as net
+                        from sf_journal_lines l join sf_journal_entries e on e.id = l.entry_id
+                        left join sf_finance_categories c on c.id = l.category_id
+                        where l.tenant_id = :t and e.entry_date between :from and :to and l.account_code in (:codes)
+                          and (cast(:farm as bigint) is null or l.farm_id = :farm)
+                        group by 1, 2, 3, 4, 5""")
+                .param("t", ctx.tenantId()).param("from", from).param("to", to).param("codes", PROFIT_AND_LOSS_CODES).param("farm", farmId)
+                .query().listOfRows()
+                .forEach(row -> {
+                    YearMonth m = YearMonth.from(((java.sql.Date) row.get("month")).toLocalDate());
+                    AmountRow r = new AmountRow((String) row.get("account_code"),
+                            row.get("category_id") == null ? null : ((Number) row.get("category_id")).longValue(),
+                            (String) row.get("code"), (String) row.get("name"), (BigDecimal) row.get("net"));
+                    add(totals.computeIfAbsent(m, x -> new LinkedHashMap<>()), meta, r, r.amount());
+                });
+        List<IncomeStatement> months = new ArrayList<>();
+        for (YearMonth m = YearMonth.from(from); !m.isAfter(YearMonth.from(to)); m = m.plusMonths(1)) {
+            LocalDate a = m.atDay(1).isBefore(from) ? from : m.atDay(1), b = m.atEndOfMonth().isAfter(to) ? to : m.atEndOfMonth();
+            months.add(assemble(a, b, "ACCRUAL", farmId, null, totals.getOrDefault(m, Map.of()), meta));
+        }
+        return months;
+    }
+
+    /** Sorts account and category totals (credit minus debit) into the income statement's sections. */
+    private static IncomeStatement assemble(LocalDate from, LocalDate to, String basis, Long farmId, Long costObjectId,
+                                            Map<String, BigDecimal> totals, Map<String, AmountRow> meta) {
         List<AmountRow> revenue = new ArrayList<>(), costs = new ArrayList<>(), other = new ArrayList<>();
         BigDecimal interest = ZERO, losses = ZERO;
         for (Map.Entry<String, BigDecimal> e : totals.entrySet()) {
@@ -152,7 +195,7 @@ public class ReportService {
         BigDecimal revenueTotal = sum(revenue), costTotal = sum(costs), otherTotal = sum(other);
         BigDecimal operatingProfit = revenueTotal.subtract(costTotal);
         BigDecimal netProfit = operatingProfit.add(otherTotal).subtract(interest).subtract(losses);
-        return new IncomeStatement(from, to, cash ? "CASH" : "ACCRUAL", true, farmId, costObjectId, sorted(revenue), revenueTotal,
+        return new IncomeStatement(from, to, basis, true, farmId, costObjectId, sorted(revenue), revenueTotal,
                 sorted(costs), costTotal, operatingProfit, sorted(other), otherTotal, interest, losses, netProfit);
     }
 
@@ -289,10 +332,13 @@ public class ReportService {
     // ---- Balances, activity and dashboard ------------------------------------------------------------------------
 
     @Transactional
-    public Balances balances(TenantContext ctx, LocalDate asOf) {
+    public Balances balances(TenantContext ctx, LocalDate asOf) { return balances(ctx, asOf, dues(ctx, asOf)); }
+
+    /** {@code dues}: already computed for {@code asOf}, so the dashboard ages receivables once. */
+    @Transactional
+    public Balances balances(TenantContext ctx, LocalDate asOf, Dues dues) {
         List<FinancialAccount> accounts = master.financialAccounts(ctx, asOf);
         List<Loan> loans = master.loans(ctx);
-        Dues dues = dues(ctx, asOf);
         return new Balances(asOf, accounts, accounts.stream().map(FinancialAccount::balance).reduce(ZERO, BigDecimal::add), loans,
                 loans.stream().map(Loan::outstanding).reduce(ZERO, BigDecimal::add), dues.receivableTotal(), dues.payableTotal());
     }
@@ -318,12 +364,15 @@ public class ReportService {
     }
 
     @Transactional
-    public Summary summary(TenantContext ctx, LocalDate asOf) {
+    public Summary summary(TenantContext ctx, LocalDate asOf) { return summary(ctx, asOf, dues(ctx, asOf)); }
+
+    /** {@code dues}: already computed for {@code asOf} (see {@link #balances(TenantContext, LocalDate, Dues)}). */
+    @Transactional
+    public Summary summary(TenantContext ctx, LocalDate asOf, Dues dues) {
         settings.ensureDefaults(ctx.tenantId());
         LocalDate yearStart = FinanceSettingsService.fiscalYearStart(asOf, settings.settings(ctx.tenantId()).fiscalYearStartMonth());
         IncomeStatement year = incomeStatement(ctx, yearStart, asOf, null, null, "ACCRUAL");
         IncomeStatement month = incomeStatement(ctx, asOf.withDayOfMonth(1), asOf, null, null, "ACCRUAL");
-        Dues dues = dues(ctx, asOf);
         BigDecimal overdue = dues.receivables().stream()
                 .map(d -> d.days1to30().add(d.days31to60()).add(d.days61to90()).add(d.over90())).reduce(ZERO, BigDecimal::add);
         BigDecimal cash = master.financialAccounts(ctx, asOf).stream().map(FinancialAccount::balance).reduce(ZERO, BigDecimal::add);

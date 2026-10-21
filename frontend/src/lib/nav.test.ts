@@ -9,7 +9,8 @@ function tenant(permissions: Permission[], modules: TenantSummary['enabledModule
 describe('navigation visibility', () => {
   it('shows only sections the member has permission for', () => {
     const worker = tenant(['TENANT_READ', 'FARM_READ', 'CROP_READ', 'CROP_ACTIVITY_WRITE']);
-    expect(visibleNav(worker).map(i => i.key)).toEqual(['farms', 'crops', 'settings']);
+    // Every member gets the dashboard first (H1) and the reports list, which shows only reports they may open
+    expect(visibleNav(worker).map(i => i.key)).toEqual(['dashboard', 'farms', 'crops', 'reports', 'settings']);
   });
 
   it('hides modules the tenant has not enabled', () => {

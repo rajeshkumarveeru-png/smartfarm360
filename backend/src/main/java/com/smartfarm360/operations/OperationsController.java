@@ -4,6 +4,8 @@ import com.smartfarm360.crop.CropDtos.Activity;
 import com.smartfarm360.crop.CropDtos.Harvest;
 import com.smartfarm360.inventory.StockDtos;
 import com.smartfarm360.operations.OperationsDtos.*;
+import com.smartfarm360.platform.export.ExportService;
+import com.smartfarm360.platform.export.ReportLabels;
 import com.smartfarm360.platform.rbac.Permission;
 import com.smartfarm360.platform.security.RequiresModule;
 import com.smartfarm360.platform.security.RequiresPermission;
@@ -35,7 +37,12 @@ public class OperationsController {
     private final FieldOperationsService operations;
     private final CropReportService reports;
 
-    public OperationsController(FieldOperationsService operations, CropReportService reports) {
+    private final CropExports exports;
+    private final ExportService export;
+
+    public OperationsController(FieldOperationsService operations, CropReportService reports, CropExports exports, ExportService export) {
+        this.exports = exports;
+        this.export = export;
         this.operations = operations;
         this.reports = reports;
     }
@@ -78,11 +85,14 @@ public class OperationsController {
 
     @GetMapping("/cultivation-cycles/{cycleId}/report")
     @RequiresPermission(Permission.CROP_READ)
-    public CycleReport report(TenantContext ctx, @PathVariable long cycleId,
-                              @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-                              @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-                              @RequestParam(defaultValue = "ACCRUAL") String basis, @RequestParam(required = false) BigDecimal price) {
-        return reports.report(ctx, cycleId, from, to, basis, price);
+    public ResponseEntity<?> report(TenantContext ctx, @PathVariable long cycleId,
+                                    @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                                    @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+                                    @RequestParam(defaultValue = "ACCRUAL") String basis, @RequestParam(required = false) BigDecimal price,
+                                    @RequestParam(required = false) String format, @RequestParam(required = false) String lang) {
+        CycleReport r = reports.report(ctx, cycleId, from, to, basis, price);
+        if (!ExportService.isExport(format)) return ResponseEntity.ok(r);
+        return export.export(ctx, exports.cycle(ReportLabels.language(lang), r), format, lang, "crop-cycle-" + cycleId, r.from(), r.to());
     }
 
     @GetMapping("/cultivation-cycles/{cycleId}/report.csv")
@@ -96,7 +106,12 @@ public class OperationsController {
 
     @GetMapping("/crops/{cropId}/comparison")
     @RequiresPermission(Permission.CROP_READ)
-    public Comparison comparison(TenantContext ctx, @PathVariable long cropId) { return reports.comparison(ctx, cropId); }
+    public ResponseEntity<?> comparison(TenantContext ctx, @PathVariable long cropId,
+                                        @RequestParam(required = false) String format, @RequestParam(required = false) String lang) {
+        Comparison c = reports.comparison(ctx, cropId);
+        if (!ExportService.isExport(format)) return ResponseEntity.ok(c);
+        return export.export(ctx, exports.comparison(ReportLabels.language(lang), c), format, lang, "crop-comparison-" + cropId, null, null);
+    }
 
     @GetMapping("/crops/{cropId}/comparison.csv")
     @RequiresPermission(Permission.CROP_READ)

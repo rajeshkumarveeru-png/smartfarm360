@@ -125,5 +125,6 @@ class CropGoldenScenarioTest extends StockTestSupport {
         // Stock: 1,000 kg of paddy left in the harvest lot
         money(stockItem(paddyItem).get("quantity"), "1000");
         assertThat(body(get(t("/cultivation-cycles/" + samba), owner)).get("status").asText()).isEqualTo("HARVESTING");
+        assertBooksBalance("2026-12-31");
     }
 }

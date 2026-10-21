@@ -2,6 +2,8 @@ package com.smartfarm360.assets;
 
 import com.smartfarm360.assets.AssetDtos.*;
 import com.smartfarm360.finance.FinanceDtos.Document;
+import com.smartfarm360.platform.export.ExportService;
+import com.smartfarm360.platform.export.ReportLabels;
 import com.smartfarm360.platform.rbac.Permission;
 import com.smartfarm360.platform.security.RequiresModule;
 import com.smartfarm360.platform.security.RequiresPermission;
@@ -30,7 +32,14 @@ public class AssetController {
     private static final String KEY = "Idempotency-Key";
     private final AssetService assets;
 
-    public AssetController(AssetService assets) { this.assets = assets; }
+    private final AssetExports exports;
+    private final ExportService export;
+
+    public AssetController(AssetService assets, AssetExports exports, ExportService export) {
+        this.assets = assets;
+        this.exports = exports;
+        this.export = export;
+    }
 
     @GetMapping
     @RequiresPermission(Permission.ASSETS_READ)
@@ -144,6 +153,25 @@ public class AssetController {
     @GetMapping("/reports/reconciliation")
     @RequiresPermission(Permission.ASSETS_READ)
     public Reconciliation reconciliation(TenantContext ctx) { return assets.reconciliation(ctx); }
+
+    /** Depreciation, running costs, use and maintenance by asset; JSON, or a file with format=csv|xlsx (H5, H7). */
+    @GetMapping("/reports/running-costs")
+    @RequiresPermission(Permission.ASSETS_READ)
+    public ResponseEntity<?> runningCosts(TenantContext ctx, @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                                          @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+                                          @RequestParam(required = false) String format, @RequestParam(required = false) String lang) {
+        RunningCostsReport r = assets.runningCosts(ctx, from, to);
+        if (!ExportService.isExport(format)) return ResponseEntity.ok(r);
+        return export.export(ctx, exports.runningCosts(ReportLabels.language(lang), r), format, lang, "running-costs", from, to);
+    }
+
+    /** The register with its header, as CSV or XLSX (H7). The older register.csv stays for existing links. */
+    @GetMapping("/reports/register")
+    @RequiresPermission(Permission.ASSETS_READ)
+    public ResponseEntity<byte[]> register(TenantContext ctx, @RequestParam String format, @RequestParam(required = false) String lang) {
+        LocalDate today = LocalDate.now();
+        return export.export(ctx, exports.register(ReportLabels.language(lang), assets.assets(ctx, true)), format, lang, "asset-register", today, today);
+    }
 
     @GetMapping("/reports/register.csv")
     @RequiresPermission(Permission.ASSETS_READ)

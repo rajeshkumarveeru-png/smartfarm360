@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Download, Plus, Trash2 } from 'lucide-react';
-import { api, download } from '../api/client';
+import { Plus, Trash2 } from 'lucide-react';
+import { api } from '../api/client';
 import type { Page } from '../api/types';
 import { useTenant } from '../auth/useCurrentTenant';
 import { ErrorBanner, Loading } from '../components/common';
@@ -15,6 +15,7 @@ import type { Item, Lot, Unit } from '../stock/types';
 import { baseUnitLabel, isQuantity, unitChoices } from '../stock/types';
 import type { Activity, Cycle, CycleReport, Harvest, Observation } from './types';
 import { ACTIVITY_TYPES, OBSERVATION_KINDS, SEVERITIES } from './types';
+import { ExportBar } from '../reports/ReportTools';
 
 type Tab = 'activities' | 'harvests' | 'observations';
 type Input = { itemId: string; quantity: string; unit: string; lotNo: string };
@@ -101,8 +102,7 @@ export default function CyclePage() {
         <>
           <div className="section-head section-space">
             <h3>{t('report')}</h3>
-            <button type="button" className="secondary" onClick={() => download(`${base}/cultivation-cycles/${cycle.id}/report.csv?${reportQuery()}`, `crop-cycle-${cycle.id}.csv`)
-              .catch(e => setError(describeError(e)))}><Download size={16} aria-hidden />{ts('exportCsv')}</button>
+            <ExportBar path={`${base}/cultivation-cycles/${cycle.id}/report?${reportQuery()}`} name={`crop-cycle-${cycle.id}`} onError={setError} />
           </div>
           <div className="form-card form-grid filters">
             <label>{tf('from')}<input type="date" value={range.from || report.from} onChange={e => setRange({ ...range, from: e.target.value })} /></label>

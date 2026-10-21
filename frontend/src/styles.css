@@ -49,3 +49,35 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{ou
 .stage,.severity{display:inline-block;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;background:#edf1eb;color:#526456;vertical-align:middle}
 .stage-growing{background:#e3f2d7;color:#386a3f}.stage-harvesting{background:#fff4d6;color:#8a6212}.stage-closed{background:#e6eaf2;color:#3d4f6e}.stage-cancelled{background:#f4e9e7;color:#8a4a3e}
 .severity-high{background:#fff0ed;color:#9c3e30}.severity-medium{background:#fff4d6;color:#8a6212}
+
+/* Phase 7: dashboard, reports and printing (dashboard and reports design, sections 3, 5, 10) */
+.dashboard-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-top:16px}
+.dashboard-grid h3{margin-top:0}
+a.finance-stat{color:inherit;text-decoration:none}a.finance-stat:hover{border-color:#80ad7b}
+.attention-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.attention-list a{display:block;padding:10px 12px;border-radius:10px;background:#fff7e6;border:1px solid #f1d9a6;color:#5b4210;text-decoration:none;font-size:14px}
+.attention-list a:hover{border-color:#d9a640}
+.trend-chart{margin:0}.trend-chart svg{width:100%;height:auto;display:block}
+.trend-chart .axis{stroke:#c8d3c5;stroke-width:1}.trend-chart .tick{font-size:11px;fill:#66816a}
+.trend-chart .bar-income{fill:#4f9a5f}.trend-chart .bar-costs{fill:#d98b5f}.trend-chart .line-profit{stroke:#173d2b;stroke-width:2}
+.trend-chart .legend{display:flex;gap:14px;font-size:12px;color:#526456;margin-top:6px}
+.trend-chart .legend span::before{content:'';display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.key-income::before{background:#4f9a5f}.key-costs::before{background:#d98b5f}.key-profit::before{background:#173d2b;height:3px!important}
+.trend-table{margin-top:8px;font-size:13px}.trend-table summary{cursor:pointer;color:#386a3f}
+.report-catalog{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.share-bar{display:block;height:4px;background:#9cc795;border-radius:2px;margin-top:4px}
+.balance-sheet{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:start}
+.party-item{display:flex;flex-direction:column}.party-item .statement-link{align-self:flex-end;font-size:12px;margin:-4px 8px 8px}
+.print-only{display:none}
+.print-header h1{font-size:20px;margin:4px 0}.print-header p{margin:2px 0;font-size:12px}.print-tenant{font-weight:700}
+@media print{
+  @page{size:A4;margin:14mm}
+  body{background:#fff}
+  .sidebar,.topbar,.no-print,.crop-tabs,.quick-actions,nav,button{display:none!important}
+  .main{margin:0!important;padding:0!important}
+  .print-only{display:block}
+  .form-card{border:0;box-shadow:none;padding:0}
+  .data-table{width:100%;font-size:11px}.data-table thead{display:table-header-group}.data-table tr{break-inside:avoid}
+  .table-scroll{overflow:visible}
+  a{color:inherit;text-decoration:none}
+}

@@ -1,6 +1,9 @@
 package com.smartfarm360.finance;
 
 import com.smartfarm360.finance.FinanceDtos.*;
+import com.smartfarm360.platform.export.ExportService;
+import com.smartfarm360.platform.export.ReportDocument;
+import com.smartfarm360.platform.export.ReportLabels;
 import com.smartfarm360.platform.rbac.Permission;
 import com.smartfarm360.platform.security.RequiresPermission;
 import com.smartfarm360.platform.security.TenantContext;
@@ -8,10 +11,12 @@ import com.smartfarm360.platform.web.PageResponse;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.function.Supplier;
 
 /**
  * Finance API (posting rules, approved 2026-10-20). Money-creating requests accept an {@code Idempotency-Key}
@@ -26,9 +31,15 @@ public class FinanceController {
     private final ReportService reports;
     private final FinanceSettingsService settings;
     private final AllocationService allocations;
+    private final LedgerReportService ledger;
+    private final FinanceExports exports;
+    private final ExportService export;
 
     public FinanceController(DocumentService documents, MasterDataService master, ReportService reports, FinanceSettingsService settings,
-                             AllocationService allocations) {
+                             AllocationService allocations, LedgerReportService ledger, FinanceExports exports, ExportService export) {
+        this.ledger = ledger;
+        this.exports = exports;
+        this.export = export;
         this.documents = documents;
         this.master = master;
         this.reports = reports;
@@ -249,28 +260,80 @@ public class FinanceController {
     }
 
     // ---- Reports ----
+    // Each report answers JSON, or a file when format=csv|xlsx (dashboard and reports design, H7); lang labels the file.
 
     @GetMapping("/reports/income-statement")
     @RequiresPermission(Permission.FINANCE_READ)
-    public ReportService.IncomeStatement incomeStatement(TenantContext ctx,
+    public ResponseEntity<?> incomeStatement(TenantContext ctx,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) Long farmId, @RequestParam(required = false) Long costObjectId,
-            @RequestParam(defaultValue = "ACCRUAL") String basis) {
-        return reports.incomeStatement(ctx, from, to, farmId, costObjectId, basis);
+            @RequestParam(defaultValue = "ACCRUAL") String basis, @RequestParam(required = false) String compare,
+            @RequestParam(required = false) String format, @RequestParam(required = false) String lang) {
+        if (compare != null && !compare.isBlank()) {
+            LedgerReportService.IncomeComparison c = ledger.compareIncome(ctx, from, to, farmId, costObjectId, basis, compare);
+            return respond(ctx, c, format, () -> exports.comparison(lang(lang), ctx.tenantId(), c), lang, "income-statement", from, to);
+        }
+        ReportService.IncomeStatement s = reports.incomeStatement(ctx, from, to, farmId, costObjectId, basis);
+        return respond(ctx, s, format, () -> exports.income(lang(lang), ctx.tenantId(), s), lang, "income-statement", from, to);
+    }
+
+    @GetMapping("/reports/monthly")
+    @RequiresPermission(Permission.FINANCE_READ)
+    public ResponseEntity<?> monthly(TenantContext ctx, @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                                     @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+                                     @RequestParam(required = false) Long farmId, @RequestParam(defaultValue = "ACCRUAL") String basis,
+                                     @RequestParam(required = false) String format, @RequestParam(required = false) String lang) {
+        LedgerReportService.MonthlyProfitAndLoss m = ledger.monthly(ctx, from, to, farmId, basis);
+        return respond(ctx, m, format, () -> exports.monthly(lang(lang), ctx.tenantId(), m), lang, "monthly-profit-and-loss", from, to);
+    }
+
+    @GetMapping("/reports/categories")
+    @RequiresPermission(Permission.FINANCE_READ)
+    public ResponseEntity<?> categories(TenantContext ctx, @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                                        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+                                        @RequestParam(defaultValue = "COSTS") String kind, @RequestParam(required = false) Long farmId,
+                                        @RequestParam(required = false) Long costObjectId, @RequestParam(defaultValue = "ACCRUAL") String basis,
+                                        @RequestParam(required = false) String compare,
+                                        @RequestParam(required = false) String format, @RequestParam(required = false) String lang) {
+        LedgerReportService.CategoryBreakdown c = ledger.categories(ctx, from, to, kind, farmId, costObjectId, basis, compare);
+        return respond(ctx, c, format, () -> exports.categories(lang(lang), ctx.tenantId(), c), lang, "categories", from, to);
+    }
+
+    @GetMapping("/reports/balance-sheet")
+    @RequiresPermission(Permission.FINANCE_READ)
+    public ResponseEntity<?> balanceSheet(TenantContext ctx, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOf,
+                                          @RequestParam(required = false) String format, @RequestParam(required = false) String lang) {
+        LocalDate date = asOf == null ? LocalDate.now() : asOf;
+        LedgerReportService.BalanceSheet b = ledger.balanceSheet(ctx, date);
+        return respond(ctx, b, format, () -> exports.balanceSheet(lang(lang), b), lang, "balance-sheet", date, date);
+    }
+
+    @GetMapping("/reports/trial-balance")
+    @RequiresPermission(Permission.FINANCE_MANAGE)
+    public ResponseEntity<?> trialBalance(TenantContext ctx, @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                                          @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+                                          @RequestParam(required = false) String format, @RequestParam(required = false) String lang) {
+        LedgerReportService.TrialBalance t = ledger.trialBalance(ctx, from, to);
+        return respond(ctx, t, format, () -> exports.trialBalance(lang(lang), t), lang, "trial-balance", from, to);
     }
 
     @GetMapping("/reports/cash-flow")
     @RequiresPermission(Permission.FINANCE_READ)
-    public ReportService.CashFlow cashFlow(TenantContext ctx, @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-                                           @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return reports.cashFlow(ctx, from, to);
+    public ResponseEntity<?> cashFlow(TenantContext ctx, @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                                      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+                                      @RequestParam(required = false) String format, @RequestParam(required = false) String lang) {
+        ReportService.CashFlow c = reports.cashFlow(ctx, from, to);
+        return respond(ctx, c, format, () -> exports.cashFlow(lang(lang), c), lang, "cash-flow", from, to);
     }
 
     @GetMapping("/reports/dues")
     @RequiresPermission(Permission.FINANCE_READ)
-    public ReportService.Dues dues(TenantContext ctx, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOf) {
-        return reports.dues(ctx, asOf == null ? LocalDate.now() : asOf);
+    public ResponseEntity<?> dues(TenantContext ctx, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOf,
+                                  @RequestParam(required = false) String format, @RequestParam(required = false) String lang) {
+        LocalDate date = asOf == null ? LocalDate.now() : asOf;
+        ReportService.Dues d = reports.dues(ctx, date);
+        return respond(ctx, d, format, () -> exports.dues(lang(lang), d), lang, "dues", date, date);
     }
 
     @GetMapping("/reports/balances")
@@ -281,14 +344,34 @@ public class FinanceController {
 
     @GetMapping("/reports/activity")
     @RequiresPermission(Permission.FINANCE_READ)
-    public ReportService.Activity activity(TenantContext ctx, @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-                                           @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return reports.activity(ctx, from, to);
+    public ResponseEntity<?> activity(TenantContext ctx, @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                                      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+                                      @RequestParam(required = false) String format, @RequestParam(required = false) String lang) {
+        ReportService.Activity a = reports.activity(ctx, from, to);
+        return respond(ctx, a, format, () -> exports.activity(lang(lang), a), lang, "activity", from, to);
     }
 
     @GetMapping("/reports/summary")
     @RequiresPermission(Permission.FINANCE_READ)
     public ReportService.Summary summary(TenantContext ctx, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOf) {
         return reports.summary(ctx, asOf == null ? LocalDate.now() : asOf);
+    }
+
+    @GetMapping("/parties/{partyId}/statement")
+    @RequiresPermission(Permission.FINANCE_READ)
+    public ResponseEntity<?> partyStatement(TenantContext ctx, @PathVariable long partyId,
+                                            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                                            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+                                            @RequestParam(required = false) String format, @RequestParam(required = false) String lang) {
+        LedgerReportService.PartyStatement s = ledger.partyStatement(ctx, partyId, from, to);
+        return respond(ctx, s, format, () -> exports.partyStatement(lang(lang), s), lang, "party-statement-" + partyId, from, to);
+    }
+
+    private static String lang(String lang) { return ReportLabels.language(lang); }
+
+    private ResponseEntity<?> respond(TenantContext ctx, Object json, String format, Supplier<ReportDocument> doc, String lang, String code,
+                                      LocalDate from, LocalDate to) {
+        if (!ExportService.isExport(format)) return ResponseEntity.ok(json);
+        return export.export(ctx, doc.get(), format, lang, code, from, to);
     }
 }

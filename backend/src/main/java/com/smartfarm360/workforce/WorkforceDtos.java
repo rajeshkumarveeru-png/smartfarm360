@@ -115,6 +115,16 @@ public final class WorkforceDtos {
 
     public record LabourByActivity(LocalDate from, LocalDate to, List<LabourRow> rows, BigDecimal totalCost) {}
 
+    /**
+     * One worker in the wages report (dashboard and reports design, section 4). Money fields are null for readers who
+     * may see attendance but not pay ({@code PAYROLL_MANAGE} or {@code FINANCE_READ} needed).
+     */
+    public record WageRow(long workerId, String name, String payType, BigDecimal days, BigDecimal wages, BigDecimal paid,
+                          BigDecimal advanceGiven, BigDecimal advanceRecovered, BigDecimal owedAtEnd, BigDecimal advanceAtEnd) {}
+
+    public record WagesReport(LocalDate from, LocalDate to, boolean actual, boolean amountsShown, List<WageRow> workers, WageRow total,
+                              LabourByActivity byCrop) {}
+
     /** Wages owed and advances by worker against the ledger (2100, 1150); differences must be zero. */
     public record Reconciliation(BigDecimal workersOwed, BigDecimal ledgerWagesPayable, BigDecimal workersAdvance, BigDecimal ledgerAdvances) {}
 }

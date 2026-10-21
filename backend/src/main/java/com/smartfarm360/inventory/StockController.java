@@ -1,6 +1,8 @@
 package com.smartfarm360.inventory;
 
 import com.smartfarm360.inventory.StockDtos.*;
+import com.smartfarm360.platform.export.ExportService;
+import com.smartfarm360.platform.export.ReportLabels;
 import com.smartfarm360.platform.rbac.Permission;
 import com.smartfarm360.platform.security.RequiresPermission;
 import com.smartfarm360.platform.security.TenantContext;
@@ -30,7 +32,12 @@ public class StockController {
     private final StockRecordService records;
     private final StockReportService reports;
 
-    public StockController(ItemService items, StockRecordService records, StockReportService reports) {
+    private final StockExports exports;
+    private final ExportService export;
+
+    public StockController(ItemService items, StockRecordService records, StockReportService reports, StockExports exports, ExportService export) {
+        this.exports = exports;
+        this.export = export;
         this.items = items;
         this.records = records;
         this.reports = reports;
@@ -164,7 +171,12 @@ public class StockController {
 
     @GetMapping("/reports/on-hand")
     @RequiresPermission(Permission.INVENTORY_READ)
-    public OnHand onHand(TenantContext ctx, @RequestParam(required = false) Long locationId) { return reports.onHand(ctx, locationId); }
+    public ResponseEntity<?> onHand(TenantContext ctx, @RequestParam(required = false) Long locationId,
+                                    @RequestParam(required = false) String format, @RequestParam(required = false) String lang) {
+        OnHand o = reports.onHand(ctx, locationId);
+        if (!ExportService.isExport(format)) return ResponseEntity.ok(o);
+        return export.export(ctx, exports.onHand(ReportLabels.language(lang), o), format, lang, "stock-on-hand", o.asOf(), o.asOf());
+    }
 
     @GetMapping("/reports/on-hand.csv")
     @RequiresPermission(Permission.INVENTORY_READ)
@@ -172,8 +184,11 @@ public class StockController {
 
     @GetMapping("/reports/valuation")
     @RequiresPermission(Permission.INVENTORY_READ)
-    public Valuation valuation(TenantContext ctx, @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOf) {
-        return reports.valuation(ctx, asOf);
+    public ResponseEntity<?> valuation(TenantContext ctx, @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOf,
+                                       @RequestParam(required = false) String format, @RequestParam(required = false) String lang) {
+        Valuation v = reports.valuation(ctx, asOf);
+        if (!ExportService.isExport(format)) return ResponseEntity.ok(v);
+        return export.export(ctx, exports.valuation(ReportLabels.language(lang), v), format, lang, "stock-valuation", asOf, asOf);
     }
 
     @GetMapping("/reports/valuation.csv")

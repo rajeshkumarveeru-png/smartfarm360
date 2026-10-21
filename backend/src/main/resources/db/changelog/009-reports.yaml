@@ -1,0 +1,15 @@
+databaseChangeLog:
+  # Phase 7 dashboard and reports. See docs/reports/dashboard-and-reports.md (approved 2026-10-21). Forward-only.
+  # No new tables (section 11): indexes for the dashboard and report queries only.
+  - changeSet:
+      id: 042-report-indexes
+      author: smartfarm360
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE INDEX ix_sf_journal_line_tenant_cost_object ON sf_journal_lines (tenant_id, cost_object_id) WHERE cost_object_id IS NOT NULL;
+              CREATE INDEX ix_sf_doc_tenant_type_status ON sf_finance_documents (tenant_id, doc_type, status);
+      rollback:
+        - sql:
+            sql: DROP INDEX ix_sf_journal_line_tenant_cost_object; DROP INDEX ix_sf_doc_tenant_type_status;

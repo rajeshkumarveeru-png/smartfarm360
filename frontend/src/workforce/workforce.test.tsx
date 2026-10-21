@@ -84,8 +84,10 @@ describe('workforce web', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'All present on Samba 2026' }));
     expect(screen.getByLabelText('Worked on, Murugan')).toHaveValue('11');
     await userEvent.click(screen.getByRole('button', { name: 'Save attendance' }));
-    await waitFor(() => expect(calls('/attendance/' + muster.date, 'PUT').length).toBe(1));
-    const put = calls('/attendance/' + muster.date, 'PUT')[0];
+    // The page opens on today's date, so match any attendance PUT
+    const puts = () => apiMock.mock.calls.filter(([u, i]) => String(u).includes('/attendance/') && i?.method === 'PUT');
+    await waitFor(() => expect(puts().length).toBe(1));
+    const put = puts()[0];
     expect(put?.[1].body).toEqual({ entries: [{ workerId: 1, status: 'PRESENT', costObjectId: 11, hours: null }] });
   });
 

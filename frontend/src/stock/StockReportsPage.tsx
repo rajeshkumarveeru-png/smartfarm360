@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Download } from 'lucide-react';
-import { api, download } from '../api/client';
+import { api } from '../api/client';
 import { useTenant } from '../auth/useCurrentTenant';
 import { ErrorBanner, Loading } from '../components/common';
 import { currentLanguage, useNs } from '../i18n';
@@ -8,6 +7,7 @@ import { describeError } from '../lib/errors';
 import { formatDate, formatMoney, formatNumber, today } from '../lib/format';
 import type { Reconciliation, Valuation } from './types';
 import { baseUnitLabel } from './types';
+import { ExportBar } from '../reports/ReportTools';
 
 /** Stock value on any date (recomputed from movements) and the check that the ledger agrees with the store. */
 export default function StockReportsPage() {
@@ -44,9 +44,7 @@ export default function StockReportsPage() {
       )}
       <div className="section-head section-space">
         <h3>{t('valuationTitle')}</h3>
-        <button type="button" className="secondary" disabled={!asOf}
-                onClick={() => download(`${base}/valuation.csv?asOf=${asOf}`, `stock-value-${asOf}.csv`).catch(e => setError(describeError(e)))}>
-          <Download size={16} aria-hidden />{t('exportCsv')}</button>
+        {asOf && <ExportBar path={`${base}/valuation?asOf=${asOf}`} name={`stock-value-${asOf}`} onError={setError} />}
       </div>
       <div className="form-card form-grid filters">
         <label>{tf('asOf')}<input type="date" value={asOf} onChange={e => setAsOf(e.target.value)} /></label>

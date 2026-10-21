@@ -113,5 +113,6 @@ class StockGoldenScenarioTest extends StockTestSupport {
         assertThat(body(get(s("/items/" + urea + "/movements"), owner)).get("totalItems").asInt()).isEqualTo(5);
         post(f("/documents/" + issue.at("/document/summary/id").asLong() + "/reverse"), owner, Map.of()).andExpect(status().isOk());
         money(stockItem(urea).get("value"), "4032.00");
+        assertBooksBalance("2026-12-31");
     }
 }

@@ -157,5 +157,6 @@ class WorkforceGoldenScenarioTest extends FinanceTestSupport {
         money(recon.get("ledgerAccumulated"), "13500.00");
         money(recon.get("unexplained"), "0");
         assertThat(journalImbalance()).isZero();
+        assertBooksBalance("2026-12-31");
     }
 }

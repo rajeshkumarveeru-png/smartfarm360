@@ -72,6 +72,19 @@ public abstract class FinanceTestSupport extends ApiIntegrationTest {
         assertThat(new BigDecimal(node.asText())).as(node.toString()).isEqualByComparingTo(expected);
     }
 
+    /**
+     * Dashboard and reports design, section 13: after any scenario the balance sheet balances and the trial balance
+     * debits equal its credits.
+     */
+    protected void assertBooksBalance(String asOf) throws Exception {
+        JsonNode sheet = report("balance-sheet?asOf=" + asOf);
+        money(sheet.get("difference"), "0");
+        money(sheet.get("assetTotal"), sheet.get("liabilitiesAndEquity").asText());
+        JsonNode trial = report("trial-balance?from=2000-01-01&to=" + asOf);
+        money(trial.get("debitTotal"), trial.get("creditTotal").asText());
+        money(trial.get("closingTotal"), "0");
+    }
+
     protected long journalImbalance() {
         return jdbc.queryForObject("select count(*) from (select entry_id from sf_journal_lines where tenant_id = ? group by entry_id having sum(debit) <> sum(credit)) x",
                 Long.class, tenant);

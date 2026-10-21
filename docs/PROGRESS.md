@@ -2,10 +2,9 @@
 
 ## Current state
 
-- **Phase:** 6 (workforce and assets) complete on branch `feature/phase-6-workforce` (based on `feature/phase-5-crops`).
-  Phase 7 (dashboard and core reports) started on `feature/phase-7-reports`: the
-  [dashboard and reports design](reports/dashboard-and-reports.md) is awaiting review; no Phase 7 code yet. Nothing is
-  pushed yet.
+- **Phase:** 7 (dashboard and core reports) complete on branch `feature/phase-7-reports` (based on
+  `feature/phase-6-workforce`). Next: Phases 8–12 (farming modules), starting with livestock and dairy. Nothing is pushed
+  yet.
 - **Production readiness:** not ready. Authentication, roles, tenant isolation, audit, the finance core and stock with
   movements are in place and tested, but no email provider is configured and hosting/backups are undecided.
 
@@ -452,6 +451,131 @@ Not verified:
   the API tests).
 - CSV download in the browser (covered by API tests).
 
+## Phase 7 — Dashboard and core reports (2026-10-21)
+
+Commits on `feature/phase-7-reports` (based on `feature/phase-6-workforce`):
+
+- `b57f368`: design.
+- A build commit with the backend, web, mobile, verification and docs.
+
+### Features completed
+
+- **Approved design.** [dashboard and reports](reports/dashboard-and-reports.md) is implemented with H1–H14 as
+  recommended. Implementation notes are in section 14 of the design.
+- **Dashboard** (H1–H4). It is now the landing page of a farm business. It shows:
+  - money at a glance: cash and bank by account, receivables and overdue, payables, loans, this month, this financial
+    year;
+  - the last 12 months as a built-in SVG chart, with a table view;
+  - this month's five largest costs;
+  - crops in the field;
+  - a "needs attention" list with links: overdue sales, bills due, old drafts, low stock, expiring lots, wages owed,
+    advances, attendance not marked, maintenance due, depreciation not posted, unregistered assets, and any
+    reconciliation that does not agree.
+
+  Each part needs its own permission and module. A part that fails to load does not hide the rest.
+- **New reports** (H5, H6):
+  - monthly profit and loss;
+  - costs or income by category, with shares;
+  - balance sheet;
+  - trial balance (for accountants);
+  - statement of account for any party;
+  - wages by worker;
+  - maintenance and running costs by asset.
+
+  A Reports page lists every report the reader may open.
+- **Comparisons and ranges** (H10, H11):
+  - The profit and loss and the category breakdown can be compared with the previous period or the same period last
+    year, showing the change in rupees and percent ("—" when the earlier amount is zero).
+  - Quick ranges follow the fiscal year setting (labelled like "2026-27").
+- **Exports** (H7–H9):
+  - CSV and Excel for every report, including stock, crops and the asset register. Each file opens with a header block,
+    labels in English or Tamil, and plain numbers.
+  - A print layout for "Print / Save as PDF".
+  - Exports are limited to 5-year ranges and 30 a minute per user, and each one is recorded in the activity history as
+    *Report exported*.
+- **Phone** (H13):
+  - The Home tab shows receivables, payables and the "needs attention" list from the server, as the role may see them.
+  - Offline, it shows the last copy with its time.
+  - Entries waiting on the phone are shown as "not yet sent".
+
+### Database migrations
+
+`009-reports.yaml`, changeset `042-report-indexes`: two indexes, with no new tables and no data changes.
+
+- `ix_sf_journal_line_tenant_cost_object`: journal lines by cost object.
+- `ix_sf_doc_tenant_type_status`: documents by type and status.
+
+They were applied to the local database on 2026-10-21, after a `pg_dump` backup (`smartfarm360-before-phase7.backup`).
+
+### APIs added
+
+Under `/api/v1/tenants/{tenantId}`:
+
+- `GET /dashboard`
+- `GET /finance/reports/monthly`
+- `GET /finance/reports/categories`
+- `GET /finance/reports/balance-sheet`
+- `GET /finance/reports/trial-balance`
+- `GET /finance/parties/{id}/statement`
+- `GET /workforce/reports/wages`
+- `GET /assets/reports/running-costs`
+- `GET /assets/reports/register?format=`
+
+Changed:
+
+- Every report endpoint accepts `format=csv|xlsx` and `lang=en|ta`. This covers income statement, cash flow, dues,
+  activity, stock valuation and on-hand, crop cycle report and comparison, and the new reports.
+- The income statement accepts `compare=previous|lastYear`.
+- The older `.csv` endpoints are unchanged.
+
+### Tests and evidence
+
+| Command | Result |
+|---|---|
+| `backend: gradlew test --rerun bootJar` | Passed: **490 tests, 0 failures** (see below) |
+| `frontend: npm run lint`, `tsc --noEmit`, `npm run build` | Passed; the bundle is still over 500 kB |
+| `frontend: npm test` | Passed: **48 tests**, including 6 new dashboard and report tests |
+| `mobile: npm run typecheck`, `npm test`, `npx expo install --check` | Passed: **29 tests**, including 3 new dashboard tests |
+| Manual browser check | Passed (see below) |
+
+The backend run includes:
+
+- The golden scenario from section 9 of the design. Every figure is asserted: income statement, balance sheet
+  (₹2,84,000 on both sides), trial balance, monthly columns adding up to ₹30,000, category shares, the party statement,
+  and dashboard tiles equal to their source reports.
+- The balance sheet and trial balance balancing at the end of the finance, stock, crop and workforce golden scenarios.
+- 9 report rule tests:
+  - XLSX number cells and header block;
+  - CSV byte-order mark, Tamil labels and plain numbers;
+  - export audit, range limit, format check and the rate limit;
+  - CSV and XLSX for every report;
+  - comparison periods and percent from zero;
+  - tiles, reports and exports by role;
+  - running costs and hidden amounts;
+  - party statement tenant scoping;
+  - every export label in the catalog.
+- The dashboard performance test: **471 ms** at 50,000 journal lines (limit 1,000 ms).
+- 10 module-boundary rules.
+- 356 generated cross-tenant cases.
+
+The manual browser check ran against backend :8081 on local PostgreSQL 18, with Vite on :5174:
+
+- Migration 042 was applied.
+- The dashboard opened as the landing page. It showed cash ₹3,149.50, receivables ₹25,000 (overdue), this year's profit
+  ₹40,749.50, the 12-month chart, the largest costs and Samba 2026 in the field.
+- The balance sheet balanced at ₹40,749.50 and matched the dashboard.
+- The reports page listed all 16 reports for the owner.
+- The wages report showed Murugan with 1 day and ₹500 earned and paid.
+- One defect was found and fixed: the overdue line showed "{{amount}} overdue".
+- The backend log shows 0 errors and no secret values.
+
+Not verified:
+
+- Saving an export file through the browser. It needs a download approval; exports are covered by the API tests.
+- Print preview on paper.
+- A real phone.
+- GitHub Actions (nothing has been pushed).
+
 ## Known gaps and defects
 
 Security and platform:
@@ -469,7 +593,8 @@ Finance and stock:
 - Crop photos wait for attachment storage (ADR 0009); weather comes only from farmer entries.
 - The web bundle is over 500 kB; split the bundle by section before production.
 - No internal transfers of own produce or manure yet (P17, Phases 5 → 11); monthly depreciation runs arrived in Phase 6.
-- Finance report exports arrive in Phase 7.
+- The workforce labour report still shows labour cost to anyone with WORKFORCE_READ, unlike the new wages report.
+- Excel exports group thousands as #,##0.00, not Indian lakh grouping (an Excel format limit).
 - Payroll has no PF, ESI, TDS or minimum-wage rules (G6). There is no WDV depreciation and no machine-hour allocation to
   crops (G9, G12). Breeding animals are not depreciated until the livestock phases (G10). Recurring expenses are still
   open.

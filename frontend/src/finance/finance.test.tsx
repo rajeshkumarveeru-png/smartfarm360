@@ -78,7 +78,8 @@ describe('finance web', () => {
     setLanguage('ta');
     renderAt('/t/9/finance/reports', <ReportsPage />, '/t/:tenantId/finance/reports');
     expect(await screen.findByText('நிகர லாபம்')).toBeInTheDocument();
-    expect(screen.getByText(/உண்மையான எண்ணிக்கைகள்/)).toBeInTheDocument();
+    // Shown on screen, and again in the print header (H8)
+    expect(screen.getAllByText(/உண்மையான எண்ணிக்கைகள்/).some(e => e.classList.contains('hint'))).toBe(true);
     expect(screen.getByText('பயிர் விற்பனை')).toBeInTheDocument();
     expect(document.body.textContent).toContain('37,600.00');
   });

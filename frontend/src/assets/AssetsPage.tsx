@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Download, Plus } from 'lucide-react';
-import { api, download } from '../api/client';
+import { Plus } from 'lucide-react';
+import { api } from '../api/client';
 import { useTenant } from '../auth/useCurrentTenant';
 import { ErrorBanner, Loading } from '../components/common';
 import type { FinancialAccount, Party } from '../finance/types';
@@ -13,6 +13,7 @@ import { can } from '../lib/nav';
 import DetailsFields, { detailsValid } from './DetailsFields';
 import type { Asset, DetailsForm, UnregisteredLine } from './types';
 import { detailsBody, emptyDetails, isMoney } from './types';
+import { ExportBar } from '../reports/ReportTools';
 
 /** The asset register: buy an asset on a bill, register costs already on Farm assets, and export the register (G8). */
 export default function AssetsPage() {
@@ -88,8 +89,7 @@ export default function AssetsPage() {
         <div><h2>{t('register')}</h2><p>{t('registerHelp')}</p></div>
         <div className="quick-actions">
           {canBuy && mode === '' && <button type="button" className="primary" onClick={() => start('buy')}><Plus size={16} aria-hidden />{t('buyAsset')}</button>}
-          <button type="button" className="secondary" onClick={() => download(`${base}/reports/register.csv`, `asset-register-${today()}.csv`).catch(e => setError(describeError(e)))}>
-            <Download size={16} aria-hidden />{t('exportCsv')}</button>
+          <ExportBar path={`${base}/reports/register`} name={`asset-register-${today()}`} onError={setError} />
         </div>
       </div>
       <ErrorBanner message={error} />

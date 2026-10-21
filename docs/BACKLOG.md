@@ -51,13 +51,13 @@ Approved design: [workforce and assets](workforce/workforce-and-assets.md) (G1�
 - Depreciation of breeding animals → livestock phases (G10).
 - Offline attendance on the phone → Phase 13.
 
-## Phase 7 — Dashboard and core reports
+## Phase 7 — Dashboard and core reports (done 2026-10-21)
 
-Design for review: [dashboard and reports](reports/dashboard-and-reports.md) (H1–H14).
+Approved design: [dashboard and reports](reports/dashboard-and-reports.md) (H1–H14). Left for later:
 
-- Income vs expenses, cash/bank balances, receivables/payables, monthly P&L, category breakdown, activity
-  profitability, inventory valuation, wages, maintenance. CSV/XLSX/PDF exports with tenant checks.
-- Every report states date range, inclusion rules and actual vs estimated.
+- Emailed and scheduled reports (needs a server PDF and an email provider) → after Phase 14.
+- Hide labour cost in the workforce labour report from readers without pay access, as the wages report does.
+- Recurring expenses (H14) → Phase 14 or a small follow-up.
 
 ## Phases 8–12 — Farming modules
 

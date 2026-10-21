@@ -277,6 +277,21 @@ public class AssetService {
         return all.stream().filter(c -> c.eligible(m)).toList();
     }
 
+    /** The earliest month that has ended (before {@code asOf}'s month) and still has depreciation to post; for the dashboard. */
+    @Transactional(readOnly = true)
+    public Optional<String> depreciationDue(TenantContext ctx, LocalDate asOf) {
+        List<Candidate> all = candidates(ctx.tenantId());
+        if (all.isEmpty()) return Optional.empty();
+        YearMonth lastEnded = YearMonth.from(asOf).minusMonths(1);
+        YearMonth start = lastRun(ctx.tenantId()).map(x -> x.plusMonths(1))
+                .orElse(all.stream().map(Candidate::startMonth).min(Comparator.naturalOrder()).orElse(lastEnded.plusMonths(1)));
+        for (YearMonth m = start; !m.isAfter(lastEnded); m = m.plusMonths(1)) {
+            YearMonth month = m;
+            if (all.stream().anyMatch(c -> c.eligible(month))) return Optional.of(month.toString());
+        }
+        return Optional.empty();
+    }
+
     @Transactional(readOnly = true)
     public RunPreview previewRun(TenantContext ctx, String month) {
         YearMonth m = YearMonth.parse(month);
@@ -559,6 +574,35 @@ public class AssetService {
                 .param("a", assetId).param("t", ctx.tenantId()).param("from", from).param("to", to).query(BigDecimal.class).single();
         BigDecimal perHour = hours.signum() == 0 ? null : depreciation.add(running).divide(hours, 2, RoundingMode.HALF_UP);
         return new Costs(assetId, from, to, depreciation, new ArrayList<>(rows.values()), running, hours, perHour);
+    }
+
+    /** Depreciation, running costs, use and maintenance by asset for a period (dashboard and reports design, H5). */
+    @Transactional(readOnly = true)
+    public RunningCostsReport runningCosts(TenantContext ctx, LocalDate from, LocalDate to) {
+        if (from == null || to == null || to.isBefore(from)) throw ApiException.badRequest("INVALID_DATE_RANGE", "Choose a valid date range.");
+        boolean amounts = ctx.has(Permission.FINANCE_READ);
+        Map<Long, Long> due = new HashMap<>();
+        for (Plan p : plans(ctx, null)) if (p.active() && !"OK".equals(p.status())) due.merge(p.assetId(), 1L, Long::sum);
+        Map<Long, Long> done = new HashMap<>();
+        jdbc.sql("select asset_id, count(*) from sf_maintenance_logs where tenant_id = :t and done_on between :from and :to group by asset_id")
+                .param("t", ctx.tenantId()).param("from", from).param("to", to).query().listOfRows()
+                .forEach(r -> done.put(((Number) r.get("asset_id")).longValue(), ((Number) r.get("count")).longValue()));
+        List<RunningCostRow> rows = new ArrayList<>();
+        BigDecimal dep = ZERO, run = ZERO;
+        for (Asset a : assets(ctx, true)) {
+            Costs c = costs(ctx, a.id(), from, to);
+            int maint = done.getOrDefault(a.id(), 0L).intValue(), plansDue = due.getOrDefault(a.id(), 0L).intValue();
+            BigDecimal total = c.depreciation().add(c.runningTotal());
+            boolean disposedBefore = !"IN_USE".equals(a.status()) && total.signum() == 0 && c.hours().signum() == 0 && maint == 0;
+            if (disposedBefore) continue;
+            dep = dep.add(c.depreciation());
+            run = run.add(c.runningTotal());
+            rows.add(amounts
+                    ? new RunningCostRow(a.id(), a.name(), a.kind(), a.status(), c.depreciation(), c.runningTotal(), total, c.hours(), c.costPerHour(), maint, plansDue)
+                    : new RunningCostRow(a.id(), a.name(), a.kind(), a.status(), null, null, null, c.hours(), null, maint, plansDue));
+        }
+        return amounts ? new RunningCostsReport(from, to, true, true, rows, dep, run, dep.add(run))
+                : new RunningCostsReport(from, to, true, false, rows, null, null, null);
     }
 
     @Transactional(readOnly = true)

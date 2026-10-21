@@ -12,6 +12,7 @@ import { useFinanceData } from './useFinanceData';
 
 /** Customers, suppliers and lenders (one list, D11) with what each owes or is owed. */
 export default function PartiesPage() {
+  const tr = useNs('reports');
   const tenant = useTenant();
   const t = useNs('fin');
   const tc = useNs('common');
@@ -58,7 +59,8 @@ export default function PartiesPage() {
       )}
       <div className="activity-list">
         {data.parties.map(p => (
-          <Link key={p.id} className="activity-row record-link" to={`/t/${tenant.id}/finance/records?partyId=${p.id}`}>
+          <div key={p.id} className="party-item">
+          <Link className="activity-row record-link" to={`/t/${tenant.id}/finance/records?partyId=${p.id}`}>
             <div className="cycle-main">
               <h4>{p.name}{!p.active ? ` · ${t('inactive')}` : ''}</h4>
               <p>{[p.customer && t('customer'), p.supplier && t('supplier'), p.lender && t('lender')].filter(Boolean).join(' · ')}</p>
@@ -69,6 +71,8 @@ export default function PartiesPage() {
               {Number(p.payable) !== 0 && <small>{Number(p.payable) > 0 ? t('weOwe', { amount: formatMoney(p.payable, lang) }) : t('advancePaid', { amount: formatMoney(-p.payable, lang) })}</small>}
             </div>
           </Link>
+          <Link className="text-action statement-link" to={`/t/${tenant.id}/finance/parties/${p.id}/statement`}>{tr('title.partyStatement')}</Link>
+          </div>
         ))}
         {!data.parties.length && <EmptyState>{t('noParties')}</EmptyState>}
       </div>

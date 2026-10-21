@@ -8,6 +8,7 @@ import { FarmEntry, EntryKind, claimLegacyEntries, loadEntries, newEntryId, remo
 import { FinanceContext, isOffline, loadFinance, postEntry, syncPending } from './src/finance/quickEntry';
 import { loadStock, quantityLabel, type StockView } from './src/stock/stockView';
 import CropScreen from './src/crop/CropScreen';
+import DashboardPanel from './src/dashboard/DashboardPanel';
 import WorkforceScreen from './src/workforce/WorkforceScreen';
 import { errorText } from './src/screens/AuthScreens';
 import { API_BASE_URL, apiRequest, isApiConfigured, onSessionEnded, refreshSession, signIn, signOut, type User } from './src/services/api';
@@ -77,6 +78,7 @@ function FarmHome({ user, tenant, language, onLanguage, onSignOut, onSwitchTenan
   const [saving, setSaving] = useState(false);
   const [finance, setFinance] = useState<FinanceContext | null>(null);
   const [stock, setStock] = useState<StockView | null>(null);
+  const [refreshes, setRefreshes] = useState(0);
   const canSeeStock = tenant.permissions.includes('INVENTORY_READ');
   const canSeeWorkforce = tenant.permissions.includes('WORKFORCE_READ') && tenant.enabledModules.includes('WORKFORCE');
   const canRead = tenant.permissions.includes('FINANCE_READ');
@@ -110,6 +112,7 @@ function FarmHome({ user, tenant, language, onLanguage, onSignOut, onSwitchTenan
       try { setStock(await loadStock(tenant.id)); } catch { setStock(null); } // offline: stock needs the server
     }
     setEntries(rows.sort((a,b) => b.createdAt.localeCompare(a.createdAt)));
+    setRefreshes(n => n + 1);
     setLoading(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per user/tenant scope
   }, [storageKey]);
@@ -176,6 +179,7 @@ function FarmHome({ user, tenant, language, onLanguage, onSignOut, onSwitchTenan
     <>
       <View style={styles.hero}><View style={styles.heroTop}><Text style={styles.brand}>{t('appName')}</Text><Pressable onPress={() => setLanguage(language === 'ta' ? 'en' : 'ta')} style={styles.languagePill}><Text style={styles.languageText}>{language === 'ta' ? 'EN' : 'தமிழ்'}</Text></Pressable></View><Text style={styles.heroTitle}>{t('greeting')}</Text><Text style={styles.heroSub}>{t('subtitle')}</Text><View style={styles.leafBadge}><Text style={styles.leafEmoji}>🌱</Text><Text style={styles.leafText}>{t('month')}</Text></View></View>
       <View style={styles.metricsGrid}><Metric label={t('revenue')} value={money(totals.income)} tone="green"/><Metric label={t('expenses')} value={money(totals.expenses)} tone="red"/><Metric label={finance ? tr(language, 'fin.cashAndBank') : t('net')} value={money(totals.net)} tone={totals.net < 0 ? 'red' : 'dark'}/></View>
+      <DashboardPanel tenant={tenant} language={language} scope={storageKey} pending={entries.filter(e => e.syncStatus === 'pending').length} refreshKey={refreshes}/>
       <Text style={styles.sectionTitle}>{t('quickActions')}</Text><View style={styles.actionsRow}><Pressable style={styles.actionCard} onPress={() => openEntry('expense')}><Text style={styles.actionIcon}>↘</Text><Text style={styles.actionTitle}>{t('addExpense')}</Text></Pressable><Pressable style={[styles.actionCard, styles.incomeAction]} onPress={() => openEntry('income')}><Text style={[styles.actionIcon, styles.incomeIcon]}>↗</Text><Text style={styles.actionTitle}>{t('addIncome')}</Text></Pressable></View>
       {stock && (stock.lowStock.length > 0 || stock.expiringLots.length > 0) && <Pressable onPress={() => setTab('stock')} style={styles.noteCard}><Text style={styles.noteTitle}>📦 {tr(language, 'stock.title')}</Text>{stock.lowStock.slice(0, 3).map(i => <Text key={i.id} style={styles.noteText}>{tr(language, 'stock.lowStock')}: {i.name} · {quantityLabel(language, i)}</Text>)}{stock.expiringLots.slice(0, 3).map(l => <Text key={l.lotId} style={styles.noteText}>{tr(language, l.expired ? 'stock.expired' : 'stock.expiringSoon')}: {l.itemName} · {l.lotNo} · {l.expiryDate}</Text>)}</Pressable>}
       <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>{t('recent')}</Text><Pressable onPress={() => setTab('records')}><Text style={styles.seeAll}>{t('viewAll')}</Text></Pressable></View>

@@ -45,7 +45,7 @@ public abstract class ApiIntegrationTest extends EmbeddedPostgresSupport {
     }
 
     @BeforeEach
-    void resetRateLimits() { rateLimiter.reset(); }
+    protected void resetRateLimits() { rateLimiter.reset(); }
 
     public record User(long id, String email, String token) {}
 

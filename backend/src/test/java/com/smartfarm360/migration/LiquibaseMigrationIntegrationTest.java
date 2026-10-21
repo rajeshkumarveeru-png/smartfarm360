@@ -59,7 +59,7 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
                 "038-crop-v2-schema",
                 "039-crop-v2-backfill",
                 "040-workforce-assets-schema",
-                "041-workforce-assets-seed");
+                "041-workforce-assets-seed", "042-report-indexes");
     }
 
     @Test

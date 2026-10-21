@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Download } from 'lucide-react';
-import { api, download } from '../api/client';
+import { api } from '../api/client';
 import { useTenant } from '../auth/useCurrentTenant';
 import { ErrorBanner, Loading } from '../components/common';
 import { currentLanguage, useNs } from '../i18n';
 import { describeError } from '../lib/errors';
 import { formatDate, formatMoney, formatNumber } from '../lib/format';
 import type { Comparison } from './types';
+import { ExportBar } from '../reports/ReportTools';
 
 /** Every cycle of one crop side by side: plan against actual, yield, cost per acre and profit (F8). */
 export default function ComparisonPage() {
@@ -29,8 +29,7 @@ export default function ComparisonPage() {
       <div className="crop-page-head">
         <div><h2>{t('comparisonTitle', { crop: data.cropName })}</h2><p>{t('comparisonHelp')}</p></div>
         <div className="form-actions">
-          <button type="button" className="secondary" onClick={() => download(`${base}/comparison.csv`, `crop-comparison-${cropId}.csv`).catch(e => setError(describeError(e)))}>
-            <Download size={16} aria-hidden />{ts('exportCsv')}</button>
+          <ExportBar path={`${base}/comparison`} name={`crop-comparison-${cropId}`} onError={setError} />
           <Link className="secondary" to={`/t/${tenant.id}/crops/setup`}>{tc('back')}</Link>
         </div>
       </div>

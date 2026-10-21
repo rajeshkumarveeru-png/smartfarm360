@@ -27,6 +27,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.9'
     implementation 'org.liquibase:liquibase-core'
+    // XLSX report exports (dashboard and reports design, H7); streaming writer only
+    implementation 'org.apache.poi:poi-ooxml:5.4.1'
     runtimeOnly 'org.postgresql:postgresql'
     compileOnly 'org.projectlombok:lombok:1.18.38'
     annotationProcessor 'org.projectlombok:lombok:1.18.38'
@@ -36,6 +38,11 @@ dependencies {
     testImplementation 'io.zonky.test:embedded-postgres:2.1.1'
     testImplementation 'com.tngtech.archunit:archunit-junit5:1.4.1'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+// Report exports label their headings in the user's language from the catalogs shared with web and mobile (ADR 0008).
+processResources {
+    from('../shared/i18n') { include 'en.json', 'ta.json'; into 'i18n' }
 }
 
 tasks.named('test') {

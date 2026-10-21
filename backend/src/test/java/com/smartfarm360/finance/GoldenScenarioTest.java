@@ -108,5 +108,6 @@ class GoldenScenarioTest extends FinanceTestSupport {
         assertThat(bill.at("/summary/paymentStatus").asText()).isEqualTo("PAID");
 
         assertThat(journalImbalance()).isZero();
+        assertBooksBalance("2026-12-31");
     }
 }

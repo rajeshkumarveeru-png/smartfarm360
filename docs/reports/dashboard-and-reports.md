@@ -1,6 +1,6 @@
 # Dashboard and core reports design (Phase 7)
 
-- Status: **Draft for product-owner review** (2026-10-21). No Phase 7 code is written until this is approved.
+- Status: **Approved** (2026-10-21, H1–H14 as recommended) and implemented on `feature/phase-7-reports`; see section 14.
 - Builds on:
   - the approved [finance posting rules](../finance/posting-rules.md): the chart of accounts, accrual and cash basis, and
     the fiscal year setting;
@@ -296,3 +296,47 @@ The monthly profit and loss columns for April to July add up to ₹30,000. The t
 - cross-tenant tests for every new endpoint;
 - the export rate limit and audit;
 - the dashboard performance test.
+
+## 14. Implementation notes (2026-10-21)
+
+- **Packages.** The dashboard lives in a new `reporting` package. It may read finance, inventory, crop, operations,
+  workforce and assets. Nothing may depend on it (`ModuleBoundaryTest`, rule `nothingDependsOnReporting`). The rules
+  that kept workforce, assets and operations private were widened to let `reporting` read them, as H2 requires.
+- **New report code:**
+  - `finance.LedgerReportService`: monthly profit and loss, category breakdown, comparisons, balance sheet, trial
+    balance, party statement, and the dashboard's bills-due and old-drafts checks;
+  - `WorkerService.wages`: the wages report;
+  - `AssetService.runningCosts`: the running-costs report;
+  - `AssetService.depreciationDue`: the dashboard's depreciation check.
+- **Exports:**
+  - Shared code is in `platform.export`: `ReportDocument`, `ExportService`, `ReportLabels`, `CsvWriter`.
+  - Each module lays out its own reports: `FinanceExports`, `StockExports`, `CropExports`, `WorkforceExports`,
+    `AssetExports`.
+  - A report endpoint answers JSON, or a file when `format=csv|xlsx`. `lang=en|ta` sets the language of the labels.
+  - The older `.csv` endpoints stay for existing links. The asset register has a new `reports/register?format=` endpoint.
+  - Labels come from `shared/i18n`, which the build copies into the jar. A test fails if an export uses a label key
+    that is not in the catalog.
+- **XLSX numbers:**
+  - Spreadsheet number cells are binary floating point by the file format's definition. Amounts up to ₹10¹² with two
+    decimals display exactly. The exact decimal values are also in the JSON and the CSV.
+  - The number format is `#,##0.00`, not the `#,##,##0.00` in section 5: Excel cannot show lakh grouping and negative
+    amounts with one format.
+- **Dashboard endpoint:**
+  - `GET /dashboard` is allowed with `TENANT_READ`, which every role has. Each tile checks its own permission and module.
+  - A tile that throws is reported in `errors` with its code; the rest still answers.
+  - A crop tile shows profit only with `FINANCE_READ`. The crop report endpoint itself still shows profit to anyone with
+    `CROP_READ` (Phase 5 behaviour, left as is).
+- **Performance (H4):**
+  - The first measurement at 50,000 journal lines was 1,073 ms.
+  - Two changes brought it to 417 ms (best of 3): the 12 monthly figures now come from one grouped query that uses the
+    same classification as the income statement (`ReportService.accrualByMonth`), and the dashboard ages dues once
+    instead of three times.
+  - Migration `009-reports.yaml` (`042-report-indexes`) adds two indexes: journal lines by cost object, and documents by
+    type and status. There are no summary tables.
+  - `DashboardPerformanceTest` guards the 1-second limit.
+- **Hidden amounts.** The wages report hides money from readers without `PAYROLL_MANAGE` or `FINANCE_READ`. The
+  running-costs report hides money from readers without `FINANCE_READ`. The older workforce labour report still shows
+  labour cost to `WORKFORCE_READ`; this is listed as a gap.
+- **Golden scenario.** Pay runs are limited to three months (Phase 6), so the test posts four monthly runs of ₹6,000
+  instead of one of ₹24,000. Every figure in section 9 is unchanged.
+- **Old drafts** are counted by record date (older than 7 days), not by creation time.

@@ -4,12 +4,14 @@ export type NavItem = { key: string; path: string; permission: Permission; modul
 
 /** Sections of the tenant workspace. The backend enforces the same permissions; this only hides what cannot be used. */
 export const NAV_ITEMS: NavItem[] = [
+  { key: 'dashboard', path: 'dashboard', permission: 'TENANT_READ' },
   { key: 'farms', path: 'farms', permission: 'FARM_READ' },
   { key: 'crops', path: 'crops', permission: 'CROP_READ', module: 'CROP' },
   { key: 'finance', path: 'finance', permission: 'FINANCE_READ' },
   { key: 'stock', path: 'stock', permission: 'INVENTORY_READ' },
   { key: 'workforce', path: 'workforce', permission: 'WORKFORCE_READ', module: 'WORKFORCE' },
   { key: 'assets', path: 'assets', permission: 'ASSETS_READ', module: 'ASSETS' },
+  { key: 'reports', path: 'reports', permission: 'TENANT_READ' },
   { key: 'members', path: 'members', permission: 'MEMBERS_READ' },
   { key: 'audit', path: 'audit', permission: 'AUDIT_READ' },
   { key: 'settings', path: 'settings', permission: 'TENANT_READ' },

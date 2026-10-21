@@ -44,6 +44,10 @@ import WorkerPage from './workforce/WorkerPage';
 import WorkersPage from './workforce/WorkersPage';
 import WorkforceLayout from './workforce/WorkforceLayout';
 import WorkforceReportsPage from './workforce/WorkforceReportsPage';
+import DashboardPage from './reports/DashboardPage';
+import { BalanceSheetPage, CategoriesPage, MonthlyPage, PartyStatementPage, TrialBalancePage } from './reports/MoneyReports';
+import { RunningCostsPage, WagesReportPage } from './reports/OperationsReports';
+import ReportsCatalogPage from './reports/ReportsCatalogPage';
 import MembersPage from './pages/MembersPage';
 import OnboardingPage from './pages/OnboardingPage';
 import PlatformPage from './pages/PlatformPage';
@@ -95,7 +99,15 @@ function App() {
         <Route path="/onboarding" element={<OnboardingPage />} />
         <Route element={<Layout />}>
           <Route path="/t/:tenantId" element={<TenantRoute />}>
-            <Route index element={<Navigate to="farms" replace />} />
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<DashboardPage />} />
+            <Route path="reports" element={<ReportsCatalogPage />} />
+            <Route path="reports/monthly" element={<MonthlyPage />} />
+            <Route path="reports/categories" element={<CategoriesPage />} />
+            <Route path="reports/balance-sheet" element={<BalanceSheetPage />} />
+            <Route path="reports/trial-balance" element={<TrialBalancePage />} />
+            <Route path="reports/wages" element={<WagesReportPage />} />
+            <Route path="reports/running-costs" element={<RunningCostsPage />} />
             <Route path="farms" element={<FarmsPage />} />
             <Route path="crops" element={<CropLayout />}>
               <Route index element={<CyclesPage />} />
@@ -110,6 +122,7 @@ function App() {
               <Route path="records/:documentId" element={<DocumentPage />} />
               <Route path="new/:kind" element={<NewRecordPage />} />
               <Route path="parties" element={<PartiesPage />} />
+              <Route path="parties/:partyId/statement" element={<PartyStatementPage />} />
               <Route path="accounts" element={<AccountsPage />} />
               <Route path="reports" element={<ReportsPage />} />
               <Route path="settings" element={<FinanceSettingsPage />} />

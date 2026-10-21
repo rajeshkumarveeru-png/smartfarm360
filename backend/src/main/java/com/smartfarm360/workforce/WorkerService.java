@@ -3,6 +3,7 @@ package com.smartfarm360.workforce;
 import com.smartfarm360.finance.FinanceDtos.PartyRequest;
 import com.smartfarm360.finance.MasterDataService;
 import com.smartfarm360.platform.audit.AuditService;
+import com.smartfarm360.platform.rbac.Permission;
 import com.smartfarm360.platform.security.TenantContext;
 import com.smartfarm360.platform.web.ApiException;
 import com.smartfarm360.workforce.WorkforceDtos.*;
@@ -385,6 +386,55 @@ public class WorkerService {
         BigDecimal ledgerAdv = jdbc.sql("select coalesce(sum(debit - credit), 0) from sf_journal_lines where tenant_id = :t and account_code = '1150'")
                 .param("t", ctx.tenantId()).query(BigDecimal.class).single().setScale(2);
         return new Reconciliation(owed, ledgerOwed, adv, ledgerAdv);
+    }
+
+    /** Days, wages, payments and advances by worker for a period, and labour by crop (dashboard and reports design, H5). */
+    @Transactional(readOnly = true)
+    public WagesReport wages(TenantContext ctx, LocalDate from, LocalDate to) {
+        if (from == null || to == null || to.isBefore(from)) throw ApiException.badRequest("INVALID_DATE_RANGE", "Choose a valid date range.");
+        boolean amounts = ctx.has(Permission.PAYROLL_MANAGE) || ctx.has(Permission.FINANCE_READ);
+        List<WageRow> rows = jdbc.sql("""
+                        select w.id, p.name, w.pay_type,
+                               coalesce((select sum(case a.status when 'PRESENT' then 1 when 'HALF_DAY' then 0.5 else 0 end) from sf_attendance a
+                                         where a.tenant_id = w.tenant_id and a.worker_id = w.id and a.work_date between :from and :to), 0) as days,
+                               coalesce(sum(case when l.account_code = '2100' and d.doc_type = 'PAY_RUN' and e.entry_date >= :from then l.credit - l.debit end), 0) as wages,
+                               coalesce(sum(case when l.account_code = '2100' and d.doc_type <> 'PAY_RUN' and e.entry_date >= :from then l.debit - l.credit end), 0) as paid,
+                               coalesce(sum(case when l.account_code = '1150' and d.doc_type = 'ADVANCE' and e.entry_date >= :from then l.debit - l.credit end), 0) as given,
+                               coalesce(sum(case when l.account_code = '1150' and d.doc_type <> 'ADVANCE' and e.entry_date >= :from then l.credit - l.debit end), 0) as recovered,
+                               coalesce(sum(case when l.account_code = '2100' then l.credit - l.debit end), 0) as owed,
+                               coalesce(sum(case when l.account_code = '1150' then l.debit - l.credit end), 0) as advance
+                        from sf_workers w join sf_parties p on p.id = w.party_id and p.tenant_id = w.tenant_id
+                        left join (sf_journal_lines l join sf_journal_entries e on e.id = l.entry_id and e.entry_date <= :to
+                                   join sf_finance_documents d on d.id = e.document_id)
+                               on l.party_id = w.party_id and l.tenant_id = w.tenant_id and l.account_code in ('2100', '1150')
+                        where w.tenant_id = :t and w.joined_on <= :to
+                        group by w.id, w.tenant_id, p.name, w.pay_type order by lower(p.name)""")
+                .param("t", ctx.tenantId()).param("from", from).param("to", to)
+                .query((rs, i) -> new WageRow(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getBigDecimal(4),
+                        rs.getBigDecimal(5).setScale(2), rs.getBigDecimal(6).setScale(2), rs.getBigDecimal(7).setScale(2), rs.getBigDecimal(8).setScale(2),
+                        rs.getBigDecimal(9).setScale(2), rs.getBigDecimal(10).setScale(2)))
+                .list().stream()
+                .filter(r -> r.days().signum() != 0 || r.wages().signum() != 0 || r.paid().signum() != 0 || r.advanceGiven().signum() != 0
+                        || r.advanceRecovered().signum() != 0 || r.owedAtEnd().signum() != 0 || r.advanceAtEnd().signum() != 0)
+                .toList();
+        WageRow total = new WageRow(0, null, null, rows.stream().map(WageRow::days).reduce(BigDecimal.ZERO, BigDecimal::add),
+                sum(rows, WageRow::wages), sum(rows, WageRow::paid), sum(rows, WageRow::advanceGiven), sum(rows, WageRow::advanceRecovered),
+                sum(rows, WageRow::owedAtEnd), sum(rows, WageRow::advanceAtEnd));
+        LabourByActivity byCrop = labourByActivity(ctx, from, to);
+        if (!amounts) {
+            rows = rows.stream().map(WorkerService::withoutAmounts).toList();
+            total = withoutAmounts(total);
+            byCrop = new LabourByActivity(from, to, byCrop.rows().stream().map(r -> new LabourRow(r.costObjectId(), r.name(), r.kind(), r.days(), null)).toList(), null);
+        }
+        return new WagesReport(from, to, true, amounts, rows, total, byCrop);
+    }
+
+    private static WageRow withoutAmounts(WageRow r) {
+        return new WageRow(r.workerId(), r.name(), r.payType(), r.days(), null, null, null, null, null, null);
+    }
+
+    private static BigDecimal sum(List<WageRow> rows, java.util.function.Function<WageRow, BigDecimal> f) {
+        return rows.stream().map(f).reduce(ZERO, BigDecimal::add);
     }
 
     static String trim(String s) { return s == null || s.isBlank() ? null : s.trim(); }

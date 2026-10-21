@@ -95,6 +95,16 @@ public final class AssetDtos {
     public record Costs(long assetId, LocalDate from, LocalDate to, BigDecimal depreciation, List<CostRow> runningCosts, BigDecimal runningTotal,
                         BigDecimal hours, BigDecimal costPerHour) {}
 
+    /**
+     * One asset in the maintenance and running costs report (dashboard and reports design, section 4). Money fields are
+     * null for readers without {@code FINANCE_READ}.
+     */
+    public record RunningCostRow(long assetId, String name, String kind, String status, BigDecimal depreciation, BigDecimal runningCosts,
+                                 BigDecimal totalCost, BigDecimal hours, BigDecimal costPerHour, int maintenanceDone, int plansDue) {}
+
+    public record RunningCostsReport(LocalDate from, LocalDate to, boolean actual, boolean amountsShown, List<RunningCostRow> assets,
+                                     BigDecimal depreciation, BigDecimal runningCosts, BigDecimal totalCost) {}
+
     /** Register against the ledger (1300 cost, 1310 accumulated depreciation). Unexplained difference must be zero. */
     public record Reconciliation(BigDecimal registerCost, BigDecimal registerAccumulated, BigDecimal ledgerCost, BigDecimal ledgerAccumulated,
                                  BigDecimal unregisteredCost, BigDecimal manualDepreciation, BigDecimal unexplained) {}

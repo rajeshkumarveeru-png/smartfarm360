@@ -1,6 +1,8 @@
 package com.smartfarm360.workforce;
 
 import com.smartfarm360.finance.FinanceDtos.Document;
+import com.smartfarm360.platform.export.ExportService;
+import com.smartfarm360.platform.export.ReportLabels;
 import com.smartfarm360.platform.rbac.Permission;
 import com.smartfarm360.platform.security.RequiresModule;
 import com.smartfarm360.platform.security.RequiresPermission;
@@ -10,6 +12,7 @@ import com.smartfarm360.workforce.WorkforceDtos.*;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -28,7 +31,12 @@ public class WorkforceController {
     private final WorkerService workers;
     private final PayrollService payroll;
 
-    public WorkforceController(WorkerService workers, PayrollService payroll) {
+    private final WorkforceExports exports;
+    private final ExportService export;
+
+    public WorkforceController(WorkerService workers, PayrollService payroll, WorkforceExports exports, ExportService export) {
+        this.exports = exports;
+        this.export = export;
         this.workers = workers;
         this.payroll = payroll;
     }
@@ -131,6 +139,17 @@ public class WorkforceController {
     public LabourByActivity labour(TenantContext ctx, @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
                                    @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         return workers.labourByActivity(ctx, from, to);
+    }
+
+    /** Wages by worker and labour by crop; JSON, or a file with format=csv|xlsx (dashboard and reports design, H5, H7). */
+    @GetMapping("/reports/wages")
+    @RequiresPermission(Permission.WORKFORCE_READ)
+    public ResponseEntity<?> wages(TenantContext ctx, @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                                   @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+                                   @RequestParam(required = false) String format, @RequestParam(required = false) String lang) {
+        WagesReport r = workers.wages(ctx, from, to);
+        if (!ExportService.isExport(format)) return ResponseEntity.ok(r);
+        return export.export(ctx, exports.wages(ReportLabels.language(lang), r), format, lang, "wages", from, to);
     }
 
     @GetMapping("/reports/reconciliation")
