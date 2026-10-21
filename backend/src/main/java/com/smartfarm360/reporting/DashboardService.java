@@ -10,6 +10,7 @@ import com.smartfarm360.finance.LedgerReportService.MonthlyRow;
 import com.smartfarm360.finance.ReportService;
 import com.smartfarm360.inventory.StockDtos;
 import com.smartfarm360.inventory.StockReportService;
+import com.smartfarm360.livestock.LivestockReports;
 import com.smartfarm360.operations.CropReportService;
 import com.smartfarm360.operations.OperationsDtos.CycleReport;
 import com.smartfarm360.platform.rbac.Permission;
@@ -39,6 +40,7 @@ public class DashboardService {
     private static final Logger log = LoggerFactory.getLogger(DashboardService.class);
     private static final BigDecimal ZERO = BigDecimal.ZERO.setScale(2);
     static final int OVERDUE_DAYS = 30, BILLS_DUE_DAYS = 7, DRAFT_AGE_DAYS = 7;
+    static final java.time.ZoneId FARM_ZONE = java.time.ZoneId.of("Asia/Kolkata");
 
     private final ReportService reports;
     private final LedgerReportService ledger;
@@ -47,9 +49,12 @@ public class DashboardService {
     private final CropReportService cropReports;
     private final WorkerService workers;
     private final AssetService assets;
+    private final LivestockReports livestock;
 
     public DashboardService(ReportService reports, LedgerReportService ledger, StockReportService stock, CropService crops,
-                            CropReportService cropReports, WorkerService workers, AssetService assets) {
+                            CropReportService cropReports, WorkerService workers, AssetService assets,
+                            LivestockReports livestock) {
+        this.livestock = livestock;
         this.reports = reports;
         this.ledger = ledger;
         this.stock = stock;
@@ -116,6 +121,22 @@ public class DashboardService {
                 if (r.unexplained().signum() != 0) attention.add(new Attention("ASSETS_NOT_RECONCILED", 1, r.unexplained(), null));
                 if (ctx.has(Permission.FINANCE_MANAGE)) {
                     assets.depreciationDue(ctx, asOf).ifPresent(m -> attention.add(new Attention("DEPRECIATION_DUE", 1, null, m)));
+                }
+                return null;
+            });
+        }
+        if (ctx.has(Permission.LIVESTOCK_READ) && module(ctx, FarmModule.DAIRY)) {
+            tile("livestock", errors, () -> {
+                int withheld = livestock.withheld(ctx, asOf).size();
+                if (withheld > 0) attention.add(new Attention("MILK_WITHHELD", withheld, null, null));
+                int due = livestock.breedingDue(ctx, asOf, asOf.plusDays(7)).size();
+                if (due > 0) attention.add(new Attention("BREEDING_DUE", due, null, null));
+                int health = livestock.nextDue(ctx, asOf.plusDays(7)).size();
+                if (health > 0) attention.add(new Attention("HEALTH_DUE", health, null, null));
+                // The morning's milk is expected by 10 a.m. farm time (livestock design, section 8)
+                boolean today = asOf.equals(java.time.LocalDate.now(FARM_ZONE));
+                if (today && java.time.LocalTime.now(FARM_ZONE).isAfter(java.time.LocalTime.of(10, 0)) && !livestock.milkRecorded(ctx, asOf, "MORNING")) {
+                    attention.add(new Attention("MILK_NOT_RECORDED", 1, null, asOf.toString()));
                 }
                 return null;
             });

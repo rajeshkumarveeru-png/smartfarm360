@@ -1,6 +1,6 @@
 # Livestock and dairy design (Phase 8)
 
-- Status: **Draft for product-owner review** (2026-10-21). No Phase 8 code is written until this is approved.
+- Status: **Approved** (2026-10-21, I1–I16 as recommended) and implemented on `feature/phase-8-livestock`; see section 14.
 - Builds on:
   - the approved [finance posting rules](../finance/posting-rules.md): produce at nil value (D3), breeding and milch
     animals as farm assets (D8), *Milk sales* and *Livestock sales* on 4000, *Animal feed* and *Veterinary* on 5000;
@@ -357,3 +357,51 @@ One new forward-only migration.
 - permissions (including the worker's limited view);
 - cross-tenant tests for every new endpoint;
 - the migration on a copy of the current schema.
+
+## 14. Implementation notes (2026-10-21)
+
+- **Module.**
+  - The new `livestock` package reads finance, inventory, costing and assets through their services.
+  - `ModuleBoundaryTest` (rule `onlyReportingUsesLivestock`) allows only `reporting` to depend on it.
+  - The rule that kept assets private was widened so livestock can register bought animals.
+- **Links to finance records.** Finance documents have no `animal_id` column, unlike section 11 planned. The links live on
+  the livestock side instead:
+  - `exit_document_id` on the animal (its sale or asset disposal);
+  - `document_id` and `stock_document_id` on events (vet bills, medicine use, insurance receipts).
+
+  An animal whose exit record is reversed shows as *In the herd* again: its status is worked out from that record.
+- **Milk into stock (I6).**
+  - Saving a session keeps the day's produce records equal to the sessions for that group (table `sf_milk_postings`).
+  - More milk adds a produce record for the difference.
+  - Less milk reverses the day's records and posts the new total.
+  - The reversal is refused once the milk has been sold or used; the error is `MILK_ALREADY_USED`, and the user records
+    the difference as discarded instead.
+  - The *Milk* item (litre, farm produce, *Milk sales*) is created on first use, or an existing produce item named Milk
+    in litres is adopted.
+- **Selling milk (I8).**
+  - `POST /livestock/milk-sales` records one sale per bill period, with a Milk item line assigned to the group, so
+    revenue and the price per litre belong to the herd.
+  - A milk sale entered on the finance screens without an activity goes to farm overhead.
+- **Depreciation (I4).**
+  - Breeding and milch animals with a productive life are now depreciated to their cull value by the existing monthly
+    runs. Without a life they are still not depreciated.
+  - A move updates the asset's cost object. Depreciation therefore goes to the group the animal is in **when the run is
+    posted**, not the group it was in during the month. Posting runs each month keeps them in step. This limitation is
+    covered by a test.
+- **Worker role (section 10).**
+  - Workers get `LIVESTOCK_READ` and `LIVESTOCK_WRITE`.
+  - Book values need `FINANCE_READ`, so workers see the herd list without them; no separate limited permission was
+    needed.
+  - Selling or writing off a registered animal needs `FINANCE_MANAGE`.
+  - A milk sale, a vet bill or buying an animal needs `FINANCE_WRITE`.
+- **Herd profitability (I13).** Each group's revenue and costs come from the income statement for its cost object.
+  Litres produced come from the sessions. The average price per litre comes from the Milk sale lines assigned to the
+  group.
+- **Calving.** A second calving within 200 days of the last is refused (`CALVING_TOO_SOON`). A calving that added calves
+  cannot be deleted.
+- **Dashboard.** Livestock adds four "needs attention" items:
+  - milk withheld;
+  - breeding events due within 7 days;
+  - health events due within 7 days;
+  - the morning's milk not recorded, after 10 a.m. India time on the current day.
+- **Phone.** The Livestock tab is online only, as decided; offline arrives in Phase 13.

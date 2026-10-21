@@ -86,7 +86,7 @@ public class AssetService {
         BigDecimal accumulated = before.add(rs.getBigDecimal("runs")).setScale(2);
         Integer life = (Integer) rs.getObject("useful_life_months");
         String kind = rs.getString("kind");
-        BigDecimal monthly = life == null || "BREEDING_ANIMAL".equals(kind) ? null : monthly(cost, salvage, life);
+        BigDecimal monthly = life == null ? null : monthly(cost, salvage, life);
         java.sql.Date last = rs.getDate("last_month");
         return new Asset(rs.getLong("id"), rs.getString("name"), kind, (Long) rs.getObject("farm_id"), rs.getString("farm_name"), rs.getString("serial_no"),
                 rs.getLong("source_doc"), rs.getString("source_number"), cost, salvage, life, rs.getObject("in_use_from", LocalDate.class), before,
@@ -161,7 +161,7 @@ public class AssetService {
                           depreciation_before, cost_object_id, notes, created_by)
                         values (:t, :n, :k, :f, :s, :l, :c, :sv, :life, :use, :before, :co, :notes, :u) returning id""")
                 .param("t", ctx.tenantId()).param("n", d.name().trim()).param("k", d.kind()).param("f", d.farmId()).param("s", trim(d.serialNo()))
-                .param("l", lineId).param("c", cost).param("sv", salvage).param("life", animal ? null : d.usefulLifeMonths())
+                .param("l", lineId).param("c", cost).param("sv", salvage).param("life", d.usefulLifeMonths())
                 .param("use", d.inUseFrom() != null ? d.inUseFrom() : sourceDate).param("before", before).param("co", d.costObjectId())
                 .param("notes", trim(d.notes())).param("u", ctx.userId()).query(Long.class).single();
         audit.record(ctx.tenantId(), ctx.userId(), "ASSET_REGISTERED", "ASSET", id, Map.of("name", d.name().trim(), "cost", cost));
@@ -183,7 +183,7 @@ public class AssetService {
         jdbc.sql("""
                         update sf_assets set name = coalesce(:n, name), serial_no = coalesce(:s, serial_no), farm_id = coalesce(:f, farm_id),
                           cost_object_id = coalesce(:co, cost_object_id), notes = coalesce(:notes, notes),
-                          useful_life_months = case when kind = 'BREEDING_ANIMAL' then null else coalesce(:life, useful_life_months) end,
+                          useful_life_months = coalesce(:life, useful_life_months),
                           salvage_value = :sv, in_use_from = coalesce(:use, in_use_from), depreciation_before = :before
                         where id = :id and tenant_id = :t""")
                 .param("n", p.name() == null ? null : p.name().trim()).param("s", trim(p.serialNo())).param("f", p.farmId()).param("co", p.costObjectId())
@@ -243,7 +243,7 @@ public class AssetService {
                         from sf_assets a
                         join sf_finance_document_lines l on l.id = a.source_line_id join sf_finance_documents sd on sd.id = l.document_id
                         left join sf_finance_documents dd on dd.id = a.disposal_document_id
-                        where a.tenant_id = :t and a.kind <> 'BREEDING_ANIMAL' and a.useful_life_months is not null order by a.id""")
+                        where a.tenant_id = :t and a.useful_life_months is not null order by a.id""")
                 .param("t", tenantId)
                 .query((rs, i) -> new Candidate(rs.getLong(1), rs.getString(2), rs.getBigDecimal(3), rs.getBigDecimal(4), rs.getInt(5),
                         rs.getObject(6, LocalDate.class), rs.getObject(7, LocalDate.class), rs.getBigDecimal(8), rs.getInt(9), (Long) rs.getObject(10),

@@ -73,7 +73,8 @@ class PermissionIntegrationTest extends ApiIntegrationTest {
         put(base() + "/modules/CROP", owner, Map.of("enabled", true)).andExpect(status().isOk());
         get(base() + "/crops", owner).andExpect(status().isOk());
 
-        put(base() + "/modules/DAIRY", owner, Map.of("enabled", true)).andExpect(status().isConflict())
+        // Dairy became available in Phase 8; Poultry is still unavailable
+        put(base() + "/modules/POULTRY", owner, Map.of("enabled", true)).andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("MODULE_NOT_AVAILABLE"));
     }
 
@@ -97,7 +98,7 @@ class PermissionIntegrationTest extends ApiIntegrationTest {
         get("/api/v1/tenants", viewer).andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].roles").value(org.hamcrest.Matchers.contains("VIEWER")))
                 .andExpect(jsonPath("$[0].permissions").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem("FARM_WRITE"))))
-                .andExpect(jsonPath("$[0].enabledModules").value(org.hamcrest.Matchers.containsInAnyOrder("CROP", "WORKFORCE", "ASSETS")));
+                .andExpect(jsonPath("$[0].enabledModules").value(org.hamcrest.Matchers.containsInAnyOrder("CROP", "DAIRY", "WORKFORCE", "ASSETS")));
         get("/api/v1/roles", viewer).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(7));
     }
 }

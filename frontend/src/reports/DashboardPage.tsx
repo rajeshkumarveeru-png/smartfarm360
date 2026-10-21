@@ -16,6 +16,7 @@ export const ATTENTION_LINKS: Record<string, string> = {
   LOW_STOCK: 'stock', EXPIRING_LOTS: 'stock', STOCK_NOT_RECONCILED: 'stock/reports',
   WAGES_OWED: 'workforce/pay', ADVANCES_OUT: 'workforce/pay', WORKERS_NOT_RECONCILED: 'workforce/reports', ATTENDANCE_MISSING: 'workforce',
   MAINTENANCE_DUE: 'assets/maintenance', UNREGISTERED_ASSETS: 'assets', ASSETS_NOT_RECONCILED: 'assets/depreciation', DEPRECIATION_DUE: 'assets/depreciation',
+  MILK_WITHHELD: 'livestock/milk', BREEDING_DUE: 'livestock/care', HEALTH_DUE: 'livestock/care', MILK_NOT_RECORDED: 'livestock/milk',
 };
 
 /** The farm business at a glance: money, the last 12 months, crops in the field and what needs attention (H1–H4). */

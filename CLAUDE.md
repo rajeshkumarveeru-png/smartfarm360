@@ -36,7 +36,8 @@ Record every command you ran and its result in `docs/PROGRESS.md` at the end of 
 - Backend package root `com.smartfarm360`; tables use the `sf_` prefix.
 - Modular monolith, one package per module (ADR 0001): `platform` (auth, tenant, membership, rbac, security, audit,
   web, admin, mail), `farm`, `crop`, `finance`, `inventory` (stock), `costing`, `operations` (field work that moves stock and money),
-  `workforce` (workers, attendance, pay runs), `assets` (register, depreciation, maintenance) and `reporting`
+  `workforce` (workers, attendance, pay runs), `assets` (register, depreciation, maintenance), `livestock` (herd, milk,
+  health, breeding; only reporting depends on it) and `reporting`
   (the dashboard: reads other modules, nothing depends on it). Report exports go through `platform.export`.
   Finance reaches stock only through
   `StockHook`; `ModuleBoundaryTest` enforces the boundaries.

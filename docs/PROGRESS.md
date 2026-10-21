@@ -2,10 +2,8 @@
 
 ## Current state
 
-- **Phase:** 7 (dashboard and core reports) complete on branch `feature/phase-7-reports` (based on
-  `feature/phase-6-workforce`). Phase 8 (livestock and dairy) started on `feature/phase-8-livestock`: the
-  [livestock and dairy design](livestock/livestock-and-dairy.md) is awaiting review; no Phase 8 code yet. Nothing is
-  pushed yet.
+- **Phase:** 8 (livestock and dairy) complete on branch `feature/phase-8-livestock` (based on
+  `feature/phase-7-reports`). Next: Phase 9 (poultry batches and eggs; goat and sheep herds). Nothing is pushed yet.
 - **Production readiness:** not ready. Authentication, roles, tenant isolation, audit, the finance core and stock with
   movements are in place and tested, but no email provider is configured and hosting/backups are undecided.
 
@@ -577,6 +575,155 @@ Not verified:
 - A real phone.
 - GitHub Actions (nothing has been pushed).
 
+## Phase 8 — Livestock and dairy (2026-10-21)
+
+Commits on `feature/phase-8-livestock` (based on `feature/phase-7-reports`):
+
+- `5fc76bc`: design.
+- A build commit with the backend, web, mobile, verification and docs.
+
+### Features completed
+
+- **Approved design.** [livestock and dairy](livestock/livestock-and-dairy.md) is implemented with I1–I16 as recommended.
+  Implementation notes are in section 14 of the design.
+- **Herd** (I1–I4):
+  - Each cow and buffalo has a record: tag, breed, dam and sire, origin, status.
+  - Groups are cost objects, and moves between groups are dated.
+  - A bought animal is bought on a bill and registered as a farm asset in one step. It is depreciated to its cull value
+    over a productive life (this settles G10).
+  - Home-bred animals have nil value.
+- **Milk** (I5–I8):
+  - Morning and evening sessions by group, as a total or per animal, with fat and SNF.
+  - Each day's milk is kept in stock as nil-value produce. Corrections are refused once the milk has been used.
+  - Where milk goes: home use, fed to calves, discarded with a reason.
+  - Dairy society sales, one per bill period, assigned to the group.
+- **Health and breeding** (I9–I11):
+  - Treatments, vaccinations and dewormings, for one animal or a whole group. They can carry medicine from stock or a
+    vet bill to the group.
+  - Milk withdrawal shows warnings, and next-due dates show reminders.
+  - From an insemination the app works out:
+    - the pregnancy check, from day 60;
+    - expected calving, at 283 days for a cow and 310 for a buffalo;
+    - dry-off, 60 days before calving.
+
+    Every date can be overridden. A negative check or a new heat clears them.
+  - A calving creates the calves and starts a lactation. Dry-off ends the lactation and moves the cow to *Dry cows*.
+- **Leaving the herd** (I14):
+  - A registered animal goes through asset disposal: a gain or a loss.
+  - A home-bred animal's sale is *Livestock sales*.
+  - A death of a home-bred animal needs no money record.
+  - An insurance claim is other income.
+  - Reversing the record returns the animal to the herd.
+- **Labour** (I12): attendance can charge days to an animal group.
+- **Reports** (I13). All export as CSV and Excel.
+  - Herd profitability with **cost per litre produced** and average price per litre.
+  - The milk report: produced, sold, home, calves, discarded, with fat and SNF.
+  - The breeding calendar.
+  - The health record.
+  - The animal card.
+  - The herd register.
+- **Dashboard tiles:**
+  - milk withheld;
+  - breeding events due within 7 days;
+  - health events due within 7 days;
+  - morning milk not recorded by 10 a.m.
+- **Web:** a new *Livestock* section with Herd, animal page, Milk, Breeding and health, Groups, and Reports.
+- **Phone** (I15):
+  - The Livestock tab replaces the placeholder. It offers milk entry by session (a group total or per animal), "heat
+    seen" and "treatment given" with withdrawal days, and the animal list with flags.
+  - Online only.
+- **Module** (I16):
+  - *Livestock and dairy* is available.
+  - It is on by default for new farm businesses and off for existing ones until switched on in Settings.
+  - New permissions: `LIVESTOCK_READ` and `LIVESTOCK_WRITE`.
+
+### Database migrations
+
+`010-livestock.yaml` contains two changesets:
+
+- `043-livestock-schema`:
+  - Adds the cost object kind `ANIMAL_GROUP`.
+  - Adds the tables `sf_animal_groups`, `sf_animals`, `sf_animal_group_moves`, `sf_milk_sessions`, `sf_milk_yields`,
+    `sf_milk_postings`, `sf_animal_events`, `sf_lactations` and `sf_livestock_settings`. All have tenant keys and
+    composite foreign keys.
+- `044-livestock-seed`: the permissions and role grants. Existing tenants keep the module off.
+
+These were applied to the local database on 2026-10-21, after a `pg_dump` backup (`smartfarm360-before-phase8.backup`).
+No business data was changed.
+
+### APIs added
+
+Under `/api/v1/tenants/{tenantId}/livestock` (module *Dairy*):
+
+- `GET|POST /groups`, `PATCH /groups/{id}`
+- `GET|POST /animals`, `GET|PATCH /animals/{id}`
+- `POST /animals/{id}/moves`, `POST /animals/{id}/exit`, `POST /animals/{id}/insurance`
+- `POST /animals/{id}/breeding`, `POST /animals/{id}/calving`
+- `GET /events`, `POST /health`, `DELETE /events/{id}`
+- `GET|PUT /milk/{date}`, `POST /milk-uses`, `POST /milk-sales`
+- `GET /reports/milk`, `GET /reports/herd`, `GET /reports/breeding`, `GET /reports/health`
+
+Report endpoints and the herd list accept `format=csv|xlsx`.
+
+Changed: breeding and milch animals with a useful life are depreciated by the asset runs.
+
+### Tests and evidence
+
+| Command | Result |
+|---|---|
+| `backend: gradlew test --rerun bootJar` | Passed: **547 tests, 0 failures** (see below) |
+| `frontend: npm run lint`, `tsc --noEmit`, `npm run build` | Passed; the bundle is still over 500 kB |
+| `frontend: npm test` | Passed: **53 tests**, including 5 new livestock screen tests |
+| `mobile: npm run typecheck`, `npm test`, `npx expo install --check` | Passed: **33 tests**, including 4 new livestock tests |
+| Manual browser check | Passed (see below) |
+
+The backend run includes:
+
+- The golden scenario from section 7 of the design. Every figure is asserted:
+  - milk balance 0 after 558 litres in and 425 sold, 31 home use, 62 to calves and 40 discarded;
+  - feed 50 kg at ₹1,400;
+  - Milking herd costs ₹16,050 and profit ₹100;
+  - cost per litre ₹28.76 and price per litre ₹38.00;
+  - the society's receivable ₹4,150;
+  - Lakshmi's book value ₹58,500;
+  - Ganga's dates.
+- 8 livestock rule tests:
+  - milk stock and corrections after use;
+  - yields only for animals in the group that day;
+  - breeding dates for cow and buffalo, a negative check, a heat and a re-insemination;
+  - calvings, lactations and dry-off moves;
+  - depreciation to the cull value and following the group;
+  - every exit's postings and their reversal;
+  - permissions, including the worker and viewer, and the module switch;
+  - withdrawals and next-due dates on the dashboard.
+- An upgrade migration test: existing farms keep Dairy off, the grants are in place, and the database accepts animal
+  groups.
+- 11 module-boundary rules.
+- 402 generated cross-tenant cases.
+- The dashboard performance test: **522 ms** at 50,000 journal lines.
+
+Two existing tests changed with the approved design:
+
+- New farm businesses now get Dairy by default (I16).
+- The "unavailable module" check uses Poultry, because Dairy is now available.
+
+The manual browser check ran against backend :8081 on local PostgreSQL 18, with Vite on :5174:
+
+- Migrations 043–044 were applied.
+- Livestock and dairy was switched on in Settings, and the menu showed *Livestock*.
+- Groups *Milking herd* and *Calves* were added, and Ganga (home-bred) was added to Milking herd.
+- 6.5 litres were recorded for this morning, putting 6.5 litres in stock.
+- Home use of 1.5 litres and then 1 litre left 4 litres in stock.
+- The dashboard loaded with no failed tiles.
+- One defect was found and fixed: the "Records saved" confirmation disappeared because the page reload cleared it.
+- The backend log shows 0 errors and no secret values.
+
+Not verified:
+
+- A real phone.
+- Buying an animal, exits and a society sale in the browser (they are covered by the API golden and rule tests).
+- GitHub Actions (nothing has been pushed).
+
 ## Known gaps and defects
 
 Security and platform:
@@ -595,6 +742,8 @@ Finance and stock:
 - The web bundle is over 500 kB; split the bundle by section before production.
 - No internal transfers of own produce or manure yet (P17, Phases 5 → 11); monthly depreciation runs arrived in Phase 6.
 - The workforce labour report still shows labour cost to anyone with WORKFORCE_READ, unlike the new wages report.
+- Animal depreciation goes to the group the animal is in when the run is posted, not the group of that month (post runs monthly).
+- Overhead is not shared out to herds (I12); fodder grown on the farm and fed to the herd waits for internal transfers (P17, Phase 11).
 - Excel exports group thousands as #,##0.00, not Indian lakh grouping (an Excel format limit).
 - Payroll has no PF, ESI, TDS or minimum-wage rules (G6). There is no WDV depreciation and no machine-hour allocation to
   crops (G9, G12). Breeding animals are not depreciated until the livestock phases (G10). Recurring expenses are still
@@ -602,7 +751,7 @@ Finance and stock:
 - Removing a match after a later report date is not reflected historically in dues ageing (matches have no history).
 
 Clients:
-- Mobile money entries wait on the phone when offline; crop recording and attendance are online only (offline in Phase 13). The
+- Mobile money entries wait on the phone when offline; crop recording, attendance and livestock are online only (offline in Phase 13). The
   livestock tab is still a placeholder until the livestock modules (Phases 8–12).
 
 Tooling (left unchanged by policy — user scripts):

@@ -20,6 +20,12 @@ const GROUPS: { key: string; entries: Entry[] }[] = [
   { key: 'crops', entries: [
     { key: 'cropCycles', path: 'crops', permission: 'CROP_READ', module: 'CROP' },
   ] },
+  { key: 'livestock', entries: [
+    { key: 'herdProfit', path: 'livestock/reports', permission: 'FINANCE_READ', module: 'DAIRY' },
+    { key: 'milkReport', path: 'livestock/reports', permission: 'LIVESTOCK_READ', module: 'DAIRY' },
+    { key: 'breedingCalendar', path: 'livestock/care', permission: 'LIVESTOCK_READ', module: 'DAIRY' },
+    { key: 'herdRegister', path: 'livestock', permission: 'LIVESTOCK_READ', module: 'DAIRY' },
+  ] },
   { key: 'stock', entries: [
     { key: 'stockValue', path: 'stock/reports', permission: 'INVENTORY_READ' },
   ] },

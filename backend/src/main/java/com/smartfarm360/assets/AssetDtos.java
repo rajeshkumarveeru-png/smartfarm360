@@ -14,7 +14,10 @@ public final class AssetDtos {
 
     public static final String KINDS = "EQUIPMENT|VEHICLE|IRRIGATION|STRUCTURE|BREEDING_ANIMAL|OTHER";
 
-    /** Details of an asset; {@code usefulLifeMonths} is required except for breeding and milch animals (never depreciated, G10). */
+    /**
+     * Details of an asset. {@code usefulLifeMonths} is required except for breeding and milch animals, which are depreciated
+     * to their cull value ({@code salvageValue}) only when a productive life is given (livestock design, I4).
+     */
     public record AssetDetails(@NotBlank @Size(max = 140) String name, @NotNull @Pattern(regexp = KINDS) String kind, Long farmId,
                                @Size(max = 80) String serialNo, @Positive @Max(1200) Integer usefulLifeMonths,
                                @PositiveOrZero @Digits(integer = 12, fraction = 2) BigDecimal salvageValue, LocalDate inUseFrom,

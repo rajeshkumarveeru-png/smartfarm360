@@ -41,7 +41,8 @@ class TenantEndpointInventoryTest extends EmbeddedPostgresSupport {
                 boolean farmData = controller.startsWith("com.smartfarm360.farm.") || controller.startsWith("com.smartfarm360.crop.")
                         || controller.startsWith("com.smartfarm360.finance.") || controller.startsWith("com.smartfarm360.inventory.")
                         || controller.startsWith("com.smartfarm360.operations.") || controller.startsWith("com.smartfarm360.workforce.")
-                        || controller.startsWith("com.smartfarm360.assets.") || controller.startsWith("com.smartfarm360.reporting.");
+                        || controller.startsWith("com.smartfarm360.assets.") || controller.startsWith("com.smartfarm360.reporting.")
+                        || controller.startsWith("com.smartfarm360.livestock.");
                 if (farmData && !pattern.startsWith("/api/v1/tenants/{tenantId}/")) offenders.add(pattern + " (farm data outside tenant path)");
             }
         }

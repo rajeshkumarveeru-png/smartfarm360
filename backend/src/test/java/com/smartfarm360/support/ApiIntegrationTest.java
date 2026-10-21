@@ -63,7 +63,7 @@ public abstract class ApiIntegrationTest extends EmbeddedPostgresSupport {
         return new User(body.at("/user/id").asLong(), email, body.get("accessToken").asText());
     }
 
-    /** Creates a tenant owned by {@code owner} with the default modules (crop, workforce, assets) and returns its id. */
+    /** Creates a tenant owned by {@code owner} with the default modules (crop, dairy, workforce, assets) and returns its id. */
     protected long newTenant(User owner, String name) throws Exception {
         return body(post("/api/v1/tenants", owner, Map.of("name", name)).andExpect(status().isCreated()))
                 .get("id").asLong();

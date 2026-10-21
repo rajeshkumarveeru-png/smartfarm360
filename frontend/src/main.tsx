@@ -48,6 +48,13 @@ import DashboardPage from './reports/DashboardPage';
 import { BalanceSheetPage, CategoriesPage, MonthlyPage, PartyStatementPage, TrialBalancePage } from './reports/MoneyReports';
 import { RunningCostsPage, WagesReportPage } from './reports/OperationsReports';
 import ReportsCatalogPage from './reports/ReportsCatalogPage';
+import AnimalPage from './livestock/AnimalPage';
+import CarePage from './livestock/CarePage';
+import GroupsPage from './livestock/GroupsPage';
+import HerdPage from './livestock/HerdPage';
+import LivestockLayout from './livestock/LivestockLayout';
+import LivestockReportsPage from './livestock/LivestockReportsPage';
+import MilkPage from './livestock/MilkPage';
 import MembersPage from './pages/MembersPage';
 import OnboardingPage from './pages/OnboardingPage';
 import PlatformPage from './pages/PlatformPage';
@@ -115,6 +122,14 @@ function App() {
               <Route path="setup" element={<SetupPage />} />
               <Route path="compare/:cropId" element={<ComparisonPage />} />
               <Route path="weather" element={<WeatherPage />} />
+            </Route>
+            <Route path="livestock" element={<LivestockLayout />}>
+              <Route index element={<HerdPage />} />
+              <Route path="animals/:animalId" element={<AnimalPage />} />
+              <Route path="milk" element={<MilkPage />} />
+              <Route path="care" element={<CarePage />} />
+              <Route path="groups" element={<GroupsPage />} />
+              <Route path="reports" element={<LivestockReportsPage />} />
             </Route>
             <Route path="finance" element={<FinanceLayout />}>
               <Route index element={<FinanceHome />} />

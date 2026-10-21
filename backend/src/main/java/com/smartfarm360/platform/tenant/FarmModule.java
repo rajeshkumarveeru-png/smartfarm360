@@ -7,7 +7,7 @@ package com.smartfarm360.platform.tenant;
  */
 public enum FarmModule {
     CROP(true),
-    DAIRY(false),
+    DAIRY(true),
     POULTRY(false),
     GOAT_SHEEP(false),
     AQUACULTURE(false),

@@ -57,6 +57,20 @@ public class CostObjectService {
         return id;
     }
 
+    /** A new animal group as a cost object (livestock design, I2); costs and revenue of the herd are assigned to it. */
+    @Transactional
+    public long createAnimalGroup(long tenantId, String name, Long farmId) {
+        return jdbc.sql("insert into sf_cost_objects (tenant_id, kind, name, farm_id) values (:t, 'ANIMAL_GROUP', :name, :farm) returning id")
+                .param("t", tenantId).param("name", name).param("farm", farmId).query(Long.class).single();
+    }
+
+    /** Renames, moves or retires an animal group's cost object. */
+    @Transactional
+    public void updateAnimalGroup(long tenantId, long costObjectId, String name, Long farmId, boolean active) {
+        jdbc.sql("update sf_cost_objects set name = :name, farm_id = :farm, active = :active where id = :id and tenant_id = :t and kind = 'ANIMAL_GROUP'")
+                .param("name", name).param("farm", farmId).param("active", active).param("id", costObjectId).param("t", tenantId).update();
+    }
+
     /** The cost object of a crop cycle, if it has one. */
     public Optional<Long> forCycle(long tenantId, long cropCycleId) {
         return jdbc.sql("select id from sf_cost_objects where tenant_id = :t and crop_cycle_id = :cycle")

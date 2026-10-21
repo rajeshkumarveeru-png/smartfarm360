@@ -12,13 +12,14 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
  * inventory → finance; operations (field work that moves stock and money) → crop, inventory, finance. Finance never
  * depends on the farming or stock modules, crop never on finance or stock, and nothing depends on operations. Workforce and
  * assets build on finance (and costing); no other module depends on them. Reporting (the dashboard) only reads the other
- * modules, and nothing depends on reporting (dashboard and reports design, H2).
+ * modules, and nothing depends on reporting (dashboard and reports design, H2). Livestock builds on finance, inventory,
+ * costing and assets (it registers bought animals); only reporting depends on livestock (livestock design, section 11).
  */
 @AnalyzeClasses(packages = "com.smartfarm360", importOptions = ImportOption.DoNotIncludeTests.class)
 class ModuleBoundaryTest {
     private static final String[] BUSINESS = {"com.smartfarm360.farm..", "com.smartfarm360.crop..", "com.smartfarm360.finance..",
             "com.smartfarm360.inventory..", "com.smartfarm360.costing..", "com.smartfarm360.operations..", "com.smartfarm360.workforce..", "com.smartfarm360.assets..",
-            "com.smartfarm360.reporting.."};
+            "com.smartfarm360.reporting..", "com.smartfarm360.livestock.."};
 
     @ArchTest
     static final ArchRule platformDoesNotDependOnBusinessModules = noClasses().that().resideInAPackage("com.smartfarm360.platform..")
@@ -42,7 +43,8 @@ class ModuleBoundaryTest {
             .should().dependOnClassesThat().resideInAnyPackage("com.smartfarm360.crop..", "com.smartfarm360.inventory..", "com.smartfarm360.farm..");
 
     @ArchTest
-    static final ArchRule onlyTheirOwnCodeUsesWorkforceAndAssets = noClasses().that().resideOutsideOfPackages("com.smartfarm360.workforce..", "com.smartfarm360.assets..", "com.smartfarm360.reporting..")
+    static final ArchRule onlyTheirOwnCodeUsesWorkforceAndAssets = noClasses().that().resideOutsideOfPackages("com.smartfarm360.workforce..", "com.smartfarm360.assets..", "com.smartfarm360.reporting..",
+                    "com.smartfarm360.livestock..")
             .should().dependOnClassesThat().resideInAnyPackage("com.smartfarm360.workforce..", "com.smartfarm360.assets..");
 
     @ArchTest
@@ -52,6 +54,10 @@ class ModuleBoundaryTest {
     @ArchTest
     static final ArchRule nothingDependsOnOperations = noClasses().that().resideOutsideOfPackages("com.smartfarm360.operations..", "com.smartfarm360.reporting..")
             .should().dependOnClassesThat().resideInAPackage("com.smartfarm360.operations..");
+
+    @ArchTest
+    static final ArchRule onlyReportingUsesLivestock = noClasses().that().resideOutsideOfPackages("com.smartfarm360.livestock..", "com.smartfarm360.reporting..")
+            .should().dependOnClassesThat().resideInAPackage("com.smartfarm360.livestock..");
 
     @ArchTest
     static final ArchRule nothingDependsOnReporting = noClasses().that().resideOutsideOfPackage("com.smartfarm360.reporting..")

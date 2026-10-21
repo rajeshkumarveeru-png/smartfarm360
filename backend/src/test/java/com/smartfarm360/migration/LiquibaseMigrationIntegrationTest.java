@@ -59,7 +59,7 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
                 "038-crop-v2-schema",
                 "039-crop-v2-backfill",
                 "040-workforce-assets-schema",
-                "041-workforce-assets-seed", "042-report-indexes");
+                "041-workforce-assets-seed", "042-report-indexes", "043-livestock-schema", "044-livestock-seed");
     }
 
     @Test
@@ -81,7 +81,8 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
                 "sf_units", "sf_stock_locations", "sf_stock_items", "sf_item_units", "sf_stock_lots", "sf_stock_movements", "sf_stock_balances",
                 "sf_crop_observations", "sf_weather_notes",
                 "sf_workers", "sf_worker_rates", "sf_attendance", "sf_piece_work", "sf_assets", "sf_asset_depreciation", "sf_asset_usage",
-                "sf_maintenance_plans", "sf_maintenance_logs", "sf_pay_run_workers");
+                "sf_maintenance_plans", "sf_maintenance_logs", "sf_pay_run_workers", "sf_animal_groups", "sf_animals", "sf_animal_group_moves",
+                "sf_milk_sessions", "sf_milk_yields", "sf_milk_postings", "sf_animal_events", "sf_lactations", "sf_livestock_settings");
     }
 
     @Test
@@ -329,6 +330,30 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
         // Pay types are checked by the database too
         assertThatThrownBy(() -> db.update("insert into sf_workers(tenant_id, party_id, pay_type, joined_on) values (?, ?, 'HOURLY', current_date)", tenant, party))
                 .hasMessageContaining("pay_type");
+    }
+
+    @Test
+    void upgradingLeavesDairyOffForExistingFarmsAndGrantsLivestockPermissions() throws Exception {
+        DataSource legacy = newDatabase("legacy_ls_" + UUID.randomUUID().toString().replace("-", ""));
+        JdbcTemplate db = new JdbcTemplate(legacy);
+        runChangelog(legacy, 18); // everything before Phase 8 (changesets 025-042)
+        long tenant = db.queryForObject("insert into sf_tenants(name, slug) values ('Old farm', 'old-farm-ls') returning id", Long.class);
+        db.update("insert into sf_tenant_modules(tenant_id, module_code, enabled) values (?, 'CROP', true)", tenant);
+
+        runChangelog(legacy, null);
+
+        // I16: existing farm businesses keep their menus until they switch Livestock and dairy on
+        assertThat(db.queryForList("select module_code from sf_tenant_modules where tenant_id = ? and enabled", String.class, tenant))
+                .doesNotContain("DAIRY");
+        assertThat(db.queryForList("select r.code from sf_role_permissions rp join sf_roles r on r.id = rp.role_id where r.tenant_id is null " +
+                "and rp.permission_code = 'LIVESTOCK_WRITE'", String.class))
+                .containsExactlyInAnyOrder("TENANT_OWNER", "FARM_ADMIN", "FARM_MANAGER", "FIELD_SUPERVISOR", "WORKER");
+        assertThat(db.queryForList("select r.code from sf_role_permissions rp join sf_roles r on r.id = rp.role_id where r.tenant_id is null " +
+                "and rp.permission_code = 'LIVESTOCK_READ'", String.class)).contains("ACCOUNTANT", "VIEWER");
+        // Animal groups are cost objects; other kinds are still refused
+        db.update("insert into sf_cost_objects(tenant_id, kind, name) values (?, 'ANIMAL_GROUP', 'Milking herd')", tenant);
+        assertThatThrownBy(() -> db.update("insert into sf_cost_objects(tenant_id, kind, name) values (?, 'POND', 'Pond 1')", tenant))
+                .hasMessageContaining("ck_sf_cost_object_kind");
     }
 
     @Test

@@ -25,5 +25,7 @@ public enum Permission {
     WORKFORCE_WRITE,
     PAYROLL_MANAGE,
     ASSETS_READ,
-    ASSETS_WRITE
+    ASSETS_WRITE,
+    LIVESTOCK_READ,
+    LIVESTOCK_WRITE
 }
