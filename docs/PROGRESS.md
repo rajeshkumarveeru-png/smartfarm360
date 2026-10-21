@@ -3,7 +3,9 @@
 ## Current state
 
 - **Phase:** 8 (livestock and dairy) complete on branch `feature/phase-8-livestock` (based on
-  `feature/phase-7-reports`). Next: Phase 9 (poultry batches and eggs; goat and sheep herds). Nothing is pushed yet.
+  `feature/phase-7-reports`). Phase 9 (poultry, goats and sheep) started on
+  `feature/phase-9-poultry-goats`: the [poultry, goats and sheep design](livestock/poultry-goats-sheep.md) is awaiting
+  review; no Phase 9 code yet. Nothing is pushed yet.
 - **Production readiness:** not ready. Authentication, roles, tenant isolation, audit, the finance core and stock with
   movements are in place and tested, but no email provider is configured and hosting/backups are undecided.
 
