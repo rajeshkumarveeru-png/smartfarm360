@@ -3,7 +3,9 @@
 ## Current state
 
 - **Phase:** 9 (poultry, goats and sheep) complete on branch `feature/phase-9-poultry-goats` (based on
-  `feature/phase-8-livestock`). Next: Phase 10 (aquaculture), starting with its design. Nothing is pushed yet.
+  `feature/phase-8-livestock`). Phase 10 (aquaculture) started on
+  `feature/phase-10-aquaculture`: the [aquaculture design](aquaculture/aquaculture.md) is awaiting review; no Phase 10
+  code yet. Nothing is pushed yet.
 - **Production readiness:** not ready. Authentication, roles, tenant isolation, audit, the finance core and stock with
   movements are in place and tested, but no email provider is configured and hosting/backups are undecided.
 
