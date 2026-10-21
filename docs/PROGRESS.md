@@ -3,7 +3,9 @@
 ## Current state
 
 - **Phase:** 10 (aquaculture) complete on branch `feature/phase-10-aquaculture` (based on
-  `feature/phase-9-poultry-goats`). Next: Phase 11 (organic resources), starting with its design. Nothing is pushed yet.
+  `feature/phase-9-poultry-goats`). Phase 11 (organic resources) started on
+  `feature/phase-11-organic`: the [organic resources design](organic/organic-resources.md) is awaiting review; no
+  Phase 11 code yet. Nothing is pushed yet.
 - **Production readiness:** not ready. Authentication, roles, tenant isolation, audit, the finance core and stock with
   movements are in place and tested, but no email provider is configured and hosting/backups are undecided.
 
