@@ -7,9 +7,12 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/** Refuses the request with 403 MODULE_DISABLED unless the tenant has enabled this module. Allowed on types and methods. */
+/**
+ * Refuses the request with 403 MODULE_DISABLED unless the tenant has enabled one of these modules. Allowed on types and
+ * methods; a method annotation replaces the type's (for example livestock endpoints that only dairy uses).
+ */
 @Target({ElementType.TYPE, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface RequiresModule {
-    FarmModule value();
+    FarmModule[] value();
 }

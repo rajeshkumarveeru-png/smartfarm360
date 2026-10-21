@@ -13,6 +13,7 @@ import com.smartfarm360.livestock.LivestockDtos.*;
 import com.smartfarm360.platform.audit.AuditService;
 import com.smartfarm360.platform.rbac.Permission;
 import com.smartfarm360.platform.security.TenantContext;
+import com.smartfarm360.platform.tenant.FarmModule;
 import com.smartfarm360.platform.web.ApiException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
@@ -49,16 +50,49 @@ public class HerdService {
 
     // ---- Groups ------------------------------------------------------------------------------------------------------
 
+    /** Signed heads of a counted group's movements up to a date; movements whose finance record was reversed do not count (J7). */
+    static String headsSql(String group, String date) {
+        return "(select coalesce(sum(case when hm.kind in ('PLACED', 'BOUGHT', 'BORN', 'MOVED_IN', 'COUNT_GAIN') then hm.heads else -hm.heads end), 0)"
+                + " from sf_head_movements hm left join sf_finance_documents hd on hd.id = hm.document_id and hd.tenant_id = hm.tenant_id"
+                + " where hm.tenant_id = " + group + ".tenant_id and hm.group_id = " + group + ".id and hm.move_date <= " + date
+                + " and (hm.document_id is null or hd.status = 'POSTED'))";
+    }
+
     private static final String GROUP_SELECT = """
             select g.id, g.cost_object_id, co.name, g.purpose, co.farm_id, g.notes, co.active,
-                   (select count(*) from sf_animals a where a.tenant_id = g.tenant_id and a.status = 'ACTIVE'
-                      and (select m.group_id from sf_animal_group_moves m where m.tenant_id = a.tenant_id and m.animal_id = a.id
-                           and m.from_date <= current_date order by m.from_date desc, m.id desc limit 1) = g.id) as animals
+                   case when g.species = 'CATTLE' then
+                     (select count(*) from sf_animals a where a.tenant_id = g.tenant_id and a.status = 'ACTIVE'
+                        and (select m.group_id from sf_animal_group_moves m where m.tenant_id = a.tenant_id and m.animal_id = a.id
+                             and m.from_date <= current_date order by m.from_date desc, m.id desc limit 1) = g.id)
+                   else """ + headsSql("g", "current_date") + """
+                    end as animals,
+                   g.species, g.placed_on, g.age_at_placement_days, g.strain, g.closed_on,
+                   exists (select 1 from sf_head_movements x where x.tenant_id = g.tenant_id and x.group_id = g.id) as has_moves
             from sf_animal_groups g join sf_cost_objects co on co.id = g.cost_object_id and co.tenant_id = g.tenant_id
             where g.tenant_id = :t""";
 
     private static Group group(java.sql.ResultSet rs) throws java.sql.SQLException {
-        return new Group(rs.getLong(1), rs.getLong(2), rs.getString(3), rs.getString(4), (Long) rs.getObject(5), rs.getString(6), rs.getBoolean(7), rs.getInt(8));
+        String species = rs.getString(9);
+        LocalDate closedOn = rs.getObject(13, LocalDate.class);
+        int animals = rs.getInt(8);
+        boolean closed = closedOn != null || ("CHICKEN".equals(species) && rs.getBoolean(14) && animals == 0);
+        return new Group(rs.getLong(1), rs.getLong(2), rs.getString(3), rs.getString(4), (Long) rs.getObject(5), rs.getString(6), rs.getBoolean(7), animals,
+                species, rs.getObject(10, LocalDate.class), (Integer) rs.getObject(11), rs.getString(12), closedOn, closed);
+    }
+
+    /** The purposes each species may have (J1, J2); the database checks the same. */
+    static final Map<String, Set<String>> PURPOSES_BY_SPECIES = Map.of(
+            "CATTLE", Set.of("MILKING", "DRY", "HEIFER", "CALF", "BULL", "OTHER"),
+            "CHICKEN", Set.of("LAYER", "BROILER", "COUNTRY"),
+            "GOAT", Set.of("BREEDING_HERD", "FATTENING", "MIXED"),
+            "SHEEP", Set.of("BREEDING_HERD", "FATTENING", "MIXED"));
+
+    static FarmModule moduleFor(String species) {
+        return switch (species) {
+            case "CHICKEN" -> FarmModule.POULTRY;
+            case "GOAT", "SHEEP" -> FarmModule.GOAT_SHEEP;
+            default -> FarmModule.DAIRY;
+        };
     }
 
     @Transactional(readOnly = true)
@@ -78,10 +112,22 @@ public class HerdService {
 
     @Transactional
     public Group createGroup(TenantContext ctx, GroupRequest r) {
+        return createGroup(ctx, r, null, null, null);
+    }
+
+    /** Creates a group; counted batches and herds also carry their placement (J2). */
+    @Transactional
+    public Group createGroup(TenantContext ctx, GroupRequest r, LocalDate placedOn, Integer ageDays, String strain) {
+        String species = r.species() == null ? "CATTLE" : r.species();
+        if (!PURPOSES_BY_SPECIES.get(species).contains(r.purpose())) throw ApiException.badRequest("INVALID_GROUP_PURPOSE", "This purpose does not fit the species.");
+        if (!ctx.enabledModules().contains(moduleFor(species))) throw ApiException.forbidden("MODULE_DISABLED", "This module is not enabled for your farm business.");
         if (r.farmId() != null) master.requireFarm(ctx.tenantId(), r.farmId());
         long co = costObjects.createAnimalGroup(ctx.tenantId(), r.name().trim(), r.farmId());
-        long id = jdbc.sql("insert into sf_animal_groups (tenant_id, cost_object_id, purpose, notes) values (:t, :co, :p, :n) returning id")
-                .param("t", ctx.tenantId()).param("co", co).param("p", r.purpose()).param("n", trim(r.notes())).query(Long.class).single();
+        long id = jdbc.sql("""
+                        insert into sf_animal_groups (tenant_id, cost_object_id, purpose, notes, species, placed_on, age_at_placement_days, strain)
+                        values (:t, :co, :p, :n, :s, :placed, :age, :strain) returning id""")
+                .param("t", ctx.tenantId()).param("co", co).param("p", r.purpose()).param("n", trim(r.notes())).param("s", species)
+                .param("placed", placedOn).param("age", ageDays).param("strain", trim(strain)).query(Long.class).single();
         audit.record(ctx.tenantId(), ctx.userId(), "ANIMAL_GROUP_SAVED", "ANIMAL_GROUP", id, Map.of("name", r.name().trim(), "purpose", r.purpose()));
         return group(ctx, id);
     }

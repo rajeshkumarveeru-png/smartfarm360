@@ -4,14 +4,17 @@ import type { TenantSummary } from '../auth/session';
 import { tr, type Language } from '../i18n/translations';
 import { errorText } from '../screens/AuthScreens';
 import { newEntryId } from '../storage/entries';
+import FlockSection from './FlockSection';
 import { flags, isLitres, loadHerd, loadMilkDay, milkingGroups, recordHeat, recordTreatment, saveSession, type Animal, type Group, type MilkDay, type Session } from './livestockView';
 
 const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
-/** The Livestock tab (I15): today's milk by session, quick heat and treatment notes, and the animals with their flags. */
+/** The Livestock tab (I15, J12): today's milk by session, quick heat and treatment notes, the animals with their flags, and poultry batches and goat and sheep herds. */
 export default function LivestockScreen({ tenant, language }: { tenant: TenantSummary; language: Language }) {
   const t = (path: string, params?: Record<string, string>) => tr(language, path, params);
-  const canRead = tenant.permissions.includes('LIVESTOCK_READ') && tenant.enabledModules.includes('DAIRY');
+  const dairy = tenant.enabledModules.includes('DAIRY');
+  const counted = tenant.enabledModules.includes('POULTRY') || tenant.enabledModules.includes('GOAT_SHEEP');
+  const canRead = tenant.permissions.includes('LIVESTOCK_READ') && (dairy || counted);
   const canWrite = tenant.permissions.includes('LIVESTOCK_WRITE');
   const today = localToday();
   const [groups, setGroups] = useState<Group[]>([]);
@@ -26,17 +29,18 @@ export default function LivestockScreen({ tenant, language }: { tenant: TenantSu
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    if (!canRead) return;
+    if (!canRead || !dairy) { setAnimals([]); return; }
     try {
       const [herd, milk] = await Promise.all([loadHerd(tenant.id), loadMilkDay(tenant.id, today)]);
       setGroups(herd.groups); setAnimals(herd.animals); setDay(milk); setOffline(false);
     } catch {
       setOffline(true); setAnimals([]);
     }
-  }, [tenant.id, canRead, today]);
+  }, [tenant.id, canRead, dairy, today]);
   useEffect(() => { void load(); }, [load]);
 
   if (!canRead) return <Text style={s.note}>{t('mobile.livestockNotEnabled')}</Text>;
+  if (!dairy) return <View><Text style={s.title}>{t('livestock.title')}</Text><FlockSection tenant={tenant} language={language} today={today} /></View>;
   if (!animals) return <ActivityIndicator size="large" color="#28734A" style={{ marginTop: 40 }} />;
   const milking = milkingGroups(groups, animals);
 
@@ -127,6 +131,7 @@ export default function LivestockScreen({ tenant, language }: { tenant: TenantSu
         );
       })}
       <Button title={t('mobile.refresh')} onPress={() => void load()} outline />
+      {counted && <FlockSection tenant={tenant} language={language} today={today} />}
     </View>
   );
 }

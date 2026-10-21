@@ -29,7 +29,12 @@ public class EventService {
     /** Standard periods (I10); the farmer can override every worked-out date. */
     static final int CHECK_FROM_DAYS = 60, DRY_OFF_BEFORE_DAYS = 60;
 
-    static int gestationDays(String species) { return "BUFFALO".equals(species) ? 310 : 283; }
+    static int gestationDays(String species) {
+        return switch (species) { case "BUFFALO" -> 310; case "GOAT", "SHEEP" -> 150; default -> 283; };   // goats and sheep: J10
+    }
+
+    /** Goats and sheep get only an expected kidding or lambing date: no pregnancy check or dry-off (J10). */
+    static boolean smallStock(String species) { return "GOAT".equals(species) || "SHEEP".equals(species); }
 
     private final JdbcClient jdbc;
     private final HerdService herd;
@@ -121,6 +126,12 @@ public class EventService {
                 .param("t", ctx.tenantId()).param("a", r.animalId()).param("g", r.animalId() == null ? groupId : null).param("k", r.kind())
                 .param("d", r.date()).param("desc", r.description().trim()).param("by", HerdService.trim(r.doneBy())).param("w", withdrawal)
                 .param("next", r.nextDue()).param("doc", billDoc).param("sdoc", stockDoc).param("u", ctx.userId()).query(Long.class).single();
+        if (r.planItemId() != null) {
+            // The plan item this event carries out (poultry, goats and sheep design, J9)
+            int n = jdbc.sql("update sf_health_plan_items set done_event_id = :e where id = :p and tenant_id = :t and group_id = :g")
+                    .param("e", id).param("p", r.planItemId()).param("t", ctx.tenantId()).param("g", groupId).update();
+            if (n == 0) throw ApiException.notFound("PLAN_ITEM_NOT_FOUND", "Health plan item not found.");
+        }
         audit.record(ctx.tenantId(), ctx.userId(), "ANIMAL_HEALTH_RECORDED", "ANIMAL_EVENT", id, Map.of("kind", r.kind(), "for", target));
         return event(ctx, id);
     }
@@ -147,10 +158,11 @@ public class EventService {
         switch (r.kind()) {
             case "INSEMINATION" -> {
                 if (r.service() == null) throw ApiException.badRequest("SERVICE_REQUIRED", "Choose AI or natural service.");
-                check = r.checkDueFrom() != null ? r.checkDueFrom() : r.date().plusDays(CHECK_FROM_DAYS);
+                boolean small = smallStock(a.species());
+                check = r.checkDueFrom() != null ? r.checkDueFrom() : small ? null : r.date().plusDays(CHECK_FROM_DAYS);
                 calving = r.expectedCalving() != null ? r.expectedCalving() : r.date().plusDays(gestationDays(a.species()));
-                dryOff = r.dryOffDue() != null ? r.dryOffDue() : calving.minusDays(DRY_OFF_BEFORE_DAYS);
-                if (!calving.isAfter(r.date()) || dryOff.isAfter(calving)) throw ApiException.badRequest("INVALID_BREEDING_DATES", "Check the expected dates.");
+                dryOff = r.dryOffDue() != null ? r.dryOffDue() : small ? null : calving.minusDays(DRY_OFF_BEFORE_DAYS);
+                if (!calving.isAfter(r.date()) || (dryOff != null && dryOff.isAfter(calving))) throw ApiException.badRequest("INVALID_BREEDING_DATES", "Check the expected dates.");
             }
             case "PREGNANCY_CHECK" -> {
                 if (r.result() == null) throw ApiException.badRequest("RESULT_REQUIRED", "Choose positive or negative.");

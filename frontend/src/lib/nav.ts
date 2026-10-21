@@ -1,13 +1,14 @@
 import type { ModuleCode, Permission, TenantSummary } from '../api/types';
 
-export type NavItem = { key: string; path: string; permission: Permission; module?: ModuleCode };
+/** {@code module}: the section needs that module; {@code anyModule}: any one of these (livestock covers dairy, poultry, goats and sheep). */
+export type NavItem = { key: string; path: string; permission: Permission; module?: ModuleCode; anyModule?: ModuleCode[] };
 
 /** Sections of the tenant workspace. The backend enforces the same permissions; this only hides what cannot be used. */
 export const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard', path: 'dashboard', permission: 'TENANT_READ' },
   { key: 'farms', path: 'farms', permission: 'FARM_READ' },
   { key: 'crops', path: 'crops', permission: 'CROP_READ', module: 'CROP' },
-  { key: 'livestock', path: 'livestock', permission: 'LIVESTOCK_READ', module: 'DAIRY' },
+  { key: 'livestock', path: 'livestock', permission: 'LIVESTOCK_READ', anyModule: ['DAIRY', 'POULTRY', 'GOAT_SHEEP'] },
   { key: 'finance', path: 'finance', permission: 'FINANCE_READ' },
   { key: 'stock', path: 'stock', permission: 'INVENTORY_READ' },
   { key: 'workforce', path: 'workforce', permission: 'WORKFORCE_READ', module: 'WORKFORCE' },
@@ -23,5 +24,6 @@ export function can(tenant: TenantSummary | undefined, permission: Permission): 
 }
 
 export function visibleNav(tenant: TenantSummary | undefined): NavItem[] {
-  return NAV_ITEMS.filter(item => can(tenant, item.permission) && (!item.module || tenant!.enabledModules.includes(item.module)));
+  return NAV_ITEMS.filter(item => can(tenant, item.permission) && (!item.module || tenant!.enabledModules.includes(item.module))
+    && (!item.anyModule || item.anyModule.some(m => tenant!.enabledModules.includes(m))));
 }

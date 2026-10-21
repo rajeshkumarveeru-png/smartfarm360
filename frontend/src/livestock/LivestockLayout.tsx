@@ -10,11 +10,14 @@ export default function LivestockLayout() {
   const tenant = useTenant();
   const t = useNs('livestock');
   const base = `/t/${tenant.id}/livestock`;
+  const dairy = tenant.enabledModules.includes('DAIRY');
+  // Each part shows only with its module (poultry, goats and sheep design, J11)
   const tabs = [
-    { to: base, label: t('herd'), end: true },
-    { to: `${base}/milk`, label: t('milk') },
+    ...(dairy ? [{ to: base, label: t('herd'), end: true }, { to: `${base}/milk`, label: t('milk') }] : []),
+    ...(tenant.enabledModules.includes('POULTRY') ? [{ to: `${base}/poultry`, label: t('poultry') }] : []),
+    ...(tenant.enabledModules.includes('GOAT_SHEEP') ? [{ to: `${base}/small-stock`, label: t('smallStock') }] : []),
     { to: `${base}/care`, label: t('care') },
-    { to: `${base}/groups`, label: t('groups') },
+    ...(dairy ? [{ to: `${base}/groups`, label: t('groups') }] : []),
     { to: `${base}/reports`, label: t('reports') },
   ];
   return (

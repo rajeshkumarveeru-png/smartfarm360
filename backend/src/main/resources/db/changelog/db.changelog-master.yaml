@@ -19,3 +19,5 @@ databaseChangeLog:
       file: db/changelog/009-reports.yaml
   - include:
       file: db/changelog/010-livestock.yaml
+  - include:
+      file: db/changelog/011-poultry-goats.yaml

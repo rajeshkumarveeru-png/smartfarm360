@@ -51,7 +51,9 @@ import ReportsCatalogPage from './reports/ReportsCatalogPage';
 import AnimalPage from './livestock/AnimalPage';
 import CarePage from './livestock/CarePage';
 import GroupsPage from './livestock/GroupsPage';
-import HerdPage from './livestock/HerdPage';
+import FlockPage from './livestock/FlockPage';
+import FlocksPage from './livestock/FlocksPage';
+import LivestockHome from './livestock/LivestockHome';
 import LivestockLayout from './livestock/LivestockLayout';
 import LivestockReportsPage from './livestock/LivestockReportsPage';
 import MilkPage from './livestock/MilkPage';
@@ -124,9 +126,12 @@ function App() {
               <Route path="weather" element={<WeatherPage />} />
             </Route>
             <Route path="livestock" element={<LivestockLayout />}>
-              <Route index element={<HerdPage />} />
+              <Route index element={<LivestockHome />} />
               <Route path="animals/:animalId" element={<AnimalPage />} />
               <Route path="milk" element={<MilkPage />} />
+              <Route path="poultry" element={<FlocksPage kind="poultry" />} />
+              <Route path="small-stock" element={<FlocksPage kind="smallStock" />} />
+              <Route path="flocks/:groupId" element={<FlockPage />} />
               <Route path="care" element={<CarePage />} />
               <Route path="groups" element={<GroupsPage />} />
               <Route path="reports" element={<LivestockReportsPage />} />

@@ -59,7 +59,8 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
                 "038-crop-v2-schema",
                 "039-crop-v2-backfill",
                 "040-workforce-assets-schema",
-                "041-workforce-assets-seed", "042-report-indexes", "043-livestock-schema", "044-livestock-seed");
+                "041-workforce-assets-seed", "042-report-indexes", "043-livestock-schema", "044-livestock-seed",
+                "045-poultry-goats-schema", "046-poultry-goats-seed");
     }
 
     @Test
@@ -82,7 +83,8 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
                 "sf_crop_observations", "sf_weather_notes",
                 "sf_workers", "sf_worker_rates", "sf_attendance", "sf_piece_work", "sf_assets", "sf_asset_depreciation", "sf_asset_usage",
                 "sf_maintenance_plans", "sf_maintenance_logs", "sf_pay_run_workers", "sf_animal_groups", "sf_animals", "sf_animal_group_moves",
-                "sf_milk_sessions", "sf_milk_yields", "sf_milk_postings", "sf_animal_events", "sf_lactations", "sf_livestock_settings");
+                "sf_milk_sessions", "sf_milk_yields", "sf_milk_postings", "sf_animal_events", "sf_lactations", "sf_livestock_settings",
+                "sf_batch_days", "sf_head_movements", "sf_egg_postings", "sf_health_plan_items");
     }
 
     @Test

@@ -20,7 +20,7 @@ import java.util.List;
 /** Livestock and dairy API (livestock design, approved 2026-10-21). Money-creating requests accept an Idempotency-Key. */
 @RestController
 @RequestMapping("/api/v1/tenants/{tenantId}/livestock")
-@RequiresModule(FarmModule.DAIRY)
+@RequiresModule({FarmModule.DAIRY, FarmModule.POULTRY, FarmModule.GOAT_SHEEP})
 public class LivestockController {
     private static final String KEY = "Idempotency-Key";
     private static final String ISO = "yyyy-MM-dd";
@@ -109,6 +109,7 @@ public class LivestockController {
     }
 
     @PostMapping("/animals/{animalId}/calving")
+    @RequiresModule(FarmModule.DAIRY)
     @RequiresPermission(Permission.LIVESTOCK_WRITE)
     @ResponseStatus(HttpStatus.CREATED)
     public AnimalCard calving(TenantContext ctx, @PathVariable long animalId, @Valid @RequestBody CalvingRequest r) {
@@ -140,16 +141,19 @@ public class LivestockController {
     // ---- Milk ----
 
     @GetMapping("/milk/{date}")
+    @RequiresModule(FarmModule.DAIRY)
     @RequiresPermission(Permission.LIVESTOCK_READ)
     public MilkDay milkDay(TenantContext ctx, @PathVariable @DateTimeFormat(pattern = ISO) LocalDate date) { return milk.day(ctx, date); }
 
     @PutMapping("/milk/{date}")
+    @RequiresModule(FarmModule.DAIRY)
     @RequiresPermission(Permission.LIVESTOCK_WRITE)
     public MilkDay saveMilkDay(TenantContext ctx, @PathVariable @DateTimeFormat(pattern = ISO) LocalDate date, @Valid @RequestBody MilkDayRequest r) {
         return milk.saveDay(ctx, date, r);
     }
 
     @PostMapping("/milk-uses")
+    @RequiresModule(FarmModule.DAIRY)
     @RequiresPermission(Permission.LIVESTOCK_WRITE)
     @ResponseStatus(HttpStatus.CREATED)
     public List<RecordRef> milkUses(TenantContext ctx, @Valid @RequestBody MilkUseRequest r, @RequestHeader(value = KEY, required = false) String key) {
@@ -157,6 +161,7 @@ public class LivestockController {
     }
 
     @PostMapping("/milk-sales")
+    @RequiresModule(FarmModule.DAIRY)
     @RequiresPermission(Permission.LIVESTOCK_WRITE)
     @ResponseStatus(HttpStatus.CREATED)
     public RecordRef milkSale(TenantContext ctx, @Valid @RequestBody MilkSaleRequest r, @RequestHeader(value = KEY, required = false) String key) {
@@ -166,6 +171,7 @@ public class LivestockController {
     // ---- Reports (section 8) ----
 
     @GetMapping("/reports/milk")
+    @RequiresModule(FarmModule.DAIRY)
     @RequiresPermission(Permission.LIVESTOCK_READ)
     public ResponseEntity<?> milkReport(TenantContext ctx, @RequestParam @DateTimeFormat(pattern = ISO) LocalDate from,
                                         @RequestParam @DateTimeFormat(pattern = ISO) LocalDate to,

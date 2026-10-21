@@ -10,6 +10,7 @@ import com.smartfarm360.finance.LedgerReportService.MonthlyRow;
 import com.smartfarm360.finance.ReportService;
 import com.smartfarm360.inventory.StockDtos;
 import com.smartfarm360.inventory.StockReportService;
+import com.smartfarm360.livestock.FlockReports;
 import com.smartfarm360.livestock.LivestockReports;
 import com.smartfarm360.operations.CropReportService;
 import com.smartfarm360.operations.OperationsDtos.CycleReport;
@@ -50,11 +51,13 @@ public class DashboardService {
     private final WorkerService workers;
     private final AssetService assets;
     private final LivestockReports livestock;
+    private final FlockReports flocks;
 
     public DashboardService(ReportService reports, LedgerReportService ledger, StockReportService stock, CropService crops,
                             CropReportService cropReports, WorkerService workers, AssetService assets,
-                            LivestockReports livestock) {
+                            LivestockReports livestock, FlockReports flocks) {
         this.livestock = livestock;
+        this.flocks = flocks;
         this.reports = reports;
         this.ledger = ledger;
         this.stock = stock;
@@ -125,18 +128,27 @@ public class DashboardService {
                 return null;
             });
         }
-        if (ctx.has(Permission.LIVESTOCK_READ) && module(ctx, FarmModule.DAIRY)) {
+        boolean dairy = module(ctx, FarmModule.DAIRY), poultry = module(ctx, FarmModule.POULTRY);
+        if (ctx.has(Permission.LIVESTOCK_READ) && (dairy || poultry || module(ctx, FarmModule.GOAT_SHEEP))) {
             tile("livestock", errors, () -> {
-                int withheld = livestock.withheld(ctx, asOf).size();
-                if (withheld > 0) attention.add(new Attention("MILK_WITHHELD", withheld, null, null));
-                int due = livestock.breedingDue(ctx, asOf, asOf.plusDays(7)).size();
-                if (due > 0) attention.add(new Attention("BREEDING_DUE", due, null, null));
+                boolean today = asOf.equals(java.time.LocalDate.now(FARM_ZONE));
+                boolean afterTen = today && java.time.LocalTime.now(FARM_ZONE).isAfter(java.time.LocalTime.of(10, 0));
+                if (dairy) {
+                    int withheld = livestock.withheld(ctx, asOf).size();
+                    if (withheld > 0) attention.add(new Attention("MILK_WITHHELD", withheld, null, null));
+                    int due = livestock.breedingDue(ctx, asOf, asOf.plusDays(7)).size();
+                    if (due > 0) attention.add(new Attention("BREEDING_DUE", due, null, null));
+                    // The morning's milk is expected by 10 a.m. farm time (livestock design, section 8)
+                    if (afterTen && !livestock.milkRecorded(ctx, asOf, "MORNING")) attention.add(new Attention("MILK_NOT_RECORDED", 1, null, asOf.toString()));
+                }
                 int health = livestock.nextDue(ctx, asOf.plusDays(7)).size();
                 if (health > 0) attention.add(new Attention("HEALTH_DUE", health, null, null));
-                // The morning's milk is expected by 10 a.m. farm time (livestock design, section 8)
-                boolean today = asOf.equals(java.time.LocalDate.now(FARM_ZONE));
-                if (today && java.time.LocalTime.now(FARM_ZONE).isAfter(java.time.LocalTime.of(10, 0)) && !livestock.milkRecorded(ctx, asOf, "MORNING")) {
-                    attention.add(new Attention("MILK_NOT_RECORDED", 1, null, asOf.toString()));
+                if (poultry) {
+                    // Poultry, goats and sheep design, section 9: daily records and mortality
+                    int missing = afterTen ? flocks.batchesWithoutRecord(ctx, asOf) : 0;
+                    if (missing > 0) attention.add(new Attention("BATCH_RECORD_MISSING", missing, null, asOf.toString()));
+                    int high = flocks.highMortality(ctx, asOf.minusDays(1), asOf);
+                    if (high > 0) attention.add(new Attention("HIGH_MORTALITY", high, null, null));
                 }
                 return null;
             });

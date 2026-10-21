@@ -1,6 +1,7 @@
 # Poultry, goats and sheep design (Phase 9)
 
-- Status: **Draft for product-owner review** (2026-10-21). No Phase 9 code is written until this is approved.
+- Status: **Approved** (2026-10-21) with the recommended answers to J1–J15, and implemented in Phase 9. Implementation
+  notes are in section 15.
 - Builds on the approved [livestock and dairy design](livestock-and-dairy.md):
   - animal groups as cost objects (I2);
   - dated group events, health events with next-due dates (I9);
@@ -309,3 +310,37 @@ All new tables get tenant keys and composite foreign keys. Every new endpoint ge
 - permissions and module switches;
 - cross-tenant tests for every new endpoint;
 - the migration on a copy of the current schema.
+
+## 15. Implementation notes (2026-10-21)
+
+- **Counted groups (J1, J2, J7).**
+  - Batches and herds are rows of `sf_animal_groups` with a `species` (CHICKEN, GOAT, SHEEP; CATTLE for dairy groups),
+    so they stay cost objects and reuse group health events.
+  - The head count is not stored. It is the sum of `sf_head_movements` up to a date. A movement whose finance record
+    was reversed no longer counts, so reversing a sale or purchase restores the count by itself.
+  - Every change is checked against every later day, so a count never goes below zero on any day (`HEADS_NEGATIVE`).
+  - Individually tagged goats and sheep (for breeding, J10) do **not** change the herd's head count; the herd count
+    is kept by movements only.
+- **Closing (J2, J14).** There is no "close batch" endpoint. A poultry batch is closed when its count reaches zero,
+  for example after the last sale or a count check of zero. Reversing that sale reopens it. The *since the batch
+  started* figures are the closing summary. Closed batches refuse new records (`BATCH_CLOSED`).
+- **Daily record (J4, J5, J13).**
+  - Saving a day writes its deaths and culls as movements linked to the day.
+  - Feed becomes one stock use to the batch. Changing the day reverses the earlier use and posts the new one.
+  - Good and cracked eggs are kept equal to the day's produce records (`sf_egg_postings`), the same delta approach as
+    milk. Less eggs after they were sold or used is refused (`EGGS_ALREADY_USED`).
+  - The *Eggs* item (pieces, farm produce, *Egg sales*) is made on first use. An existing item named Eggs that is not
+    produce in pieces is refused (`EGG_ITEM_CONFLICT`).
+  - The unit *tray* (30 pieces) was added. Egg sales take pieces, dozens or trays.
+  - Egg home use and damage come from the farm's egg stock, not from one batch.
+- **Modules (J11).**
+  - `@RequiresModule` now takes several modules and allows a call when any of them is on.
+  - The livestock controller needs any of Dairy, Poultry or Goats and sheep. Milk endpoints and calving still need
+    Dairy.
+  - Without Dairy the web opens Livestock on Poultry (or Goats and sheep) and hides Herd, Milk and Groups.
+- **Schema.** Changeset `045` also widens `sf_animal_groups.purpose` from 10 to 16 characters for
+  `BREEDING_HERD`. It had not been applied anywhere when this was found, so the changeset was corrected before its
+  first run.
+- **Phone (J12).** Online only. Saving the day from the phone sends back the death cause, weight sample and notes of
+  the loaded day, so they are not lost when the day is replaced.
+

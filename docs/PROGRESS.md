@@ -2,10 +2,8 @@
 
 ## Current state
 
-- **Phase:** 8 (livestock and dairy) complete on branch `feature/phase-8-livestock` (based on
-  `feature/phase-7-reports`). Phase 9 (poultry, goats and sheep) started on
-  `feature/phase-9-poultry-goats`: the [poultry, goats and sheep design](livestock/poultry-goats-sheep.md) is awaiting
-  review; no Phase 9 code yet. Nothing is pushed yet.
+- **Phase:** 9 (poultry, goats and sheep) complete on branch `feature/phase-9-poultry-goats` (based on
+  `feature/phase-8-livestock`). Next: Phase 10 (aquaculture), starting with its design. Nothing is pushed yet.
 - **Production readiness:** not ready. Authentication, roles, tenant isolation, audit, the finance core and stock with
   movements are in place and tested, but no email provider is configured and hosting/backups are undecided.
 
@@ -726,6 +724,134 @@ Not verified:
 - Buying an animal, exits and a society sale in the browser (they are covered by the API golden and rule tests).
 - GitHub Actions (nothing has been pushed).
 
+## Phase 9 — Poultry, goats and sheep (2026-10-21)
+
+Commits on `feature/phase-9-poultry-goats` (based on `feature/phase-8-livestock`):
+
+- `7e49e7f`: design.
+- A build commit with the backend, web, mobile, verification and docs.
+
+### Features completed
+
+- **Approved design.** [poultry, goats and sheep](livestock/poultry-goats-sheep.md) is implemented with J1–J15 as
+  recommended. Implementation notes are in section 15 of the design.
+- **Batches and herds** (J1, J2, J7):
+  - Poultry batches (layers, broilers, country birds) and goat and sheep herds are counted groups and cost objects.
+  - A batch starts with its placement date, age, strain and first count.
+  - Head counts change only through dated movements: started, bought, born, moved, died, culled, sold and count checks.
+    A count never goes below zero on any day.
+  - A batch closes when its count reaches zero, and reopens when that sale is reversed.
+- **Buying** (J3): bought chicks, pullets, kids and lambs are a bill to the group under the new category *Chicks and
+  young stock*.
+- **Daily batch record** (J4, J5, J13):
+  - Deaths, culls, good, cracked and broken eggs, feed and an optional weight sample, one record per day.
+  - Feed is one stock use to the batch.
+  - Good and cracked eggs go into stock at nil value; broken eggs are recorded only.
+  - Warnings for eggs withheld after treatment and for deaths above 1% in a day.
+- **Eggs** (J5): home use and damaged eggs from the egg stock; egg sales in pieces, dozens or trays (new unit, 30).
+- **Selling** (J6): birds and animals by head with live weight, priced per kg or per head, with the count movement.
+- **Goats and sheep** (J10): herd-level kidding and lambing (born alive and dead). Tagged does and ewes keep their
+  individual breeding events, with a 150-day expected date.
+- **Health** (J9): a health plan per batch or herd, marked done through the Phase 8 group health event, and copied from
+  an earlier batch at the same bird age.
+- **Figures** (J8, J14), for the period and since the batch started:
+  - hen-day %, feed per dozen and cost per egg for layers;
+  - mortality, average weight, FCR and cost per kg for broilers;
+  - revenue, costs and profit, and cost per head per month for herds.
+- **Reports**: *Batches and herds* on the livestock reports page, exported as CSV and Excel.
+- **Dashboard**: today's batch record missing, and high mortality. Health due now includes plan items.
+- **Modules** (J11): *Poultry* and *Goats and sheep* are available, off by default, and reuse the livestock
+  permissions. Each part of Livestock shows only with its module; without Dairy the section opens on Poultry.
+- **Web**: Poultry and Goats and sheep tabs, and a page for each batch or herd.
+- **Phone** (J12): the Livestock tab lists open batches and herds. A batch takes today's record; a herd takes born, died
+  or culled counts. Online only.
+
+### Database migrations
+
+`011-poultry-goats.yaml` contains two changesets:
+
+- `045-poultry-goats-schema`:
+  - Adds species, placement date, age at placement, strain and closing date to `sf_animal_groups`, and widens its
+    `purpose` column to 16 characters.
+  - Allows goats and sheep as animals, and kidding events with born alive and dead.
+  - Adds the tables `sf_batch_days`, `sf_head_movements`, `sf_egg_postings` and `sf_health_plan_items`. All have
+    tenant keys and composite foreign keys.
+  - Adds the egg item to the livestock settings; the milk item becomes optional.
+- `046-poultry-goats-seed`: the unit *tray* and the category *Chicks and young stock*.
+
+These were applied to the local database on 2026-10-21, after a `pg_dump` backup (`smartfarm360-before-phase9.backup`).
+No business data was changed.
+
+### APIs added
+
+Under `/api/v1/tenants/{tenantId}/livestock` (module *Poultry* or *Goats and sheep*):
+
+- `GET|POST /flocks`
+- `GET|POST /flocks/{id}/movements`, `DELETE /flock-movements/{id}`
+- `POST /flocks/{id}/purchases`, `POST /flocks/{id}/sales`, `POST /flocks/{id}/births` (Goats and sheep)
+- `GET|PUT /flocks/{id}/days/{date}`, `POST /egg-uses`, `POST /egg-sales` (Poultry)
+- `GET|POST /flocks/{id}/plan`, `POST /flocks/{id}/plan/copy`
+- `GET /flocks/{id}/report`, `GET /reports/flocks` (accepts `format=csv|xlsx`)
+
+Changed:
+
+- `@RequiresModule` accepts several modules (any of them).
+- The livestock endpoints need any livestock module; milk and calving still need Dairy.
+- `POST /health` accepts `planItemId`.
+
+### Tests and evidence
+
+| Command | Result |
+|---|---|
+| `backend: gradlew test --rerun bootJar` | Passed: **591 tests, 0 failures** (see below) |
+| `frontend: npm run lint`, `tsc --noEmit`, `npm run build` | Passed; the bundle is still over 500 kB |
+| `frontend: npm test` | Passed: **60 tests**, including 7 new poultry, goat and sheep screen tests |
+| `mobile: npx tsc --noEmit`, `npm test`, `npx expo install --check` | Passed: **37 tests**, including 4 new batch and herd tests |
+| Manual browser check | Passed (see below) |
+
+The backend run includes:
+
+- The golden scenario from section 10 of the design. Every figure is asserted:
+  - layers: 30,588 hen-days, hen-day 85.0%, 1.57 kg feed per dozen, mortality 0.61%, costs ₹1,10,300, revenue
+    ₹1,26,000, profit ₹15,700, cost per egg ₹4.24, costs since placement ₹2,90,300, 400 eggs in stock;
+  - broilers: mortality 3.00%, average weight 2.20 kg, FCR 1.64, costs ₹3,56,000, revenue ₹4,69,480, profit
+    ₹1,13,480, ₹83.41 per kg, batch closed;
+  - goats: 22 heads, costs ₹4,900, revenue ₹26,000, profit ₹21,100.
+- 9 rule tests:
+  - head counts change only by movements and never go below zero;
+  - eggs follow the daily record until used, and broken eggs are not stocked;
+  - daily feed is one stock use, and a change reverses the earlier one;
+  - an empty batch closes, and reversing its sale reopens it;
+  - health plans are copied with shifted dates and marked done;
+  - kidding in the herd, and a 150-day date for a tagged doe;
+  - withdrawal warnings on the daily record, and high mortality on the dashboard;
+  - modules and permissions, including a poultry-only farm refused the dairy endpoints;
+  - another farm business's batches cannot be read, changed or referenced (moves, plan copies, egg sales).
+- The migration test with changesets 045–046 and the four new tables.
+- 11 module-boundary rules.
+- 436 generated cross-tenant cases.
+- The dashboard performance test: **558 ms** at 50,000 journal lines.
+
+One existing test changed with the approved design: the "unavailable module" check now uses Fish farming, because
+Poultry is now available (J11).
+
+The manual browser check ran against backend :8081 on local PostgreSQL 18, with Vite on :5174:
+
+- Migrations 045–046 were applied at startup.
+- Poultry was switched on in Settings, and Livestock showed a *Poultry* tab next to Herd and Milk.
+- Batch *Layer shed A* was started on 1 Oct 2026 with 200 birds.
+- Today's record with 2 deaths and 150 good eggs left 198 birds, put 150 eggs in stock at nil value, and showed
+  hen-day 3.6% (150 eggs over 4,198 bird-days) and mortality 1%.
+- The livestock reports page showed the batch under *Batches and herds*; the dashboard loaded with no failed tiles.
+- The backend log shows 0 errors and no secret values.
+
+Not verified:
+
+- A real phone.
+- Buying, selling, egg sales, goats and copied plans in the browser (they are covered by the API golden and rule tests
+  and the screen tests).
+- GitHub Actions (nothing has been pushed).
+
 ## Known gaps and defects
 
 Security and platform:
@@ -745,7 +871,8 @@ Finance and stock:
 - No internal transfers of own produce or manure yet (P17, Phases 5 → 11); monthly depreciation runs arrived in Phase 6.
 - The workforce labour report still shows labour cost to anyone with WORKFORCE_READ, unlike the new wages report.
 - Animal depreciation goes to the group the animal is in when the run is posted, not the group of that month (post runs monthly).
-- Overhead is not shared out to herds (I12); fodder grown on the farm and fed to the herd waits for internal transfers (P17, Phase 11).
+- The daily batch record offers every stock input measured by weight as feed, not only items in the feed category.
+- Overhead is not shared out to herds or batches (I12, J15); fodder grown on the farm and fed to the herd waits for internal transfers (P17, Phase 11).
 - Excel exports group thousands as #,##0.00, not Indian lakh grouping (an Excel format limit).
 - Payroll has no PF, ESI, TDS or minimum-wage rules (G6). There is no WDV depreciation and no machine-hour allocation to
   crops (G9, G12). Breeding animals are not depreciated until the livestock phases (G10). Recurring expenses are still
@@ -753,8 +880,7 @@ Finance and stock:
 - Removing a match after a later report date is not reflected historically in dues ageing (matches have no history).
 
 Clients:
-- Mobile money entries wait on the phone when offline; crop recording, attendance and livestock are online only (offline in Phase 13). The
-  livestock tab is still a placeholder until the livestock modules (Phases 8–12).
+- Mobile money entries wait on the phone when offline; crop recording, attendance and livestock are online only (offline in Phase 13).
 
 Tooling (left unchanged by policy — user scripts):
 - `dev.bat` uses port 5173 (Vite runs on 5174) and sets `SMART_BILLING_LOG_DIR` while logback reads `SMARTFARM_LOG_DIR`.

@@ -1,5 +1,5 @@
 export type Species = 'COW' | 'BUFFALO';
-export type Purpose = 'MILKING' | 'DRY' | 'HEIFER' | 'CALF' | 'BULL' | 'OTHER';
+export type Purpose = 'MILKING' | 'DRY' | 'HEIFER' | 'CALF' | 'BULL' | 'OTHER' | 'LAYER' | 'BROILER' | 'COUNTRY' | 'BREEDING_HERD' | 'FATTENING' | 'MIXED';
 export const PURPOSES: Purpose[] = ['MILKING', 'DRY', 'HEIFER', 'CALF', 'BULL', 'OTHER'];
 export type Session = 'MORNING' | 'EVENING';
 export const SESSIONS: Session[] = ['MORNING', 'EVENING'];
@@ -32,3 +32,19 @@ export type HerdRow = { groupId: number; groupName: string; purpose: Purpose; re
 export type DueItem = { kind: string; animalId: number; tag: string; name: string | null; due: string };
 export type BreedingCalendar = { from: string; to: string; due: DueItem[]; openLong: DueItem[]; intervals: { animalId: number; tag: string; previous: string; latest: string; days: number }[] };
 export type HealthReport = { from: string; to: string; events: AnimalEvent[]; nextDue: DueItem[]; withheld: Withheld[] };
+
+// ---- Poultry, goats and sheep (Phase 9) ----
+export type FlockSpecies = 'CHICKEN' | 'GOAT' | 'SHEEP';
+export type FlockGroup = Group & { species: 'CATTLE' | FlockSpecies; placedOn: string | null; ageAtPlacementDays: number | null; strain: string | null;
+  closedOn: string | null; closed: boolean };
+export type Movement = { id: number; date: string; kind: string; heads: number; kg: number | null; cause: string | null; documentId: number | null;
+  batchDayId: number | null; pairGroupId: number | null; pairGroupName: string | null; reversed: boolean };
+export type BatchDay = { day: string; deaths: number; deathCause: string | null; culls: number; eggsGood: number; eggsCracked: number; eggsBroken: number;
+  feedItemId: number | null; feedKg: number | null; feedDocumentId: number | null; weightBirds: number | null; weightKg: number | null; notes: string | null;
+  headsAtEnd: number; warnings: string[] };
+export type Figures = { from: string; to: string; openingHeads: number; closingHeads: number; arrived: number; born: number; died: number; culled: number;
+  sold: number; movedOut: number; soldKg: number; headDays: number; eggsGood: number; eggsCracked: number; eggsBroken: number; eggs: number;
+  henDayPercent: number | null; feedKg: number; feedPerDozen: number | null; mortalityPercent: number | null; averageWeight: number | null; fcr: number | null;
+  revenue: number | null; costs: number | null; profit: number | null; costPerEgg: number | null; costPerKg: number | null; costPerHeadMonth: number | null };
+export type FlockReport = { group: FlockGroup; heads: number; period: Figures; sincePlacement: Figures | null };
+export type PlanItem = { id: number; kind: string; description: string; dueOn: string; doneEventId: number | null };

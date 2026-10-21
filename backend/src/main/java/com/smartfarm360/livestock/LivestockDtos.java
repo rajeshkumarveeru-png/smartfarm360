@@ -12,21 +12,32 @@ import java.util.List;
 public final class LivestockDtos {
     private LivestockDtos() {}
 
-    public static final String SPECIES = "COW|BUFFALO";
-    public static final String PURPOSES = "MILKING|DRY|HEIFER|CALF|BULL|OTHER";
+    public static final String SPECIES = "COW|BUFFALO|GOAT|SHEEP";
+    public static final String GROUP_SPECIES = "CATTLE|CHICKEN|GOAT|SHEEP";
+    public static final String PURPOSES = "MILKING|DRY|HEIFER|CALF|BULL|OTHER|LAYER|BROILER|COUNTRY|BREEDING_HERD|FATTENING|MIXED";
     public static final String SESSIONS = "MORNING|EVENING";
     public static final String HEALTH_KINDS = "TREATMENT|VACCINATION|DEWORMING|HEALTH_OTHER";
 
     // ---- Groups (I2) ----
 
+    /** {@code species}: CATTLE (default) for dairy groups; CHICKEN, GOAT or SHEEP for counted batches and herds (Phase 9, J1). */
     public record GroupRequest(@NotBlank @Size(max = 140) String name, @NotNull @Pattern(regexp = PURPOSES) String purpose, Long farmId,
-                               @Size(max = 300) String notes) {}
+                               @Size(max = 300) String notes, @Pattern(regexp = GROUP_SPECIES) String species) {
+        public GroupRequest(String name, String purpose, Long farmId, String notes) { this(name, purpose, farmId, notes, null); }
+    }
 
     public record GroupPatch(@Size(min = 1, max = 140) String name, @Pattern(regexp = PURPOSES) String purpose, Long farmId, @Size(max = 300) String notes,
                              Boolean active) {}
 
     /** {@code costObjectId}: what costs, revenue, labour and stock use are assigned to. */
-    public record Group(long id, long costObjectId, String name, String purpose, Long farmId, String notes, boolean active, int animals) {}
+    /**
+     * {@code animals}: individual animals in the group, or the head count for counted batches and herds (J1, J7).
+     * {@code closed}: closed by hand ({@code closedOn}), or a poultry batch with no birds left (J2, J14).
+     */
+    public record Group(long id, long costObjectId, String name, String purpose, Long farmId, String notes, boolean active, int animals,
+                        String species, LocalDate placedOn, Integer ageAtPlacementDays, String strain, LocalDate closedOn, boolean closed) {
+        public boolean counted() { return !"CATTLE".equals(species); }
+    }
 
     // ---- Animals (I1, I3) ----
 
@@ -131,7 +142,13 @@ public final class LivestockDtos {
 
     public record HealthRequest(Long animalId, Long groupId, @NotNull @Pattern(regexp = HEALTH_KINDS) String kind, @NotNull LocalDate date,
                                 @NotBlank @Size(max = 300) String description, @Size(max = 120) String doneBy,
-                                @PositiveOrZero @Max(120) Integer withdrawalDays, LocalDate nextDue, @Valid Medicine medicine, @Valid VetBill bill) {}
+                                @PositiveOrZero @Max(120) Integer withdrawalDays, LocalDate nextDue, @Valid Medicine medicine, @Valid VetBill bill,
+                                Long planItemId) {
+        public HealthRequest(Long animalId, Long groupId, String kind, LocalDate date, String description, String doneBy, Integer withdrawalDays,
+                             LocalDate nextDue, Medicine medicine, VetBill bill) {
+            this(animalId, groupId, kind, date, description, doneBy, withdrawalDays, nextDue, medicine, bill, null);
+        }
+    }
 
     /**
      * Breeding events. {@code kind}: HEAT, INSEMINATION (service AI or NATURAL, with {@code bull}), PREGNANCY_CHECK

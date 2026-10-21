@@ -78,6 +78,28 @@ public class LivestockExports {
         return d;
     }
 
+    /** Batches and herds for a period (poultry, goats and sheep design, section 9); money only when the reader may see it. */
+    public ReportDocument flocks(String lang, LocalDate from, LocalDate to, List<FlockDtos.FlockReport> list) {
+        ReportDocument d = new ReportDocument(labels.t(lang, "livestock.report.flocks"));
+        d.meta(labels.t(lang, "reports.export.period"), from + " – " + to);
+        d.meta(labels.t(lang, "reports.export.figures"), labels.t(lang, "reports.export.actualPosted"));
+        d.text(labels.t(lang, "livestock.group")).text(labels.t(lang, "livestock.purposeLabel"))
+                .column(labels.t(lang, "livestock.openingHeads"), ReportDocument.Kind.NUMBER).column(labels.t(lang, "livestock.closingHeads"), ReportDocument.Kind.NUMBER)
+                .column(labels.t(lang, "livestock.died"), ReportDocument.Kind.NUMBER).column(labels.t(lang, "livestock.soldHeads"), ReportDocument.Kind.NUMBER)
+                .column(labels.t(lang, "livestock.mortality"), ReportDocument.Kind.NUMBER).column(labels.t(lang, "livestock.eggs"), ReportDocument.Kind.NUMBER)
+                .column(labels.t(lang, "livestock.henDay"), ReportDocument.Kind.NUMBER).column(labels.t(lang, "livestock.feedKg"), ReportDocument.Kind.NUMBER)
+                .column(labels.t(lang, "livestock.fcr"), ReportDocument.Kind.NUMBER).column(labels.t(lang, "livestock.averageWeight"), ReportDocument.Kind.NUMBER)
+                .money(labels.t(lang, "fin.revenue")).money(labels.t(lang, "fin.costs")).money(labels.t(lang, "reports.profit"))
+                .money(labels.t(lang, "livestock.costPerEgg")).money(labels.t(lang, "livestock.costPerKg"));
+        for (FlockDtos.FlockReport r : list) {
+            FlockDtos.Figures f = r.period();
+            d.row(r.group().name(), labels.t(lang, "livestock.purpose." + r.group().purpose()), BigDecimal.valueOf(f.openingHeads()), BigDecimal.valueOf(f.closingHeads()),
+                    BigDecimal.valueOf(f.died()), BigDecimal.valueOf(f.sold()), f.mortalityPercent(), BigDecimal.valueOf(f.eggs()), f.henDayPercent(), f.feedKg(),
+                    f.fcr(), f.averageWeight(), f.revenue(), f.costs(), f.profit(), f.costPerEgg(), f.costPerKg());
+        }
+        return d;
+    }
+
     public ReportDocument health(String lang, HealthReport h) {
         ReportDocument d = new ReportDocument(labels.t(lang, "livestock.report.health"));
         d.meta(labels.t(lang, "reports.export.period"), h.from() + " – " + h.to());

@@ -67,7 +67,7 @@ public class TenantContextInterceptor implements HandlerInterceptor {
 
         RequiresModule module = method.getMethodAnnotation(RequiresModule.class);
         if (module == null) module = AnnotatedElementUtils.findMergedAnnotation(method.getBeanType(), RequiresModule.class);
-        if (module != null && !context.enabledModules().contains(module.value())) {
+        if (module != null && java.util.Arrays.stream(module.value()).noneMatch(context.enabledModules()::contains)) {
             throw ApiException.forbidden("MODULE_DISABLED", "This module is not enabled for your farm business.");
         }
 

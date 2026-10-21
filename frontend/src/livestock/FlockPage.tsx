@@ -1,0 +1,389 @@
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { Trash2 } from 'lucide-react';
+import { api } from '../api/client';
+import { useTenant } from '../auth/useCurrentTenant';
+import { ErrorBanner, Loading } from '../components/common';
+import type { FinancialAccount, Party } from '../finance/types';
+import { newIdempotencyKey } from '../finance/useFinanceData';
+import { currentLanguage, useNs } from '../i18n';
+import { describeError } from '../lib/errors';
+import { formatDate, formatMoney, formatNumber, today } from '../lib/format';
+import { can } from '../lib/nav';
+import type { Item } from '../stock/types';
+import type { RecordRefLike } from './milkTypes';
+import type { BatchDay, Figures, FlockGroup, FlockReport, Movement, PlanItem } from './types';
+import { HEALTH_KINDS } from './types';
+
+const whole = (v: string) => v === '' || /^\d{1,7}$/.test(v.trim());
+const decimal = (v: string) => v === '' || /^\d{1,9}(\.\d{1,3})?$/.test(v.trim());
+const money = (v: string) => /^\d{1,12}(\.\d{1,2})?$/.test(v.trim());
+const num = (v: string) => (v.trim() === '' ? null : Number(v));
+const str = (v: number | null | undefined) => (v == null || v === 0 ? '' : String(v));
+const monthStart = () => `${today().slice(0, 7)}-01`;
+type DayForm = { deaths: string; deathCause: string; culls: string; eggsGood: string; eggsCracked: string; eggsBroken: string; feedItemId: string; feedKg: string;
+  weightBirds: string; weightKg: string; notes: string };
+const toForm = (d: BatchDay): DayForm => ({ deaths: str(d.deaths), deathCause: d.deathCause ?? '', culls: str(d.culls), eggsGood: str(d.eggsGood),
+  eggsCracked: str(d.eggsCracked), eggsBroken: str(d.eggsBroken), feedItemId: d.feedItemId ? String(d.feedItemId) : '', feedKg: str(d.feedKg),
+  weightBirds: str(d.weightBirds), weightKg: str(d.weightKg), notes: d.notes ?? '' });
+
+/** One poultry batch or goat and sheep herd: figures (J8), the daily record (J4), head movements (J7), sales (J6), eggs (J5) and the health plan (J9). */
+export default function FlockPage() {
+  const { groupId } = useParams();
+  const tenant = useTenant();
+  const t = useNs('livestock');
+  const tc = useNs('common');
+  const tf = useNs('fin');
+  const lang = currentLanguage();
+  const base = `/api/v1/tenants/${tenant.id}/livestock`;
+  const flock = `${base}/flocks/${groupId}`;
+  const canWrite = can(tenant, 'LIVESTOCK_WRITE');
+  const canMoney = canWrite && can(tenant, 'FINANCE_WRITE');
+  const showMoney = can(tenant, 'FINANCE_READ');
+  const [range, setRange] = useState({ from: monthStart(), to: today() });
+  const [report, setReport] = useState<FlockReport | null>(null);
+  const [moves, setMoves] = useState<Movement[]>([]);
+  const [plan, setPlan] = useState<PlanItem[]>([]);
+  const [others, setOthers] = useState<FlockGroup[]>([]);
+  const [feeds, setFeeds] = useState<Item[]>([]);
+  const [parties, setParties] = useState<Party[]>([]);
+  const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
+  const [date, setDate] = useState(today());
+  const [day, setDay] = useState<BatchDay | null>(null);
+  const [dayForm, setDayForm] = useState<DayForm | null>(null);
+  const [move, setMove] = useState({ date: today(), kind: 'DIED', heads: '', toGroupId: '', countedHeads: '', cause: '' });
+  const [buy, setBuy] = useState({ date: today(), heads: '', amount: '', partyId: '', financialAccountId: '' });
+  const [sale, setSale] = useState({ date: today(), heads: '', kg: '', rateBasis: 'KG', rate: '', partyId: '', financialAccountId: '' });
+  const [birth, setBirth] = useState({ date: today(), alive: '', dead: '' });
+  const [eggUse, setEggUse] = useState({ date: today(), homeUse: '', damaged: '', reason: '' });
+  const [eggSale, setEggSale] = useState({ date: today(), quantity: '', unit: 'tray', amount: '', partyId: '', financialAccountId: '' });
+  const [planForm, setPlanForm] = useState({ kind: 'VACCINATION', description: '', dueOn: today(), copyFrom: '' });
+  const [keys, setKeys] = useState({ buy: newIdempotencyKey(), sale: newIdempotencyKey(), eggUse: newIdempotencyKey(), eggSale: newIdempotencyKey(), health: newIdempotencyKey() });
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  const group = report?.group;
+  const poultry = group?.species === 'CHICKEN';
+  const layers = poultry && group?.purpose !== 'BROILER';
+
+  const load = useCallback(async () => {
+    setError(''); setMessage('');
+    try {
+      const [r, m, p, all] = await Promise.all([api<FlockReport>(`${flock}/report?from=${range.from}&to=${range.to}`), api<Movement[]>(`${flock}/movements`),
+        api<PlanItem[]>(`${flock}/plan`), api<FlockGroup[]>(`${base}/flocks`)]);
+      setReport(r); setMoves(m); setPlan(p); setOthers(all.filter(g => g.id !== r.group.id && g.species === r.group.species));
+    } catch (e) {
+      setError(describeError(e));
+    }
+  }, [base, flock, range.from, range.to]);
+  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    if (!poultry) return;
+    api<BatchDay>(`${flock}/days/${date}`).then(d => { setDay(d); setDayForm(toForm(d)); }).catch(e => setError(describeError(e)));
+  }, [flock, date, poultry]);
+  useEffect(() => {
+    if (poultry && can(tenant, 'INVENTORY_READ')) api<Item[]>(`/api/v1/tenants/${tenant.id}/stock/items`)
+      .then(i => setFeeds(i.filter(x => x.active && x.kind === 'INPUT' && x.dimension === 'MASS'))).catch(() => undefined);
+  }, [poultry, tenant]);
+  useEffect(() => {
+    if (!canMoney) return;
+    const fin = `/api/v1/tenants/${tenant.id}/finance`;
+    Promise.all([api<Party[]>(`${fin}/parties`), api<FinancialAccount[]>(`${fin}/accounts`)])
+      .then(([p, a]) => { setParties(p.filter(x => x.active)); setAccounts(a.filter(x => x.active)); }).catch(() => undefined);
+  }, [canMoney, tenant.id]);
+
+  /** Sends a change, reloads and then shows the confirmation (reloading clears messages). */
+  async function send<T>(path: string, method: 'POST' | 'PUT' | 'DELETE', body: unknown, k: keyof typeof keys | null, done: (r: T) => string) {
+    setError(''); setMessage('');
+    try {
+      const result = await api<T>(path, { method, body, headers: k ? { 'Idempotency-Key': keys[k] } : undefined });
+      if (k) setKeys(x => ({ ...x, [k]: newIdempotencyKey() }));
+      await load();
+      setMessage(done(result));
+    } catch (e) {
+      setError(describeError(e));
+    }
+  }
+  const payer = (f: { partyId: string; financialAccountId: string }) => ({ partyId: f.partyId ? Number(f.partyId) : null,
+    financialAccountId: !f.partyId && f.financialAccountId ? Number(f.financialAccountId) : null });
+  const payerOk = (f: { partyId: string; financialAccountId: string }) => Boolean(f.partyId || f.financialAccountId);
+  if (!report || !group) return error ? <ErrorBanner message={error} /> : <Loading />;
+  const open = canWrite && !group.closed;
+  const listPath = `/t/${tenant.id}/livestock/${poultry ? 'poultry' : 'small-stock'}`;
+
+  function saveDay(e: React.FormEvent) {
+    e.preventDefault();
+    if (!dayForm) return;
+    const f = dayForm;
+    if (![f.deaths, f.culls, f.eggsGood, f.eggsCracked, f.eggsBroken, f.weightBirds].every(whole) || ![f.feedKg, f.weightKg].every(decimal)) { setError(t('errors.wholeNumbers')); return; }
+    if (Boolean(f.feedItemId) !== Boolean(f.feedKg)) { setError(t('errors.feed')); return; }
+    void send<BatchDay>(`${flock}/days/${date}`, 'PUT', { deaths: num(f.deaths), deathCause: f.deathCause || null, culls: num(f.culls), eggsGood: num(f.eggsGood),
+      eggsCracked: num(f.eggsCracked), eggsBroken: num(f.eggsBroken), feedItemId: f.feedItemId ? Number(f.feedItemId) : null, feedKg: f.feedKg || null,
+      weightBirds: num(f.weightBirds), weightKg: f.weightKg || null, notes: f.notes || null }, null,
+    d => { setDay(d); setDayForm(toForm(d)); return t('dayRecordSaved', { date: formatDate(date, lang) }); });
+  }
+
+  function saveMove(e: React.FormEvent) {
+    e.preventDefault();
+    const counting = move.kind === 'COUNT';
+    if (counting ? !/^\d{1,7}$/.test(move.countedHeads) : !/^\d{1,7}$/.test(move.heads) || Number(move.heads) <= 0) { setError(t('errors.heads')); return; }
+    if (move.kind === 'MOVED' && !move.toGroupId) { setError(t('errors.toGroup')); return; }
+    void send<Movement[]>(`${flock}/movements`, 'POST', { date: move.date, kind: move.kind, heads: counting ? null : Number(move.heads),
+      countedHeads: counting ? Number(move.countedHeads) : null, toGroupId: move.kind === 'MOVED' ? Number(move.toGroupId) : null, cause: move.cause || null }, null,
+    () => { setMove({ ...move, heads: '', countedHeads: '', cause: '' }); return t('headsRecorded'); });
+  }
+
+  const kinds = ['DIED', 'CULLED', 'RECEIVED', 'MOVED', 'COUNT', ...(poultry ? [] : ['BORN'])];
+  return (
+    <>
+      <div className="crop-page-head">
+        <div>
+          <p><Link to={listPath}>{t(poultry ? 'poultry' : 'smallStock')}</Link></p>
+          <h2>{group.name}{group.closed && <small> · {t('closed')}</small>}</h2>
+          <p>{t(`species.${group.species}`)} · {t(`purpose.${group.purpose}`)}{group.placedOn && <> · {t(poultry ? 'placedOn' : 'startedOn')} {formatDate(group.placedOn, lang)}</>}
+            {group.strain && <> · {group.strain}</>} · <b>{t('headsNow', { count: formatNumber(report.heads, lang, 0) })}</b></p>
+        </div>
+      </div>
+      <ErrorBanner message={error} />
+      {message && <p className="hint" role="status">{message}</p>}
+
+      <div className="form-card form-grid filters">
+        <label>{tf('from')}<input type="date" value={range.from} onChange={e => setRange({ ...range, from: e.target.value })} /></label>
+        <label>{tf('to')}<input type="date" value={range.to} onChange={e => setRange({ ...range, to: e.target.value })} /></label>
+      </div>
+      <FigureCards title={tf('rangeLabel', { from: formatDate(report.period.from, lang), to: formatDate(report.period.to, lang) })} f={report.period}
+                   poultry={poultry} layers={layers} showMoney={showMoney} />
+      {report.sincePlacement && <FigureCards title={t('sincePlacement')} f={report.sincePlacement} poultry={poultry} layers={layers} showMoney={showMoney} />}
+
+      {poultry && dayForm && day && (
+        <>
+          <h3 className="section-space">{t('dailyRecord')}</h3>
+          <form className="form-card form-grid" noValidate onSubmit={saveDay}>
+            <label>{tf('date')}<input type="date" max={today()} value={date} onChange={e => setDate(e.target.value)} /></label>
+            <p className="hint">{t('headsAtEnd', { count: formatNumber(day.headsAtEnd, lang, 0) })}</p>
+            {day.warnings.map(w => <p key={w} className="error-banner full" role="alert">{t(`warning.${w}`)}</p>)}
+            <label>{t('deaths')}<input inputMode="numeric" disabled={!open} value={dayForm.deaths} onChange={e => setDayForm({ ...dayForm, deaths: e.target.value })} /></label>
+            <label>{t('deathCause')} <small>{tc('optional')}</small><input maxLength={120} disabled={!open} value={dayForm.deathCause} onChange={e => setDayForm({ ...dayForm, deathCause: e.target.value })} /></label>
+            <label>{t('culls')}<input inputMode="numeric" disabled={!open} value={dayForm.culls} onChange={e => setDayForm({ ...dayForm, culls: e.target.value })} /></label>
+            {layers && <>
+              <label>{t('eggsGood')}<input inputMode="numeric" disabled={!open} value={dayForm.eggsGood} onChange={e => setDayForm({ ...dayForm, eggsGood: e.target.value })} /></label>
+              <label>{t('eggsCracked')}<input inputMode="numeric" disabled={!open} value={dayForm.eggsCracked} onChange={e => setDayForm({ ...dayForm, eggsCracked: e.target.value })} /></label>
+              <label>{t('eggsBroken')}<input inputMode="numeric" disabled={!open} value={dayForm.eggsBroken} onChange={e => setDayForm({ ...dayForm, eggsBroken: e.target.value })} /></label>
+            </>}
+            <label>{t('feed')}<select disabled={!open} value={dayForm.feedItemId} onChange={e => setDayForm({ ...dayForm, feedItemId: e.target.value })}>
+              <option value="">—</option>{feeds.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}</select></label>
+            <label>{t('feedKg')}<input inputMode="decimal" disabled={!open} value={dayForm.feedKg} onChange={e => setDayForm({ ...dayForm, feedKg: e.target.value })} /></label>
+            <label>{t('weightBirds')} <small>{tc('optional')}</small><input inputMode="numeric" disabled={!open} value={dayForm.weightBirds} onChange={e => setDayForm({ ...dayForm, weightBirds: e.target.value })} /></label>
+            <label>{t('weightKg')} <small>{tc('optional')}</small><input inputMode="decimal" disabled={!open} value={dayForm.weightKg} onChange={e => setDayForm({ ...dayForm, weightKg: e.target.value })} /></label>
+            <label className="full">{t('notes')} <small>{tc('optional')}</small><input maxLength={300} disabled={!open} value={dayForm.notes} onChange={e => setDayForm({ ...dayForm, notes: e.target.value })} /></label>
+            <p className="hint full">{t('dailyRecordHelp')}</p>
+            {open && <div className="form-actions full"><button className="primary">{t('saveDay')}</button></div>}
+          </form>
+        </>
+      )}
+
+      <h3 className="section-space">{t('headMovements')}</h3>
+      {open && (
+        <form className="form-card form-grid" noValidate onSubmit={saveMove}>
+          <label>{tf('date')}<input type="date" max={today()} value={move.date} onChange={e => setMove({ ...move, date: e.target.value })} /></label>
+          <label>{t('whatHappened')}<select value={move.kind} onChange={e => setMove({ ...move, kind: e.target.value })}>
+            {kinds.map(k => <option key={k} value={k}>{t(`moveKind.${k}`)}</option>)}</select></label>
+          {move.kind === 'COUNT'
+            ? <label>{t('countedHeads')}<input inputMode="numeric" value={move.countedHeads} onChange={e => setMove({ ...move, countedHeads: e.target.value })} /></label>
+            : <label>{t('heads')}<input inputMode="numeric" value={move.heads} onChange={e => setMove({ ...move, heads: e.target.value })} /></label>}
+          {move.kind === 'MOVED' && <label>{t('toGroup')}<select value={move.toGroupId} onChange={e => setMove({ ...move, toGroupId: e.target.value })}>
+            <option value="">—</option>{others.filter(g => !g.closed).map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></label>}
+          <label className="full">{t('cause')} <small>{tc('optional')}</small><input maxLength={300} value={move.cause} onChange={e => setMove({ ...move, cause: e.target.value })} /></label>
+          {move.kind === 'COUNT' && <p className="hint full">{t('countHelp')}</p>}
+          <div className="form-actions full"><button className="secondary">{t('recordHeads')}</button></div>
+        </form>
+      )}
+      {moves.length === 0 ? <p className="hint">{t('noEvents')}</p> : (
+        <table className="data-table">
+          <thead><tr><th>{tf('date')}</th><th>{t('whatHappened')}</th><th className="num">{t('heads')}</th><th>{t('cause')}</th><th /></tr></thead>
+          <tbody>{moves.map(m => (
+            <tr key={m.id} className={m.reversed ? 'muted' : undefined}>
+              <td>{formatDate(m.date, lang)}</td>
+              <td>{t(`movement.${m.kind}`)}{m.pairGroupName && <small> · {m.pairGroupName}</small>}{m.reversed && <small> · {t('reversed')}</small>}
+                {m.documentId && <small> · <Link to={`/t/${tenant.id}/finance/records/${m.documentId}`}>{t('record')}</Link></small>}</td>
+              <td className="num">{formatNumber(m.heads, lang, 0)}{m.kg != null && <small> · {formatNumber(m.kg, lang, 2)} kg</small>}</td>
+              <td>{m.cause ?? ''}</td>
+              <td>{open && !m.documentId && !m.batchDayId && !['PLACED', 'BOUGHT'].includes(m.kind) && (
+                <button type="button" className="icon-button" aria-label={t('removeMovement')}
+                        onClick={() => { if (window.confirm(t('confirmRemoveMovement'))) void send(`${base}/flock-movements/${m.id}`, 'DELETE', undefined, null, () => t('movementRemoved')); }}>
+                  <Trash2 size={16} aria-hidden /></button>)}</td>
+            </tr>
+          ))}</tbody>
+        </table>
+      )}
+
+      {open && !poultry && (
+        <>
+          <h3 className="section-space">{t('births')}</h3>
+          <form className="form-card form-grid" noValidate onSubmit={e => {
+            e.preventDefault();
+            if (!/^\d{1,2}$/.test(birth.alive) || !whole(birth.dead)) { setError(t('errors.wholeNumbers')); return; }
+            void send(`${flock}/births`, 'POST', { date: birth.date, alive: Number(birth.alive), dead: num(birth.dead) }, null,
+              () => { setBirth({ ...birth, alive: '', dead: '' }); return t('birthsRecorded'); });
+          }}>
+            <label>{tf('date')}<input type="date" max={today()} value={birth.date} onChange={e => setBirth({ ...birth, date: e.target.value })} /></label>
+            <label>{t('bornAlive')}<input inputMode="numeric" value={birth.alive} onChange={e => setBirth({ ...birth, alive: e.target.value })} /></label>
+            <label>{t('bornDead')}<input inputMode="numeric" value={birth.dead} onChange={e => setBirth({ ...birth, dead: e.target.value })} /></label>
+            <div className="form-actions full"><button className="secondary">{t('recordBirths')}</button></div>
+          </form>
+        </>
+      )}
+
+      {open && canMoney && (
+        <>
+          <h3 className="section-space">{t('buyMore')}</h3>
+          <form className="form-card form-grid" noValidate onSubmit={e => {
+            e.preventDefault();
+            if (!/^\d{1,7}$/.test(buy.heads) || Number(buy.heads) <= 0 || !money(buy.amount) || !payerOk(buy)) { setError(t('errors.purchase')); return; }
+            void send(`${flock}/purchases`, 'POST', { date: buy.date, heads: Number(buy.heads), bill: { amount: buy.amount, ...payer(buy) } }, 'buy',
+              () => { setBuy({ ...buy, heads: '', amount: '' }); return t('purchaseRecorded'); });
+          }}>
+            <label>{tf('date')}<input type="date" max={today()} value={buy.date} onChange={e => setBuy({ ...buy, date: e.target.value })} /></label>
+            <label>{t('heads')}<input inputMode="numeric" value={buy.heads} onChange={e => setBuy({ ...buy, heads: e.target.value })} /></label>
+            <label>{t('billAmountTotal')}<input inputMode="decimal" value={buy.amount} onChange={e => setBuy({ ...buy, amount: e.target.value })} /></label>
+            <PayerFields parties={parties} accounts={accounts} f={buy} set={p => setBuy({ ...buy, ...p })} partyLabel={t('boughtFrom')} accountLabel={tf('paidFrom')} />
+            <div className="form-actions full"><button className="secondary">{t('recordPurchase')}</button></div>
+          </form>
+
+          <h3 className="section-space">{t(poultry ? 'sellBirds' : 'sellAnimals')}</h3>
+          <form className="form-card form-grid" noValidate onSubmit={e => {
+            e.preventDefault();
+            if (!/^\d{1,7}$/.test(sale.heads) || Number(sale.heads) <= 0 || !decimal(sale.kg) || !money(sale.rate) || !payerOk(sale)) { setError(t('errors.sale')); return; }
+            if (sale.rateBasis === 'KG' && !sale.kg) { setError(t('errors.saleKg')); return; }
+            void send<Movement>(`${flock}/sales`, 'POST', { date: sale.date, heads: Number(sale.heads), kg: sale.kg || null, rateBasis: sale.rateBasis, rate: sale.rate, ...payer(sale) }, 'sale',
+              () => { setSale({ ...sale, heads: '', kg: '', rate: '' }); return t('saleOfHeadsRecorded'); });
+          }}>
+            <label>{tf('date')}<input type="date" max={today()} value={sale.date} onChange={e => setSale({ ...sale, date: e.target.value })} /></label>
+            <label>{t('heads')}<input inputMode="numeric" value={sale.heads} onChange={e => setSale({ ...sale, heads: e.target.value })} /></label>
+            <label>{t('liveWeightKg')}<input inputMode="decimal" value={sale.kg} onChange={e => setSale({ ...sale, kg: e.target.value })} /></label>
+            <label>{t('rateBasis')}<select value={sale.rateBasis} onChange={e => setSale({ ...sale, rateBasis: e.target.value })}>
+              <option value="KG">{t('perKg')}</option><option value="HEAD">{t('perHead')}</option></select></label>
+            <label>{t('rate')}<input inputMode="decimal" value={sale.rate} onChange={e => setSale({ ...sale, rate: e.target.value })} /></label>
+            <PayerFields parties={parties} accounts={accounts} f={sale} set={p => setSale({ ...sale, ...p })} partyLabel={t('buyer')} accountLabel={tf('receivedInto')} />
+            <div className="form-actions full"><button className="secondary">{t('recordSale')}</button></div>
+          </form>
+        </>
+      )}
+
+      {layers && canWrite && (
+        <>
+          <h3 className="section-space">{t('eggsOut')}</h3>
+          <form className="form-card form-grid" noValidate onSubmit={e => {
+            e.preventDefault();
+            if (![eggUse.homeUse, eggUse.damaged].every(whole) || (!eggUse.homeUse && !eggUse.damaged)) { setError(t('errors.wholeNumbers')); return; }
+            void send<RecordRefLike[]>(`${base}/egg-uses`, 'POST', { date: eggUse.date, homeUse: num(eggUse.homeUse), damaged: num(eggUse.damaged), reason: eggUse.reason || null }, 'eggUse',
+              r => { setEggUse({ ...eggUse, homeUse: '', damaged: '', reason: '' }); return t('usesRecorded', { count: String(r.length) }); });
+          }}>
+            <label>{tf('date')}<input type="date" max={today()} value={eggUse.date} onChange={e => setEggUse({ ...eggUse, date: e.target.value })} /></label>
+            <label>{t('eggsHomeUse')}<input inputMode="numeric" value={eggUse.homeUse} onChange={e => setEggUse({ ...eggUse, homeUse: e.target.value })} /></label>
+            <label>{t('eggsDamaged')}<input inputMode="numeric" value={eggUse.damaged} onChange={e => setEggUse({ ...eggUse, damaged: e.target.value })} /></label>
+            {eggUse.damaged && <label>{t('discardReason')}<input maxLength={300} value={eggUse.reason} onChange={e => setEggUse({ ...eggUse, reason: e.target.value })} /></label>}
+            <p className="hint full">{t('eggUsesHelp')}</p>
+            <div className="form-actions full"><button className="secondary">{t('recordUses')}</button></div>
+          </form>
+          {canMoney && (
+            <form className="form-card form-grid section-space" noValidate onSubmit={e => {
+              e.preventDefault();
+              if (!/^\d{1,9}(\.\d{1,2})?$/.test(eggSale.quantity) || !money(eggSale.amount) || !payerOk(eggSale)) { setError(t('errors.sale')); return; }
+              void send<RecordRefLike>(`${base}/egg-sales`, 'POST', { date: eggSale.date, groupId: group.id, quantity: eggSale.quantity, unit: eggSale.unit,
+                amount: eggSale.amount, ...payer(eggSale) }, 'eggSale', r => { setEggSale({ ...eggSale, quantity: '', amount: '' }); return t('saleRecorded', { number: r.number }); });
+            }}>
+              <h4 className="full">{t('sellEggs')}</h4>
+              <label>{tf('date')}<input type="date" max={today()} value={eggSale.date} onChange={e => setEggSale({ ...eggSale, date: e.target.value })} /></label>
+              <label>{t('quantity')}<input inputMode="decimal" value={eggSale.quantity} onChange={e => setEggSale({ ...eggSale, quantity: e.target.value })} /></label>
+              <label>{t('eggUnit')}<select value={eggSale.unit} onChange={e => setEggSale({ ...eggSale, unit: e.target.value })}>
+                {['piece', 'dozen', 'tray'].map(u => <option key={u} value={u}>{t(`eggUnits.${u}`)}</option>)}</select></label>
+              <label>{t('billAmountTotal')}<input inputMode="decimal" value={eggSale.amount} onChange={e => setEggSale({ ...eggSale, amount: e.target.value })} /></label>
+              <PayerFields parties={parties} accounts={accounts} f={eggSale} set={p => setEggSale({ ...eggSale, ...p })} partyLabel={t('buyer')} accountLabel={tf('receivedInto')} />
+              <div className="form-actions full"><button className="secondary">{t('recordSale')}</button></div>
+            </form>
+          )}
+        </>
+      )}
+
+      <h3 className="section-space">{t('healthPlan')}</h3>
+      <p className="hint">{t('healthPlanHelp')}</p>
+      {plan.length === 0 ? <p className="hint">{t('noPlan')}</p> : (
+        <table className="data-table">
+          <thead><tr><th>{t('dueLabel')}</th><th>{t('kindLabel')}</th><th>{t('description')}</th><th /></tr></thead>
+          <tbody>{plan.map(p => (
+            <tr key={p.id}>
+              <td>{formatDate(p.dueOn, lang)}</td><td>{t(`due.${p.kind}`)}</td><td>{p.description}</td>
+              <td>{p.doneEventId ? t('done') : open && (
+                <button type="button" className="secondary" onClick={() => void send(`${base}/health`, 'POST', { groupId: group.id, kind: p.kind, date: today(),
+                  description: p.description, planItemId: p.id }, 'health', () => t('healthRecorded'))}>{t('markDoneToday')}</button>)}</td>
+            </tr>
+          ))}</tbody>
+        </table>
+      )}
+      {open && (
+        <form className="form-card form-grid" noValidate onSubmit={e => {
+          e.preventDefault();
+          if (!planForm.description.trim()) { setError(t('errors.planDescription')); return; }
+          void send(`${flock}/plan`, 'POST', { kind: planForm.kind, description: planForm.description.trim(), dueOn: planForm.dueOn }, null,
+            () => { setPlanForm({ ...planForm, description: '' }); return t('planSaved'); });
+        }}>
+          <label>{t('kindLabel')}<select value={planForm.kind} onChange={e => setPlanForm({ ...planForm, kind: e.target.value })}>
+            {HEALTH_KINDS.map(k => <option key={k} value={k}>{t(`due.${k}`)}</option>)}</select></label>
+          <label>{t('description')}<input maxLength={300} placeholder={t(poultry ? 'planExample' : 'vaccineExample')} value={planForm.description}
+                                          onChange={e => setPlanForm({ ...planForm, description: e.target.value })} /></label>
+          <label>{t('dueLabel')}<input type="date" value={planForm.dueOn} onChange={e => setPlanForm({ ...planForm, dueOn: e.target.value })} /></label>
+          <div className="form-actions full"><button className="secondary">{t('addPlanItem')}</button></div>
+          {poultry && others.length > 0 && <>
+            <label>{t('copyPlanFrom')}<select value={planForm.copyFrom} onChange={e => setPlanForm({ ...planForm, copyFrom: e.target.value })}>
+              <option value="">—</option>{others.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></label>
+            <p className="hint">{t('copyPlanHelp')}</p>
+            <div className="form-actions full"><button type="button" className="secondary" disabled={!planForm.copyFrom}
+              onClick={() => void send<PlanItem[]>(`${flock}/plan/copy`, 'POST', { fromGroupId: Number(planForm.copyFrom) }, null, r => t('planCopied', { count: String(r.length) }))}>
+              {t('copyPlan')}</button></div>
+          </>}
+        </form>
+      )}
+    </>
+  );
+}
+
+/** The batch's or herd's figures for a period (J8); money only with FINANCE_READ. */
+function FigureCards({ title, f, poultry, layers, showMoney }: { title: string; f: Figures; poultry: boolean; layers: boolean; showMoney: boolean }) {
+  const t = useNs('livestock');
+  const tf = useNs('fin');
+  const lang = currentLanguage();
+  const n = (v: number | null, d = 2) => (v == null ? '—' : formatNumber(v, lang, d));
+  const m = (v: number | null) => (v == null ? '—' : formatMoney(v, lang));
+  return (
+    <>
+      <h3 className="section-space">{title}</h3>
+      <div className="finance-stats">
+        <div className="finance-stat"><span>{t('openingHeads')}</span><b>{n(f.openingHeads, 0)}</b><small>{t('closingHeads')} {n(f.closingHeads, 0)}</small></div>
+        <div className="finance-stat"><span>{t('died')}</span><b>{n(f.died, 0)}</b><small>{t('mortality')} {n(f.mortalityPercent)}</small></div>
+        <div className="finance-stat"><span>{t('soldHeads')}</span><b>{n(f.sold, 0)}</b>{f.soldKg > 0 && <small>{n(f.soldKg)} kg</small>}</div>
+        {!poultry && <div className="finance-stat"><span>{t('bornHeads')}</span><b>{n(f.born, 0)}</b></div>}
+        {layers && <div className="finance-stat"><span>{t('eggs')}</span><b>{n(f.eggs, 0)}</b><small>{t('henDay')} {n(f.henDayPercent, 1)}</small></div>}
+        {poultry && <div className="finance-stat"><span>{t('feedKg')}</span><b>{n(f.feedKg)}</b>
+          <small>{layers ? `${t('feedPerDozen')} ${n(f.feedPerDozen)}` : `${t('fcr')} ${n(f.fcr)} · ${t('averageWeight')} ${n(f.averageWeight, 3)}`}</small></div>}
+        {showMoney && <div className="finance-stat"><span>{t('profit')}</span><b>{m(f.profit)}</b>
+          <small>{tf('revenue')} {m(f.revenue)} · {tf('costs')} {m(f.costs)}</small></div>}
+        {showMoney && <div className="finance-stat"><span>{t(layers ? 'costPerEgg' : poultry ? 'costPerKg' : 'costPerHeadMonth')}</span>
+          <b>{m(layers ? f.costPerEgg : poultry ? f.costPerKg : f.costPerHeadMonth)}</b></div>}
+      </div>
+    </>
+  );
+}
+
+type Payer = { partyId: string; financialAccountId: string };
+/** Who paid or was paid: a party (on credit) or, without one, the cash or bank account. */
+function PayerFields({ f, set, partyLabel, accountLabel, parties, accounts }: { f: Payer; set: (p: Partial<Payer>) => void; partyLabel: string;
+  accountLabel: string; parties: Party[]; accounts: FinancialAccount[] }) {
+  const tc = useNs('common');
+  return <>
+    <label>{partyLabel} <small>{tc('optional')}</small><select value={f.partyId} onChange={e => set({ partyId: e.target.value })}>
+      <option value="">—</option>{parties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+    {!f.partyId && <label>{accountLabel}<select value={f.financialAccountId} onChange={e => set({ financialAccountId: e.target.value })}>
+      <option value="">—</option>{accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>}
+  </>;
+}
