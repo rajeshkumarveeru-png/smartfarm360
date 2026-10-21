@@ -3,8 +3,9 @@
 ## Current state
 
 - **Phase:** 11 (organic resources) complete on branch `feature/phase-11-organic` (based on
-  `feature/phase-10-aquaculture`). Next: Phase 12 (processing and trading), starting with its design. Nothing is pushed
-  yet.
+  `feature/phase-10-aquaculture`). Phase 12 (processing and trading) started on
+  `feature/phase-12-processing`: the [processing and trading design](processing/processing-and-trading.md) is awaiting
+  review; no Phase 12 code yet. Nothing is pushed yet.
 - **Production readiness:** not ready. Authentication, roles, tenant isolation, audit, the finance core and stock with
   movements are in place and tested, but no email provider is configured and hosting/backups are undecided.
 

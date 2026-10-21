@@ -65,7 +65,7 @@ Approved design: [dashboard and reports](reports/dashboard-and-reports.md) (H1�
 9. Poultry batches and eggs; goat/sheep herds — done 2026-10-21 ([poultry, goats and sheep](livestock/poultry-goats-sheep.md), J1–J15). Left for later: overhead allocation to batches and herds (J15); a weekly feed entry that splits across days; offline batch records on the phone (Phase 13)
 10. Aquaculture — done 2026-10-21 ([aquaculture](aquaculture/aquaculture.md), K1–K15). Left for later: overhead allocation to pond cycles (K15); fish into stock when processing and cold storage arrive (Phase 12); reversing harvest charges with the sale; offline pond records on the phone (Phase 13)
 11. Organic resources — done 2026-10-21 ([organic resources](organic/organic-resources.md), L1–L15). Left for later: certification records (L10); overhead allocation to organic batches (L15); refusing bills to finished batches; offline compost records on the phone (Phase 13)
-12. Processing and trading (grading, drying, packaging, yields, traceability from harvest to finished goods)
+12. Processing and trading (grading, drying, packaging, yields, traceability from harvest to finished goods) — design for review: [processing and trading](processing/processing-and-trading.md) (M1–M15)
 
 ## Phase 13 — Mobile offline
 
