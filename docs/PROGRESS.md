@@ -3,7 +3,9 @@
 ## Current state
 
 - **Phase:** 6 (workforce and assets) complete on branch `feature/phase-6-workforce` (based on `feature/phase-5-crops`).
-  Next: Phase 7 (dashboard and core reports). Nothing is pushed yet.
+  Phase 7 (dashboard and core reports) started on `feature/phase-7-reports`: the
+  [dashboard and reports design](reports/dashboard-and-reports.md) is awaiting review; no Phase 7 code yet. Nothing is
+  pushed yet.
 - **Production readiness:** not ready. Authentication, roles, tenant isolation, audit, the finance core and stock with
   movements are in place and tested, but no email provider is configured and hosting/backups are undecided.
 

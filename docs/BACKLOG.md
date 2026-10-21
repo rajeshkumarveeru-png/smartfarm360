@@ -53,6 +53,8 @@ Approved design: [workforce and assets](workforce/workforce-and-assets.md) (G1�
 
 ## Phase 7 — Dashboard and core reports
 
+Design for review: [dashboard and reports](reports/dashboard-and-reports.md) (H1–H14).
+
 - Income vs expenses, cash/bank balances, receivables/payables, monthly P&L, category breakdown, activity
   profitability, inventory valuation, wages, maintenance. CSV/XLSX/PDF exports with tenant checks.
 - Every report states date range, inclusion rules and actual vs estimated.
