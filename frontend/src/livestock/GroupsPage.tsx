@@ -5,6 +5,7 @@ import { ErrorBanner } from '../components/common';
 import { useNs } from '../i18n';
 import { describeError } from '../lib/errors';
 import { can } from '../lib/nav';
+import { CollectManure } from '../organic/BatchesPage';
 import { useGroups } from './LivestockLayout';
 import type { Purpose } from './types';
 import { PURPOSES } from './types';
@@ -52,6 +53,7 @@ export default function GroupsPage() {
           ))}</tbody>
         </table>
       )}
+      <CollectManure />
     </>
   );
 }

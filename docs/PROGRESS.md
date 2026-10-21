@@ -2,10 +2,9 @@
 
 ## Current state
 
-- **Phase:** 10 (aquaculture) complete on branch `feature/phase-10-aquaculture` (based on
-  `feature/phase-9-poultry-goats`). Phase 11 (organic resources) started on
-  `feature/phase-11-organic`: the [organic resources design](organic/organic-resources.md) is awaiting review; no
-  Phase 11 code yet. Nothing is pushed yet.
+- **Phase:** 11 (organic resources) complete on branch `feature/phase-11-organic` (based on
+  `feature/phase-10-aquaculture`). Next: Phase 12 (processing and trading), starting with its design. Nothing is pushed
+  yet.
 - **Production readiness:** not ready. Authentication, roles, tenant isolation, audit, the finance core and stock with
   movements are in place and tested, but no email provider is configured and hosting/backups are undecided.
 
@@ -979,6 +978,122 @@ Not verified:
   tests and the screen tests).
 - GitHub Actions (nothing has been pushed).
 
+## Phase 11 — Organic resources (2026-10-21)
+
+Commits on `feature/phase-11-organic` (based on `feature/phase-10-aquaculture`):
+
+- `b67c3b5`: design.
+- A build commit with the backend, web, mobile, verification and docs.
+
+### Features completed
+
+- **Approved design.** [organic resources](organic/organic-resources.md) is implemented with L1–L15 as recommended.
+  Implementation notes are in section 13 of the design.
+- **Internal transfers** (L4, L5, L9, L12; posting rule P17):
+  - A new reversible record, *Own produce used* (`ITRF`), moves the farm's own produce from stock to another activity:
+    compost to a field, fodder to the herd, dung into a compost pit.
+  - It is never income. When cost moves, it is a net-zero line on the new account *Own farm inputs* (5650). The farm's
+    total profit is unchanged.
+  - Cost moves at the source's average cost per unit so far, capped at its costs not yet moved, and is shown before
+    saving. Organic batch output moves at average cost by default; other produce moves at nil unless an owner or
+    accountant chooses average cost.
+  - A stock feature for every farm business: *Stock → Use own produce on another activity*, with lots for harvests
+    that track them.
+- **Organic batches** (L1, L2, L6, L7): compost pits, vermicompost beds and liquid manures as cost objects, with a log
+  (turned, watered, added, checked, worms), output into stock at nil value, and finishing and reopening.
+- **Manure collection** (L3): dung and litter into stock as produce of the herd or batch, from the organic and
+  livestock pages.
+- **Figures** (L8): input kg, output, yield, costs, cost moved out, revenue, profit, cost per kg and stock left, for
+  the period and the whole batch.
+- **Reports** (L14): *Compost and manure batches* and *Own produce used on the farm*, exported as CSV and Excel, and
+  in the report catalogue. Activity reports show *Own farm inputs* as a cost line.
+- **Dashboard** (L14): batches past their expected ready date.
+- **Module** (L11): *Organic manure and compost* is available, off by default, with new permissions `ORGANIC_READ`
+  and `ORGANIC_WRITE`.
+- **Web**: an *Organic manure* section with Batches, a batch page and Reports, and the own-produce page in Stock.
+- **Phone** (L13): *More → Compost*: a batch log entry, output, compost spread on a field, and manure collected.
+  Online only.
+
+### Database migrations
+
+`013-organic.yaml` contains two changesets:
+
+- `049-organic-schema`:
+  - Adds the cost object kind `ORGANIC_BATCH`, the document type `INTERNAL_TRANSFER` (allowed a zero total), and the
+    account 5650 *Own farm inputs*.
+  - Adds the tables `sf_internal_transfers`, `sf_organic_batches` and `sf_organic_logs`. All have tenant keys and
+    composite foreign keys.
+- `050-organic-seed`: the permissions and their role grants. Existing farm businesses keep the module off.
+
+These were applied to the local database on 2026-10-21, after a `pg_dump` backup (`smartfarm360-before-phase11.backup`).
+No business data was changed.
+
+### APIs added
+
+- Under `/api/v1/tenants/{tenantId}/stock/internal-transfers` (every farm business): `POST /preview`, `POST`, and
+  `GET` (accepts `format=csv|xlsx`).
+- Under `/api/v1/tenants/{tenantId}/organic` (module *Organic manure and compost*):
+  - `GET|POST /batches`, `GET|PUT /batches/{id}`, `POST /batches/{id}/finish`, `POST /batches/{id}/reopen`
+  - `GET|POST /batches/{id}/logs`, `DELETE /logs/{id}`
+  - `GET|POST /batches/{id}/outputs`
+  - `GET /batches/{id}/report`, `GET /reports/batches` (accepts `format=csv|xlsx`)
+
+### Tests and evidence
+
+| Command | Result |
+|---|---|
+| `backend: gradlew test --rerun bootJar` | Passed: **697 tests, 0 failures** (see below) |
+| `frontend: npm run lint`, `tsc --noEmit`, `npm run build` | Passed; the bundle is still over 500 kB |
+| `frontend: npm test` | Passed: **71 tests**, including 5 new organic and own-produce screen tests |
+| `mobile: npx tsc --noEmit`, `npm test`, `npx expo install --check` | Passed: **44 tests**, including 3 new compost tests |
+| Manual browser check | Passed after one fix (see below) |
+
+The backend run includes:
+
+- The golden scenario from section 8 of the design. Every figure is asserted:
+  - fodder: nil by default; at average cost ₹0.50 per kg, ₹3,000 moves; fodder plot costs ₹9,000 and herd costs ₹3,000;
+    the farm's July profit unchanged;
+  - vermicompost: 75 days, 2,500 kg in, 1,000 kg out, yield 40.0%, costs ₹10,000, ₹10.00 per kg;
+  - 600 kg to Groundnut at average cost: ₹6,000 moved, Groundnut costs ₹6,000, the farm's October profit unchanged;
+  - VC-1: ₹6,000 moved out, revenue ₹4,500, profit ₹500, 100 kg in stock;
+  - the reports and exports, and the books balance.
+- 8 rule tests:
+  - average cost capped at the costs not yet moved, and the quantity check against what the source produced;
+  - reversing a transfer restores both activities and the stock;
+  - only farm produce, a real target and a different activity; average cost needs a source;
+  - only an owner or accountant changes the default method;
+  - harvests that track lots are moved lot by lot;
+  - a finished batch refuses log entries and transfers in until reopened; input kg and the overdue dashboard item;
+  - permissions and the module switch, and transfers without the module;
+  - another farm business's batches, logs, items, farm and activities cannot be reached or referenced.
+- An upgrade migration test: existing farms keep Organic manure off; the grants, account 5650, the new cost object kind
+  and the zero-total transfer record are in place.
+- 13 module-boundary rules.
+- 520 generated cross-tenant cases.
+- The dashboard performance test: **689 ms** at 50,000 journal lines (the budget is 1,000 ms).
+
+One existing test changed with the approved design: the "unavailable module" check now uses Processing, because
+Organic manure is now available (L11).
+
+The manual browser check ran against backend :8081 on local PostgreSQL 18, with Vite on :5174:
+
+- Migrations 049–050 were applied at startup.
+- *Organic manure and compost* was switched on in Settings, and the menu showed *Organic manure*.
+- *Compost pit 1* was started.
+- **Defect found and fixed:** moving 50 kg of Samba paddy into the pit was refused ("Enter the lot or batch number"),
+  because harvests track lots and the transfer had no lot. The transfer now takes a lot, the web form offers the item's
+  open lots, and a rule test covers it. After the fix the transfer was recorded as `ITRF/2026-27/0001` at nil cost, and
+  the batch showed 50 kg of input.
+- A *Turned* log entry was recorded. The dashboard loaded with no failed tiles. The backend log shows 0 errors and no
+  secret values.
+
+Not verified:
+
+- A real phone.
+- Batch output, compost sales and average-cost transfers in the browser (they are covered by the API golden and rule
+  tests and the screen tests).
+- GitHub Actions (nothing has been pushed).
+
 ## Known gaps and defects
 
 Security and platform:
@@ -995,12 +1110,12 @@ Finance and stock:
 - Phase 1 crop activity `cost` and harvest `sale_value` stay memo history outside the accounts (D7, F4).
 - Crop photos wait for attachment storage (ADR 0009); weather comes only from farmer entries.
 - The web bundle is over 500 kB; split the bundle by section before production.
-- No internal transfers of own produce or manure yet (P17, Phases 5 → 11); monthly depreciation runs arrived in Phase 6.
+- Bills assigned to a finished organic batch are not refused (finance does not know about batches).
 - The workforce labour report still shows labour cost to anyone with WORKFORCE_READ, unlike the new wages report.
 - Animal depreciation goes to the group the animal is in when the run is posted, not the group of that month (post runs monthly).
 - The daily batch record offers every stock input measured by weight as feed, not only items in the feed category.
 - Harvest charges are a separate bill; reversing a harvest sale does not reverse its charges bill.
-- Overhead is not shared out to herds, batches or pond crops (I12, J15, K15); fodder grown on the farm and fed to the herd waits for internal transfers (P17, Phase 11).
+- Overhead is not shared out to herds, batches or pond crops (I12, J15, K15).
 - Excel exports group thousands as #,##0.00, not Indian lakh grouping (an Excel format limit).
 - Payroll has no PF, ESI, TDS or minimum-wage rules (G6). There is no WDV depreciation and no machine-hour allocation to
   crops (G9, G12). Breeding animals are not depreciated until the livestock phases (G10). Recurring expenses are still

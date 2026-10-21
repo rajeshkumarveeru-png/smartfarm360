@@ -2,15 +2,15 @@ export type Category = { id: number; code: string | null; name: string | null; k
 export type FinancialAccount = { id: number; name: string; kind: 'CASH' | 'BANK' | 'UPI'; active: boolean; balance: number };
 export type Party = { id: number; name: string; phone?: string; village?: string; notes?: string; customer: boolean; supplier: boolean; lender: boolean; active: boolean; receivable: number; payable: number };
 export type Loan = { id: number; name: string; lenderPartyId: number; lenderName: string; startDate: string; outstanding: number };
-export type CostObject = { id: number; kind: 'OVERHEAD' | 'CROP_CYCLE'; name: string; cropCycleId?: number; farmId?: number; active: boolean };
+export type CostObject = { id: number; kind: 'OVERHEAD' | 'CROP_CYCLE' | 'ANIMAL_GROUP' | 'POND_CYCLE' | 'ORGANIC_BATCH'; name: string; cropCycleId?: number; farmId?: number; active: boolean };
 export type FinanceSettings = { lockDate: string | null; fiscalYearStartMonth: number };
 
 export type DocType = 'BILL' | 'SALE' | 'PAYMENT' | 'RECEIPT' | 'TRANSFER' | 'OWNER_IN' | 'OWNER_OUT' | 'LOAN_RECEIVED' | 'LOAN_REPAYMENT'
   | 'SETTLEMENT' | 'WRITE_OFF' | 'OPENING_BALANCE' | 'DEPRECIATION'
-  | 'STOCK_ISSUE' | 'STOCK_TRANSFER' | 'WASTAGE' | 'STOCK_COUNT' | 'PRODUCE_RECEIPT' | 'PURCHASE_RETURN' | 'SALE_RETURN' | 'ALLOCATION';
+  | 'STOCK_ISSUE' | 'STOCK_TRANSFER' | 'WASTAGE' | 'STOCK_COUNT' | 'PRODUCE_RECEIPT' | 'PURCHASE_RETURN' | 'SALE_RETURN' | 'ALLOCATION' | 'INTERNAL_TRANSFER';
 export const DOC_TYPES: DocType[] = ['BILL', 'SALE', 'PAYMENT', 'RECEIPT', 'TRANSFER', 'OWNER_IN', 'OWNER_OUT', 'LOAN_RECEIVED', 'LOAN_REPAYMENT',
   'SETTLEMENT', 'WRITE_OFF', 'OPENING_BALANCE', 'DEPRECIATION',
-  'STOCK_ISSUE', 'STOCK_TRANSFER', 'WASTAGE', 'STOCK_COUNT', 'PRODUCE_RECEIPT', 'PURCHASE_RETURN', 'SALE_RETURN', 'ALLOCATION'];
+  'STOCK_ISSUE', 'STOCK_TRANSFER', 'WASTAGE', 'STOCK_COUNT', 'PRODUCE_RECEIPT', 'PURCHASE_RETURN', 'SALE_RETURN', 'ALLOCATION', 'INTERNAL_TRANSFER'];
 
 export type DocumentSummary = {
   id: number; type: DocType; status: 'DRAFT' | 'POSTED' | 'REVERSED' | 'CANCELLED'; number: string | null; docDate: string; dueDate: string | null;

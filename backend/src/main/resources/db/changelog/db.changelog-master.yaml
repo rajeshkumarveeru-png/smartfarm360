@@ -23,3 +23,5 @@ databaseChangeLog:
       file: db/changelog/011-poultry-goats.yaml
   - include:
       file: db/changelog/012-aquaculture.yaml
+  - include:
+      file: db/changelog/013-organic.yaml

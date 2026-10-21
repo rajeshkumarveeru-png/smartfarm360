@@ -11,7 +11,7 @@ public enum FarmModule {
     POULTRY(true),
     GOAT_SHEEP(true),
     AQUACULTURE(true),
-    ORGANIC(false),
+    ORGANIC(true),
     PROCESSING(false),
     WORKFORCE(true),
     ASSETS(true);

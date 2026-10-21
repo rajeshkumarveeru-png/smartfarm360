@@ -66,6 +66,7 @@ export default function StockHome() {
       {actions.length > 0 && (
         <div className="quick-actions">
           {actions.map(a => <Link key={a.kind} className="secondary" to={`/t/${tenant.id}/stock/new/${a.kind}`}>{t(`kind.${a.kind}`)}</Link>)}
+          {can(tenant, 'INVENTORY_WRITE') && <Link className="secondary" to={`/t/${tenant.id}/stock/own-produce`}>{t('transfer.action')}</Link>}
           {can(tenant, 'FINANCE_WRITE') && <Link className="secondary" to={`/t/${tenant.id}/finance/new/expense`}>{t('buyStock')}</Link>}
           {can(tenant, 'FINANCE_WRITE') && <Link className="secondary" to={`/t/${tenant.id}/finance/new/sale`}>{t('sellStock')}</Link>}
         </div>

@@ -1,6 +1,7 @@
 # Organic resources design (Phase 11)
 
-- Status: **Draft for product-owner review** (2026-10-21). No Phase 11 code is written until this is approved.
+- Status: **Approved** (2026-10-21) with the recommended answers to L1–L15, and implemented in Phase 11. Implementation
+  notes are in section 13.
 - Builds on:
   - the [finance posting rules](../finance/posting-rules.md): farm produce at nil value (D3), overhead allocation as a
     net-zero move of cost between activities (P16), and the rule fixed for **internal transfers (P17)**: quantity moves
@@ -267,3 +268,33 @@ gets cross-tenant and permission tests.
 - permissions and the module switch, and transfers without the module;
 - cross-tenant tests for every new endpoint;
 - the migration on a copy of the current schema.
+
+## 13. Implementation notes (2026-10-21)
+
+- **Modules.** Internal transfers live in the `inventory` package (`InternalTransferService`, under
+  `/stock/internal-transfers`), so they work without the *Organic manure* module (L12). Organic batches are a new
+  `organic` package; `ModuleBoundaryTest` (rule `onlyReportingUsesOrganic`) allows only `reporting` to depend on it.
+- **The record (L4).** *Internal transfer* is a stock record type (`ITRF`), so the existing reversal reverses both the
+  stock movement and the cost lines. The quantity is an `ISSUE` movement on the target activity, the same as a stock
+  use. A nil-value transfer has a zero total; changeset `049` also widens the document-total check for it. `049` had not
+  been applied anywhere when this was found, so the changeset was corrected before its first run.
+- **Average cost (L5).** The source's costs so far are its posted expense lines up to the transfer date, with the cost
+  it has already moved out added back. Cost per unit = those costs ÷ the quantity of that item it has produced; the
+  move is capped at the costs not yet moved. A reversed transfer no longer counts against the source.
+- **Who chooses (L9).** The default comes from the source: organic batch output moves at average cost, anything else at
+  nil. Choosing the other method, in either direction, needs `FINANCE_MANAGE`. A preview endpoint shows the figures
+  before saving.
+- **Finished batches.** Transfers into a finished batch are refused. Bills assigned to a finished batch are not
+  refused, because finance does not know about batches; they still count as the batch's costs.
+- **Figures (L8).** *Ready* means some output has been taken out. Input kg counts stock used on the batch in kg (own
+  produce moved in and bought stock) and log additions in kg. Liquid batches show litres and no yield. *In stock* is
+  output less what was moved or sold from the batch.
+- **Manure (L3).** *Collect manure* is on the organic batches page and the livestock *Groups* page. It records
+  *Farm produce into stock* from the chosen herd or batch, so it needs `INVENTORY_WRITE`, and `FINANCE_READ` to list
+  the activities. Taking output out of a batch also needs `INVENTORY_WRITE`.
+- **Own farm inputs in reports (L14).** Transfer cost lines carry no category, so activity reports show them under the
+  account *Own farm inputs* (5650).
+- **Lots.** Harvests that track lots are moved lot by lot: the transfer takes a lot number, and the web form offers the
+  item's open lots. (Found in the browser check; the phone form does not offer lots yet.)
+- **Phone (L13).** Under *More → Compost*. Compost can be spread on crop and pond cycles.
+

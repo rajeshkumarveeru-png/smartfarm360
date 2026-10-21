@@ -60,7 +60,7 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
                 "039-crop-v2-backfill",
                 "040-workforce-assets-schema",
                 "041-workforce-assets-seed", "042-report-indexes", "043-livestock-schema", "044-livestock-seed",
-                "045-poultry-goats-schema", "046-poultry-goats-seed", "047-aquaculture-schema", "048-aquaculture-seed");
+                "045-poultry-goats-schema", "046-poultry-goats-seed", "047-aquaculture-schema", "048-aquaculture-seed", "049-organic-schema", "050-organic-seed");
     }
 
     @Test
@@ -86,7 +86,8 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
                 "sf_milk_sessions", "sf_milk_yields", "sf_milk_postings", "sf_animal_events", "sf_lactations", "sf_livestock_settings",
                 "sf_batch_days", "sf_head_movements", "sf_egg_postings", "sf_health_plan_items",
                 "sf_ponds", "sf_pond_cycles", "sf_pond_stockings", "sf_pond_days", "sf_pond_day_feeds", "sf_pond_deaths", "sf_pond_samples",
-                "sf_water_readings", "sf_water_limits", "sf_pond_harvests", "sf_pond_harvest_lines");
+                "sf_water_readings", "sf_water_limits", "sf_pond_harvests", "sf_pond_harvest_lines",
+                "sf_internal_transfers", "sf_organic_batches", "sf_organic_logs");
     }
 
     @Test
@@ -403,6 +404,32 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
         db.update("insert into sf_cost_objects(tenant_id, kind, name) values (?, 'POND_CYCLE', 'Pond 1 – 2026')", tenant);
         assertThatThrownBy(() -> db.update("insert into sf_water_limits(tenant_id, parameter, lowest, highest) values (?, 'PH', 9, 8)", tenant))
                 .hasMessageContaining("ck_sf_water_limit_order");
+    }
+
+    @Test
+    void upgradingLeavesOrganicOffAndAddsInternalTransfers() throws Exception {
+        DataSource legacy = newDatabase("legacy_or_" + UUID.randomUUID().toString().replace("-", ""));
+        JdbcTemplate db = new JdbcTemplate(legacy);
+        runChangelog(legacy, 24); // everything before Phase 11 (changesets 025-048)
+        long tenant = db.queryForObject("insert into sf_tenants(name, slug) values ('Old farm', 'old-farm-or') returning id", Long.class);
+        db.update("insert into sf_tenant_modules(tenant_id, module_code, enabled) values (?, 'CROP', true)", tenant);
+
+        runChangelog(legacy, null);
+
+        // L11: existing farm businesses keep Organic manure off until they switch it on
+        assertThat(db.queryForList("select module_code from sf_tenant_modules where tenant_id = ? and enabled", String.class, tenant))
+                .doesNotContain("ORGANIC");
+        assertThat(db.queryForList("select r.code from sf_role_permissions rp join sf_roles r on r.id = rp.role_id where r.tenant_id is null " +
+                "and rp.permission_code = 'ORGANIC_WRITE'", String.class))
+                .containsExactlyInAnyOrder("TENANT_OWNER", "FARM_ADMIN", "FARM_MANAGER", "FIELD_SUPERVISOR", "WORKER");
+        assertThat(db.queryForList("select r.code from sf_role_permissions rp join sf_roles r on r.id = rp.role_id where r.tenant_id is null " +
+                "and rp.permission_code = 'ORGANIC_READ'", String.class)).contains("ACCOUNTANT", "VIEWER");
+        // P17: the own farm inputs account, organic batches as cost objects, and nil-value internal transfers
+        assertThat(db.queryForObject("select name from sf_ledger_accounts where code = '5650'", String.class)).isEqualTo("Own farm inputs");
+        db.update("insert into sf_cost_objects(tenant_id, kind, name) values (?, 'ORGANIC_BATCH', 'Pit 1')", tenant);
+        db.update("insert into sf_finance_documents(tenant_id, doc_type, status, doc_date, total_amount) values (?, 'INTERNAL_TRANSFER', 'DRAFT', current_date, 0)", tenant);
+        assertThatThrownBy(() -> db.update("insert into sf_finance_documents(tenant_id, doc_type, status, doc_date, total_amount) values (?, 'PAYMENT', 'DRAFT', current_date, 0)", tenant))
+                .hasMessageContaining("ck_sf_doc_total");
     }
 
     /** Applies {@code count} changesets (all when null) to the given database. */

@@ -27,7 +27,8 @@ public enum DocType {
     ADVANCE_REPAYMENT("ADVR"),
     PAY_RUN("PAYRUN"),
     WAGE_PAYMENT("WAGE"),
-    ASSET_DISPOSAL("DISP");
+    ASSET_DISPOSAL("DISP"),
+    INTERNAL_TRANSFER("ITRF");
 
     private final String prefix;
 
@@ -41,7 +42,7 @@ public enum DocType {
     /** Records created by the stock module; they always move stock and post at once. */
     public boolean isStockRecord() {
         return this == STOCK_ISSUE || this == STOCK_TRANSFER || this == WASTAGE || this == STOCK_COUNT || this == PRODUCE_RECEIPT
-                || this == PURCHASE_RETURN || this == SALE_RETURN;
+                || this == PURCHASE_RETURN || this == SALE_RETURN || this == INTERNAL_TRANSFER;
     }
 
     /**

@@ -131,7 +131,10 @@
     "treatmentGiven": "Treatment given today",
     "batchesAndHerds": "Batches and herds",
     "pondsAndWater": "Ponds",
-    "aquacultureNotEnabled": "Fish farming is not switched on for this farm business, or your role cannot see it."
+    "aquacultureNotEnabled": "Fish farming is not switched on for this farm business, or your role cannot see it.",
+    "compost": "Compost",
+    "organicNotEnabled": "Organic manure is not switched on for this farm business, or your role cannot see it.",
+    "spreadOnField": "Spread on a field"
   },
   "common": {
     "appName": "SmartFarm360",
@@ -202,7 +205,8 @@
     "dashboard": "Dashboard",
     "reports": "Reports",
     "livestock": "Livestock",
-    "aquaculture": "Fish farming"
+    "aquaculture": "Fish farming",
+    "organic": "Organic manure"
   },
   "tenant": {
     "title": "Create your farm business",
@@ -274,7 +278,7 @@
     "POULTRY": "Poultry",
     "GOAT_SHEEP": "Goats and sheep",
     "AQUACULTURE": "Fish farming",
-    "ORGANIC": "Organic manure",
+    "ORGANIC": "Organic manure and compost",
     "PROCESSING": "Processing and trading",
     "WORKFORCE": "Workers",
     "ASSETS": "Equipment"
@@ -382,7 +386,15 @@
     "POND_HARVEST_DELETED": "Pond harvest removed",
     "WATER_READING_RECORDED": "Water reading recorded",
     "WATER_READING_DELETED": "Water reading removed",
-    "WATER_LIMITS_SAVED": "Water limits saved"
+    "WATER_LIMITS_SAVED": "Water limits saved",
+    "ORGANIC_BATCH_STARTED": "Compost batch started",
+    "ORGANIC_BATCH_SAVED": "Compost batch changed",
+    "ORGANIC_BATCH_FINISHED": "Compost batch finished",
+    "ORGANIC_BATCH_REOPENED": "Compost batch reopened",
+    "ORGANIC_LOG_RECORDED": "Compost log entry recorded",
+    "ORGANIC_LOG_DELETED": "Compost log entry removed",
+    "ORGANIC_OUTPUT_RECORDED": "Compost taken out into stock",
+    "INTERNAL_TRANSFER_RECORDED": "Own produce used on another activity"
   },
   "platform": {
     "title": "Platform administration",
@@ -658,7 +670,17 @@
     "SPECIES_NAME_REQUIRED": "Enter the name of the species.",
     "SPECIES_NOT_STOCKED": "This species was not stocked in the pond.",
     "STOCKING_HAS_BILL": "This stocking has a seed bill; reverse the bill instead.",
-    "STOCKING_NOT_FOUND": "Stocking not found."
+    "STOCKING_NOT_FOUND": "Stocking not found.",
+    "ORGANIC_BATCH_NOT_FOUND": "Organic batch not found.",
+    "ORGANIC_LOG_NOT_FOUND": "Log entry not found.",
+    "BATCH_FINISHED": "This batch is finished. Reopen it to record more.",
+    "BEFORE_BATCH_START": "The batch started after this date.",
+    "LOG_EMPTY": "Say what was added, or its kg.",
+    "INVENTORY_PERMISSION_REQUIRED": "Putting output into stock needs permission to record stock.",
+    "TARGET_REQUIRED": "Choose the activity that uses it.",
+    "SAME_ACTIVITY": "Choose a different activity to move it to.",
+    "SOURCE_REQUIRED": "Choose the activity that produced it to move its cost.",
+    "SOURCE_QUANTITY_EXCEEDED": "The activity has not produced that much that is still unmoved."
   },
   "mobileAuth": {
     "chooseTenant": "Choose a farm business",
@@ -856,7 +878,8 @@
       "ADVANCE_REPAYMENT": "Advance repaid",
       "PAY_RUN": "Pay run",
       "WAGE_PAYMENT": "Wage payment",
-      "ASSET_DISPOSAL": "Asset sold or scrapped"
+      "ASSET_DISPOSAL": "Asset sold or scrapped",
+      "INTERNAL_TRANSFER": "Own produce used"
     },
     "status": {
       "DRAFT": "Draft",
@@ -938,6 +961,7 @@
       "5400": "Electricity and water",
       "5500": "Transport and marketing",
       "5600": "Other operating expenses",
+      "5650": "Own farm inputs",
       "5700": "Cost of goods sold",
       "5800": "Depreciation",
       "5900": "Loan interest",
@@ -1151,6 +1175,37 @@
       "reason": "Say why the stock was wasted.",
       "originalSale": "Choose the sale the stock was sold on.",
       "packUnit": "Each pack unit needs a name and how much it contains."
+    },
+    "transfer": {
+      "action": "Use own produce on another activity",
+      "title": "Use own produce on another activity",
+      "help": "Compost on a field, fodder to the herd, dung into a compost pit. This is never income: the quantity moves, and where the rule says so, the cost of producing it moves too.",
+      "date": "Date",
+      "from": "Produced by",
+      "fromStock": "Not named (moves at nil)",
+      "to": "Used on",
+      "method": "Cost moved",
+      "byDefault": "By the rule",
+      "methodName": {
+        "NIL": "None",
+        "AVERAGE_COST": "Average cost"
+      },
+      "notes": "Notes",
+      "previewCost": "Average cost {{unitCost}} per {{unit}} ({{costs}} of costs ÷ {{produced}} produced): {{amount}} moves with it.",
+      "previewNil": "Only the quantity moves; no cost moves with it.",
+      "rules": "Compost from your own batches carries its cost per kg to the field by default. Dung, straw, fodder and other produce move without cost unless an owner or accountant chooses average cost.",
+      "save": "Record",
+      "saved": "{{number}} recorded; cost moved {{amount}}.",
+      "report": "Own produce used on the farm",
+      "none": "Nothing moved in this period.",
+      "costMoved": "Cost moved",
+      "reversed": "reversed",
+      "number": "Record",
+      "unit": "Unit",
+      "errors": {
+        "form": "Choose the produce, a quantity, and the activity that uses it."
+      },
+      "lot": "Lot"
     }
   },
   "crop": {
@@ -1679,7 +1734,8 @@
       "workers": "Workers",
       "assets": "Assets",
       "livestock": "Livestock",
-      "aquaculture": "Fish farming"
+      "aquaculture": "Fish farming",
+      "organic": "Organic manure"
     },
     "catalog": {
       "income": "Profit and loss",
@@ -1703,7 +1759,9 @@
       "breedingCalendar": "Breeding calendar and health",
       "herdRegister": "Herd register",
       "pondCycles": "Pond crops",
-      "waterLog": "Water quality log"
+      "waterLog": "Water quality log",
+      "organicBatches": "Compost and manure batches",
+      "internalTransfers": "Own produce used on the farm"
     },
     "catalogHint": {
       "income": "income, costs and profit for a period",
@@ -1727,7 +1785,9 @@
       "breedingCalendar": "checks, dry-offs, calvings and health due",
       "herdRegister": "every animal with its group and state",
       "pondCycles": "Survival, FCR, yield and profit per acre for each pond crop",
-      "waterLog": "Readings by pond, with values outside your limits marked"
+      "waterLog": "Readings by pond, with values outside your limits marked",
+      "organicBatches": "Yield, cost per kg and cost moved to your fields",
+      "internalTransfers": "Compost, dung, fodder and straw moved between activities, with the cost moved"
     },
     "help": {
       "monthly": "Each month's income and costs. The total column equals profit and loss for the whole period.",
@@ -1805,7 +1865,8 @@
       "HIGH_MORTALITY": "Deaths above 1% in a day in {{count}} batches",
       "WATER_OUT_OF_LIMITS": "Water outside your limits today in {{count}} ponds",
       "POND_RECORD_MISSING": "Today's pond record is missing for {{count}} ponds",
-      "HARVEST_OVERDUE": "{{count}} pond crops are past their planned harvest"
+      "HARVEST_OVERDUE": "{{count}} pond crops are past their planned harvest",
+      "ORGANIC_OVERDUE": "{{count}} compost batches are past their ready date"
     }
   },
   "livestock": {
@@ -2400,6 +2461,112 @@
       "buyer": "Choose the buyer or the account the money came into.",
       "reading": "Enter at least one measurement, as a number.",
       "limit": "Limits must be numbers."
+    }
+  },
+  "organic": {
+    "title": "Organic manure and compost",
+    "batches": "Batches",
+    "reports": "Reports",
+    "report": {
+      "batches": "Compost and manure batches"
+    },
+    "batchesHelp": "Each compost pit, vermicompost bed or liquid manure: what went in, what was done, what came out and what it cost.",
+    "startBatch": "Start batch",
+    "batch": "Batch",
+    "batchName": "Batch",
+    "batchExample": "VC bed 1 – Aug 2026",
+    "kindLabel": "Kind",
+    "kind": {
+      "COMPOST": "Compost (heap or pit)",
+      "VERMICOMPOST": "Vermicompost (bed)",
+      "LIQUID": "Liquid manure (jeevamrutham, panchagavya)",
+      "OTHER": "Other"
+    },
+    "farm": "Farm",
+    "startedOn": "Started on",
+    "readyBy": "Expected ready by",
+    "readyByDate": "ready by {{date}}",
+    "finishedOn": "finished {{date}}",
+    "statusLabel": "Status",
+    "status": {
+      "MAKING": "Making",
+      "READY": "Ready",
+      "FINISHED": "Finished"
+    },
+    "noBatches": "No batches yet.",
+    "finish": "Mark finished",
+    "finished": "Batch marked finished.",
+    "confirmFinish": "A finished batch takes no more inputs or log entries. Continue?",
+    "reopen": "Reopen",
+    "reopened": "Batch reopened.",
+    "from": "From",
+    "to": "To",
+    "period": "{{from}} – {{to}}",
+    "wholeBatch": "Whole batch, from the start",
+    "inputKg": "Input (kg)",
+    "output": "Output",
+    "unitLabel": "Unit",
+    "days": "Days",
+    "daysValue": "{{days}} days",
+    "yield": "Yield",
+    "inStock": "In stock",
+    "costPerUnit": "Cost per kg",
+    "movedOut": "Moved to other activities",
+    "profit": "Profit",
+    "kg": "kg",
+    "litres": "litres",
+    "ownProduceMoves": "Own produce in and out",
+    "moveIn": "Put own produce in",
+    "useOutput": "Use the output on a field",
+    "movesHelp": "Dung, straw and residues from your herd and fields come in without cost. Output used on your fields carries the batch's cost per kg.",
+    "log": "Log",
+    "date": "Date",
+    "whatWasDone": "What was done",
+    "logKind": {
+      "TURNED": "Turned",
+      "WATERED": "Watered",
+      "ADDED": "Material added",
+      "CHECKED": "Checked",
+      "WORMS": "Worms added or separated",
+      "OTHER": "Other"
+    },
+    "temperature": "Temperature (°C)",
+    "moistureLabel": "Moisture",
+    "moisture": {
+      "DRY": "Dry",
+      "RIGHT": "Right",
+      "WET": "Wet"
+    },
+    "notes": "Notes",
+    "addedExample": "Dry leaves",
+    "details": "Details",
+    "recordLog": "Record",
+    "logSaved": "Log entry recorded.",
+    "noLog": "Nothing logged yet.",
+    "removeLog": "Remove this entry",
+    "confirmRemoveLog": "Remove this log entry?",
+    "logRemoved": "Log entry removed.",
+    "outputs": "Output taken out",
+    "item": "Item",
+    "quantity": "Quantity",
+    "lastOutput": "This is the last output; mark the batch finished",
+    "outputHelp": "Output goes into stock as farm produce at nil value; its cost stays with this batch until it is used on a field.",
+    "recordOutput": "Record output",
+    "outputSaved": "Output recorded.",
+    "manure": "Manure from the herd",
+    "collectManure": "Collect manure",
+    "collectedFrom": "Collected from",
+    "manureHelp": "Dung or litter goes into stock as farm produce of that herd or batch, at nil value.",
+    "recordManure": "Record manure",
+    "manureSaved": "Manure for {{date}} recorded.",
+    "manureNote": "Manure collected",
+    "nothingInPeriod": "Nothing recorded in this period.",
+    "batchesHelpReport": "Costs are before any cost moved to your fields; profit is revenue less the costs that stayed with the batch.",
+    "errors": {
+      "batch": "Enter a name and choose the farm.",
+      "log": "Enter kg and temperature as numbers.",
+      "output": "Choose the item and enter the quantity.",
+      "manure": "Choose where it was collected, the item and the quantity."
     }
   }
 }

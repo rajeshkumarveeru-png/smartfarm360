@@ -32,6 +32,8 @@ public enum LedgerAccount {
     ELECTRICITY_WATER("5400", Type.EXPENSE, Flow.OPERATING),
     TRANSPORT_MARKETING("5500", Type.EXPENSE, Flow.OPERATING),
     OTHER_OPERATING("5600", Type.EXPENSE, Flow.OPERATING),
+    /** Own produce moved between activities (P17); nets to zero for the farm. */
+    OWN_FARM_INPUTS("5650", Type.EXPENSE, Flow.OPERATING),
     COST_OF_GOODS_SOLD("5700", Type.EXPENSE, Flow.OPERATING),
     DEPRECIATION("5800", Type.EXPENSE, Flow.OPERATING),
     LOAN_INTEREST("5900", Type.EXPENSE, Flow.FINANCING),

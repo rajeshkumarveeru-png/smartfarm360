@@ -80,6 +80,20 @@ public class CostObjectService {
                 .param("t", tenantId).param("name", name).param("farm", farmId).param("area", areaAcres).param("from", activeFrom).query(Long.class).single();
     }
 
+    /** A new organic batch as a cost object (organic resources design, L1). */
+    @Transactional
+    public long createOrganicBatch(long tenantId, String name, Long farmId, LocalDate activeFrom) {
+        return jdbc.sql("insert into sf_cost_objects (tenant_id, kind, name, farm_id, active_from) values (:t, 'ORGANIC_BATCH', :name, :farm, :from) returning id")
+                .param("t", tenantId).param("name", name).param("farm", farmId).param("from", activeFrom).query(Long.class).single();
+    }
+
+    /** Renames an organic batch's cost object. */
+    @Transactional
+    public void renameOrganicBatch(long tenantId, long costObjectId, String name) {
+        jdbc.sql("update sf_cost_objects set name = :name where id = :id and tenant_id = :t and kind = 'ORGANIC_BATCH'")
+                .param("name", name).param("id", costObjectId).param("t", tenantId).update();
+    }
+
     /** Renames a pond cycle's cost object. */
     @Transactional
     public void renamePondCycle(long tenantId, long costObjectId, String name) {

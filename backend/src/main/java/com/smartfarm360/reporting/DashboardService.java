@@ -13,6 +13,7 @@ import com.smartfarm360.inventory.StockReportService;
 import com.smartfarm360.aquaculture.AquaReports;
 import com.smartfarm360.aquaculture.WaterService;
 import com.smartfarm360.livestock.FlockReports;
+import com.smartfarm360.organic.OrganicService;
 import com.smartfarm360.livestock.LivestockReports;
 import com.smartfarm360.operations.CropReportService;
 import com.smartfarm360.operations.OperationsDtos.CycleReport;
@@ -56,10 +57,12 @@ public class DashboardService {
     private final FlockReports flocks;
     private final AquaReports aqua;
     private final WaterService water;
+    private final OrganicService organic;
 
     public DashboardService(ReportService reports, LedgerReportService ledger, StockReportService stock, CropService crops,
                             CropReportService cropReports, WorkerService workers, AssetService assets,
-                            LivestockReports livestock, FlockReports flocks, AquaReports aqua, WaterService water) {
+                            LivestockReports livestock, FlockReports flocks, AquaReports aqua, WaterService water, OrganicService organic) {
+        this.organic = organic;
         this.aqua = aqua;
         this.water = water;
         this.livestock = livestock;
@@ -170,6 +173,14 @@ public class DashboardService {
                 if (missing > 0) attention.add(new Attention("POND_RECORD_MISSING", missing, null, asOf.toString()));
                 int late = aqua.cyclesPastPlannedHarvest(ctx, asOf);
                 if (late > 0) attention.add(new Attention("HARVEST_OVERDUE", late, null, null));
+                return null;
+            });
+        }
+        if (ctx.has(Permission.ORGANIC_READ) && module(ctx, FarmModule.ORGANIC)) {
+            tile("organic", errors, () -> {
+                // Organic resources design, L14: batches past their expected ready date
+                int late = organic.overdue(ctx, asOf);
+                if (late > 0) attention.add(new Attention("ORGANIC_OVERDUE", late, null, null));
                 return null;
             });
         }

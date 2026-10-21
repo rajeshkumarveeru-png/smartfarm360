@@ -18,7 +18,7 @@ export const ATTENTION_LINKS: Record<string, string> = {
   MAINTENANCE_DUE: 'assets/maintenance', UNREGISTERED_ASSETS: 'assets', ASSETS_NOT_RECONCILED: 'assets/depreciation', DEPRECIATION_DUE: 'assets/depreciation',
   MILK_WITHHELD: 'livestock/milk', BREEDING_DUE: 'livestock/care', HEALTH_DUE: 'livestock/care', MILK_NOT_RECORDED: 'livestock/milk',
   BATCH_RECORD_MISSING: 'livestock/poultry', HIGH_MORTALITY: 'livestock/poultry',
-  WATER_OUT_OF_LIMITS: 'aquaculture/water', POND_RECORD_MISSING: 'aquaculture', HARVEST_OVERDUE: 'aquaculture',
+  WATER_OUT_OF_LIMITS: 'aquaculture/water', POND_RECORD_MISSING: 'aquaculture', HARVEST_OVERDUE: 'aquaculture', ORGANIC_OVERDUE: 'organic',
 };
 
 /** The farm business at a glance: money, the last 12 months, crops in the field and what needs attention (H1–H4). */
