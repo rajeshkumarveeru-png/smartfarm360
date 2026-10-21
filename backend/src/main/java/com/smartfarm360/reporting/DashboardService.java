@@ -10,6 +10,8 @@ import com.smartfarm360.finance.LedgerReportService.MonthlyRow;
 import com.smartfarm360.finance.ReportService;
 import com.smartfarm360.inventory.StockDtos;
 import com.smartfarm360.inventory.StockReportService;
+import com.smartfarm360.aquaculture.AquaReports;
+import com.smartfarm360.aquaculture.WaterService;
 import com.smartfarm360.livestock.FlockReports;
 import com.smartfarm360.livestock.LivestockReports;
 import com.smartfarm360.operations.CropReportService;
@@ -52,10 +54,14 @@ public class DashboardService {
     private final AssetService assets;
     private final LivestockReports livestock;
     private final FlockReports flocks;
+    private final AquaReports aqua;
+    private final WaterService water;
 
     public DashboardService(ReportService reports, LedgerReportService ledger, StockReportService stock, CropService crops,
                             CropReportService cropReports, WorkerService workers, AssetService assets,
-                            LivestockReports livestock, FlockReports flocks) {
+                            LivestockReports livestock, FlockReports flocks, AquaReports aqua, WaterService water) {
+        this.aqua = aqua;
+        this.water = water;
         this.livestock = livestock;
         this.flocks = flocks;
         this.reports = reports;
@@ -150,6 +156,20 @@ public class DashboardService {
                     int high = flocks.highMortality(ctx, asOf.minusDays(1), asOf);
                     if (high > 0) attention.add(new Attention("HIGH_MORTALITY", high, null, null));
                 }
+                return null;
+            });
+        }
+        if (ctx.has(Permission.AQUACULTURE_READ) && module(ctx, FarmModule.AQUACULTURE)) {
+            tile("aquaculture", errors, () -> {
+                // Aquaculture design, section 9 (K14): water outside the farmer's limits, the pond record, overdue harvests
+                boolean today = asOf.equals(java.time.LocalDate.now(FARM_ZONE));
+                boolean afterTen = today && java.time.LocalTime.now(FARM_ZONE).isAfter(java.time.LocalTime.of(10, 0));
+                int outside = water.pondsOutOfLimits(ctx, asOf);
+                if (outside > 0) attention.add(new Attention("WATER_OUT_OF_LIMITS", outside, null, asOf.toString()));
+                int missing = afterTen ? aqua.cyclesWithoutRecord(ctx, asOf) : 0;
+                if (missing > 0) attention.add(new Attention("POND_RECORD_MISSING", missing, null, asOf.toString()));
+                int late = aqua.cyclesPastPlannedHarvest(ctx, asOf);
+                if (late > 0) attention.add(new Attention("HARVEST_OVERDUE", late, null, null));
                 return null;
             });
         }

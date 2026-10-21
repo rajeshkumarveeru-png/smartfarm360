@@ -2,10 +2,8 @@
 
 ## Current state
 
-- **Phase:** 9 (poultry, goats and sheep) complete on branch `feature/phase-9-poultry-goats` (based on
-  `feature/phase-8-livestock`). Phase 10 (aquaculture) started on
-  `feature/phase-10-aquaculture`: the [aquaculture design](aquaculture/aquaculture.md) is awaiting review; no Phase 10
-  code yet. Nothing is pushed yet.
+- **Phase:** 10 (aquaculture) complete on branch `feature/phase-10-aquaculture` (based on
+  `feature/phase-9-poultry-goats`). Next: Phase 11 (organic resources), starting with its design. Nothing is pushed yet.
 - **Production readiness:** not ready. Authentication, roles, tenant isolation, audit, the finance core and stock with
   movements are in place and tested, but no email provider is configured and hosting/backups are undecided.
 
@@ -854,6 +852,131 @@ Not verified:
   and the screen tests).
 - GitHub Actions (nothing has been pushed).
 
+## Phase 10 — Aquaculture (2026-10-21)
+
+Commits on `feature/phase-10-aquaculture` (based on `feature/phase-9-poultry-goats`):
+
+- `2f10bee`: design.
+- A build commit with the backend, web, mobile, verification and docs.
+
+### Features completed
+
+- **Approved design.** [aquaculture](aquaculture/aquaculture.md) is implemented with K1–K15 as recommended.
+  Implementation notes are in section 15 of the design.
+- **Ponds** (K1): ponds under a farm with kind, water spread area (kept in acres too), depth and an optional land
+  parcel. A pond is not a cost object and holds one open crop at a time.
+- **Culture cycles** (K2): one crop per pond from preparation to final harvest, as a cost object. Preparation costs
+  (lime from stock, manure bills) belong to the crop. Polyculture is normal.
+- **Stocking** (K3, K4, K11): species, number and total kg, with the seed bill as a cost of the crop under the new
+  category *Fish and shrimp seed*. 13 species, and *Other* with a name.
+- **Estimated counts** (K3): stocked − deaths seen − fish harvested, never negative for deaths. The final harvest shows
+  survival and unseen losses.
+- **Daily pond record** (K5): feed lines as one stock use to the crop per day, and deaths seen by species.
+- **Weight samples** (K6): average weight, estimated kg in the pond and estimated FCR to date, always labelled.
+- **Water quality** (K7): readings per pond (dissolved oxygen, pH, temperature, ammonia, transparency, salinity) compared
+  with limits the farmer sets for the farm business or one pond. No limits are filled in.
+- **Harvests** (K8): partial or final, by species and size grade, sold at the pond bank as one *Fish sales* record; home
+  use and fish given away without value; the buyer's commission and transport as a cost of the crop. Fish are not
+  kept in stock.
+- **Figures** (K9), for the period and the whole crop: days of culture, survival, unseen losses, FCR, yield and profit
+  per acre, cost per kg and average price.
+- **Reports** (K14): *Pond crops* and the *Water quality log*, exported as CSV and Excel, and in the report catalogue.
+- **Dashboard** (K14): water outside the limits today, today's pond record missing after 10 a.m., and crops past their
+  planned harvest.
+- **Module** (K12): *Fish farming* is available, off by default, with new permissions `AQUACULTURE_READ` and
+  `AQUACULTURE_WRITE` granted like the livestock ones.
+- **Web**: a *Fish farming* section with Ponds, a pond page, a crop page, Water quality and Reports.
+- **Phone** (K13): *More → Ponds*: today's feed and deaths seen, a water reading with its flags, and a weight sample.
+  Online only.
+
+### Database migrations
+
+`012-aquaculture.yaml` contains two changesets:
+
+- `047-aquaculture-schema`:
+  - Adds the cost object kind `POND_CYCLE`.
+  - Adds the tables `sf_ponds`, `sf_pond_cycles`, `sf_pond_stockings`, `sf_pond_days`, `sf_pond_day_feeds`,
+    `sf_pond_deaths`, `sf_pond_samples`, `sf_water_readings`, `sf_water_limits`, `sf_pond_harvests` and
+    `sf_pond_harvest_lines`. All have tenant keys and composite foreign keys.
+- `048-aquaculture-seed`: the *Fish and shrimp seed* category, and the permissions with their role grants. Existing
+  farm businesses keep the module off.
+
+These were applied to the local database on 2026-10-21, after a `pg_dump` backup (`smartfarm360-before-phase10.backup`).
+No business data was changed.
+
+### APIs added
+
+Under `/api/v1/tenants/{tenantId}/aquaculture` (module *Fish farming*):
+
+- `GET|POST /ponds`, `GET|PUT /ponds/{id}`
+- `GET /cycles`, `POST /ponds/{id}/cycles`, `GET|PUT /cycles/{id}`
+- `GET|POST /cycles/{id}/stockings`, `DELETE /stockings/{id}`
+- `GET|PUT /cycles/{id}/days/{date}`
+- `GET|POST /cycles/{id}/samples`, `DELETE /samples/{id}`
+- `GET|POST /cycles/{id}/harvests`, `DELETE /harvests/{id}`
+- `GET /readings`, `POST /ponds/{id}/readings`, `DELETE /readings/{id}`
+- `GET|PUT /water-limits`
+- `GET /cycles/{id}/report`, `GET /reports/cycles`
+
+`/readings` and `/reports/cycles` accept `format=csv|xlsx`.
+
+### Tests and evidence
+
+| Command | Result |
+|---|---|
+| `backend: gradlew test --rerun bootJar` | Passed: **654 tests, 0 failures** (see below) |
+| `frontend: npm run lint`, `tsc --noEmit`, `npm run build` | Passed; the bundle is still over 500 kB |
+| `frontend: npm test` | Passed: **66 tests**, including 6 new fish farming screen tests |
+| `mobile: npx tsc --noEmit`, `npm test`, `npx expo install --check` | Passed: **41 tests**, including 4 new pond tests |
+| Manual browser check | Passed (see below) |
+
+The backend run includes:
+
+- The golden scenario from section 10 of the design. Every figure is asserted:
+  - growing, 1 August: average weight 600 g, estimated 2,310 kg in the pond, estimated FCR 1.85, 1,550 rohu estimated;
+  - the 12 June reading of DO 3.2 flagged against the lowest of 4.0;
+  - the crop: 241 days of culture, 4,000 stocked, 200 deaths seen, 3,200 fish and 3,000 kg harvested, 6,000 kg feed,
+    survival 80.0%, 600 unseen losses, FCR 2.03, 3,000 kg per acre, costs ₹2,29,000, revenue ₹4,04,000, profit
+    ₹1,75,000 (also per acre), ₹76.33 per kg, average price ₹134.67;
+  - July alone: costs ₹30,000, no revenue, a loss;
+  - the exports, and the books balance.
+- 8 rule tests:
+  - ponds in acres, unique names, one open crop, and cycles as cost objects;
+  - deaths never above the fish stocked, only stocked species, *Other* needs a name;
+  - changing the day's feed reverses the earlier stock use;
+  - a harvested crop refuses records, the buyer's charges are costs, and reversing the sale reopens it;
+  - survival unknown without counts, FCR and yield from a partial and a final harvest, charges need a sale;
+  - water limits for the farm business and one pond, and the dashboard item;
+  - permissions (worker, viewer, money) and the module switch;
+  - another farm business's ponds, crops, stockings, samples, readings, harvests, farm and feed cannot be reached or
+    referenced.
+- An upgrade migration test: existing farms keep Fish farming off, the grants and the seed category are in place, the
+  database accepts pond cycles and refuses an inverted limit.
+- 12 module-boundary rules.
+- 488 generated cross-tenant cases.
+- The dashboard performance test: **553 ms** at 50,000 journal lines.
+
+One existing test changed with the approved design: the "unavailable module" check now uses Organic manure, because
+Fish farming is now available (K12).
+
+The manual browser check ran against backend :8081 on local PostgreSQL 18, with Vite on :5174:
+
+- Migrations 047–048 were applied at startup.
+- Fish farming was switched on in Settings, and the menu showed *Fish farming*.
+- *Pond 1* was added with 50 cents of water, shown as 0.5 acres.
+- A crop was started (*Preparing*), and 500 rohu stocked without a bill turned it to *Growing*.
+- Today's record with 5 deaths seen left 495 rohu estimated.
+- The lowest DO limit of 4 was saved for the farm business. A reading of DO 3.2 and pH 7.8 was flagged at once, and the
+  dashboard showed "Water outside your limits today in 1 ponds", linked to Water quality.
+- The reports page listed the crop. The backend log shows 0 errors and no secret values.
+
+Not verified:
+
+- A real phone.
+- Seed bills, feed from stock, samples and harvest sales in the browser (they are covered by the API golden and rule
+  tests and the screen tests).
+- GitHub Actions (nothing has been pushed).
+
 ## Known gaps and defects
 
 Security and platform:
@@ -874,7 +997,8 @@ Finance and stock:
 - The workforce labour report still shows labour cost to anyone with WORKFORCE_READ, unlike the new wages report.
 - Animal depreciation goes to the group the animal is in when the run is posted, not the group of that month (post runs monthly).
 - The daily batch record offers every stock input measured by weight as feed, not only items in the feed category.
-- Overhead is not shared out to herds or batches (I12, J15); fodder grown on the farm and fed to the herd waits for internal transfers (P17, Phase 11).
+- Harvest charges are a separate bill; reversing a harvest sale does not reverse its charges bill.
+- Overhead is not shared out to herds, batches or pond crops (I12, J15, K15); fodder grown on the farm and fed to the herd waits for internal transfers (P17, Phase 11).
 - Excel exports group thousands as #,##0.00, not Indian lakh grouping (an Excel format limit).
 - Payroll has no PF, ESI, TDS or minimum-wage rules (G6). There is no WDV depreciation and no machine-hour allocation to
   crops (G9, G12). Breeding animals are not depreciated until the livestock phases (G10). Recurring expenses are still

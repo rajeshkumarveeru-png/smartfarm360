@@ -54,6 +54,12 @@ import GroupsPage from './livestock/GroupsPage';
 import FlockPage from './livestock/FlockPage';
 import FlocksPage from './livestock/FlocksPage';
 import LivestockHome from './livestock/LivestockHome';
+import AquaLayout from './aquaculture/AquaLayout';
+import AquaReportsPage from './aquaculture/AquaReportsPage';
+import CyclePondPage from './aquaculture/CyclePage';
+import PondPage from './aquaculture/PondPage';
+import PondsPage from './aquaculture/PondsPage';
+import WaterPage from './aquaculture/WaterPage';
 import LivestockLayout from './livestock/LivestockLayout';
 import LivestockReportsPage from './livestock/LivestockReportsPage';
 import MilkPage from './livestock/MilkPage';
@@ -135,6 +141,13 @@ function App() {
               <Route path="care" element={<CarePage />} />
               <Route path="groups" element={<GroupsPage />} />
               <Route path="reports" element={<LivestockReportsPage />} />
+            </Route>
+            <Route path="aquaculture" element={<AquaLayout />}>
+              <Route index element={<PondsPage />} />
+              <Route path="ponds/:pondId" element={<PondPage />} />
+              <Route path="cycles/:cycleId" element={<CyclePondPage />} />
+              <Route path="water" element={<WaterPage />} />
+              <Route path="reports" element={<AquaReportsPage />} />
             </Route>
             <Route path="finance" element={<FinanceLayout />}>
               <Route index element={<FinanceHome />} />

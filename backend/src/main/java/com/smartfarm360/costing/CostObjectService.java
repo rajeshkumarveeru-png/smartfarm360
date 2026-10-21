@@ -71,6 +71,22 @@ public class CostObjectService {
                 .param("name", name).param("farm", farmId).param("active", active).param("id", costObjectId).param("t", tenantId).update();
     }
 
+    /** A new pond culture cycle as a cost object (aquaculture design, K2); its area is the pond's water spread in acres. */
+    @Transactional
+    public long createPondCycle(long tenantId, String name, Long farmId, BigDecimal areaAcres, LocalDate activeFrom) {
+        return jdbc.sql("""
+                        insert into sf_cost_objects (tenant_id, kind, name, farm_id, area_acres, active_from)
+                        values (:t, 'POND_CYCLE', :name, :farm, :area, :from) returning id""")
+                .param("t", tenantId).param("name", name).param("farm", farmId).param("area", areaAcres).param("from", activeFrom).query(Long.class).single();
+    }
+
+    /** Renames a pond cycle's cost object. */
+    @Transactional
+    public void renamePondCycle(long tenantId, long costObjectId, String name) {
+        jdbc.sql("update sf_cost_objects set name = :name where id = :id and tenant_id = :t and kind = 'POND_CYCLE'")
+                .param("name", name).param("id", costObjectId).param("t", tenantId).update();
+    }
+
     /** The cost object of a crop cycle, if it has one. */
     public Optional<Long> forCycle(long tenantId, long cropCycleId) {
         return jdbc.sql("select id from sf_cost_objects where tenant_id = :t and crop_cycle_id = :cycle")

@@ -26,6 +26,10 @@ const GROUPS: { key: string; entries: Entry[] }[] = [
     { key: 'breedingCalendar', path: 'livestock/care', permission: 'LIVESTOCK_READ', module: 'DAIRY' },
     { key: 'herdRegister', path: 'livestock', permission: 'LIVESTOCK_READ', module: 'DAIRY' },
   ] },
+  { key: 'aquaculture', entries: [
+    { key: 'pondCycles', path: 'aquaculture/reports', permission: 'AQUACULTURE_READ', module: 'AQUACULTURE' },
+    { key: 'waterLog', path: 'aquaculture/water', permission: 'AQUACULTURE_READ', module: 'AQUACULTURE' },
+  ] },
   { key: 'stock', entries: [
     { key: 'stockValue', path: 'stock/reports', permission: 'INVENTORY_READ' },
   ] },

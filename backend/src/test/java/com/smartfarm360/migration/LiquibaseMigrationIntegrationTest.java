@@ -60,7 +60,7 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
                 "039-crop-v2-backfill",
                 "040-workforce-assets-schema",
                 "041-workforce-assets-seed", "042-report-indexes", "043-livestock-schema", "044-livestock-seed",
-                "045-poultry-goats-schema", "046-poultry-goats-seed");
+                "045-poultry-goats-schema", "046-poultry-goats-seed", "047-aquaculture-schema", "048-aquaculture-seed");
     }
 
     @Test
@@ -84,7 +84,9 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
                 "sf_workers", "sf_worker_rates", "sf_attendance", "sf_piece_work", "sf_assets", "sf_asset_depreciation", "sf_asset_usage",
                 "sf_maintenance_plans", "sf_maintenance_logs", "sf_pay_run_workers", "sf_animal_groups", "sf_animals", "sf_animal_group_moves",
                 "sf_milk_sessions", "sf_milk_yields", "sf_milk_postings", "sf_animal_events", "sf_lactations", "sf_livestock_settings",
-                "sf_batch_days", "sf_head_movements", "sf_egg_postings", "sf_health_plan_items");
+                "sf_batch_days", "sf_head_movements", "sf_egg_postings", "sf_health_plan_items",
+                "sf_ponds", "sf_pond_cycles", "sf_pond_stockings", "sf_pond_days", "sf_pond_day_feeds", "sf_pond_deaths", "sf_pond_samples",
+                "sf_water_readings", "sf_water_limits", "sf_pond_harvests", "sf_pond_harvest_lines");
     }
 
     @Test
@@ -376,6 +378,31 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
     private List<String> permissionsOf(String role) {
         return jdbc.queryForList("select rp.permission_code from sf_role_permissions rp join sf_roles r on r.id = rp.role_id where r.code = ?",
                 String.class, role);
+    }
+
+    @Test
+    void upgradingLeavesFishFarmingOffAndGrantsAquaculturePermissions() throws Exception {
+        DataSource legacy = newDatabase("legacy_aq_" + UUID.randomUUID().toString().replace("-", ""));
+        JdbcTemplate db = new JdbcTemplate(legacy);
+        runChangelog(legacy, 22); // everything before Phase 10 (changesets 025-046)
+        long tenant = db.queryForObject("insert into sf_tenants(name, slug) values ('Old farm', 'old-farm-aq') returning id", Long.class);
+        db.update("insert into sf_tenant_modules(tenant_id, module_code, enabled) values (?, 'CROP', true)", tenant);
+
+        runChangelog(legacy, null);
+
+        // K12: existing farm businesses keep Fish farming off until they switch it on
+        assertThat(db.queryForList("select module_code from sf_tenant_modules where tenant_id = ? and enabled", String.class, tenant))
+                .doesNotContain("AQUACULTURE");
+        assertThat(db.queryForList("select r.code from sf_role_permissions rp join sf_roles r on r.id = rp.role_id where r.tenant_id is null " +
+                "and rp.permission_code = 'AQUACULTURE_WRITE'", String.class))
+                .containsExactlyInAnyOrder("TENANT_OWNER", "FARM_ADMIN", "FARM_MANAGER", "FIELD_SUPERVISOR", "WORKER");
+        assertThat(db.queryForList("select r.code from sf_role_permissions rp join sf_roles r on r.id = rp.role_id where r.tenant_id is null " +
+                "and rp.permission_code = 'AQUACULTURE_READ'", String.class)).contains("ACCOUNTANT", "VIEWER");
+        assertThat(db.queryForObject("select count(*) from sf_finance_categories where tenant_id is null and code = 'FISH_SEED'", Integer.class)).isEqualTo(1);
+        // Pond cycles are cost objects; water limits must be a range
+        db.update("insert into sf_cost_objects(tenant_id, kind, name) values (?, 'POND_CYCLE', 'Pond 1 – 2026')", tenant);
+        assertThatThrownBy(() -> db.update("insert into sf_water_limits(tenant_id, parameter, lowest, highest) values (?, 'PH', 9, 8)", tenant))
+                .hasMessageContaining("ck_sf_water_limit_order");
     }
 
     /** Applies {@code count} changesets (all when null) to the given database. */

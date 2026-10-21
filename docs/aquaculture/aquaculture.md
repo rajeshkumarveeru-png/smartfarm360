@@ -1,6 +1,7 @@
 # Aquaculture design (Phase 10)
 
-- Status: **Draft for product-owner review** (2026-10-21). No Phase 10 code is written until this is approved.
+- Status: **Approved** (2026-10-21) with the recommended answers to K1–K15, and implemented in Phase 10. Implementation
+  notes are in section 15.
 - Builds on:
   - the [crop management design](../crops/crop-management.md): a season on a piece of land is a cost object with a
     start, a harvest and a profit;
@@ -337,3 +338,36 @@ gets cross-tenant and permission tests.
 - permissions and the module switch;
 - cross-tenant tests for every new endpoint;
 - the migration on a copy of the current schema.
+
+## 15. Implementation notes (2026-10-21)
+
+- **Module.** The new `aquaculture` package reads finance, inventory and costing through their services.
+  `ModuleBoundaryTest` (rule `onlyReportingUsesAquaculture`) allows only `reporting` to depend on it.
+- **Ponds (K1).** Pond names are unique within a farm business, ignoring case. The water area is converted to acres
+  when saved, for yield and profit per acre. A pond with a crop in it cannot be made inactive.
+- **Cycles (K2).**
+  - A cycle's cost object has the kind `POND_CYCLE`, the pond's area in acres and the start date. Overhead allocation
+    still covers only crop cycles (K15).
+  - The state is worked out from the records: *Preparing* without a stocking that counts, *Growing* after one,
+    *Harvested* after a final harvest whose sale is posted (or that has no sale).
+  - Reversing the final harvest's sale reopens the cycle. Starting a new crop in the pond in between is not prevented.
+  - A harvest without a sale (home use or given away), or whose sale was reversed, can be removed.
+- **Estimated counts (K3).**
+  - Deaths seen are checked species by species: on every day with deaths, stocked − deaths − harvested must not go
+    below zero (`DEATHS_EXCEED_STOCK`). Harvest counts above the estimate are accepted, because the stocking count
+    may be wrong. The difference shows as negative unseen losses.
+  - Survival and unseen losses are shown only when every harvest line of the crop has a fish count.
+- **Samples (K6).** A sample without a species is a mixed sample. It applies to every species, unless a later sample
+  of that species exists. The estimated FCR uses the feed up to the latest sample date ÷ (estimated kg then + kg
+  harvested by then − kg stocked).
+- **Feed in figures (K5, K9).** Feed is the stock used on the cycle from items in the *Animal feed* category, so weekly
+  stock uses count too, and lime or fertiliser does not.
+- **Harvest charges (K8).** The buyer's deductions (commission, transport or ice) are a separate bill to the same buyer,
+  or paid from the same account, assigned to the cycle. Finance sale lines are positive amounts, so they cannot be lines
+  of the sale itself. The net on the buyer's balance is what was received. Reversing the sale does not reverse the
+  charges bill; it is reversed by hand.
+- **Water (K7).** A pond's own limit replaces the farm business's limit for that parameter only. The dashboard counts
+  ponds with a reading outside its limits on the farm date (Asia/Kolkata).
+- **Phone (K13).** Under *More → Ponds*. A feed entry from the phone replaces that feed's kg for the day, and deaths seen
+  are added to those already recorded. The day's other feed lines and notes are kept.
+

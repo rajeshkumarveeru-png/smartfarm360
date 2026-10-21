@@ -73,8 +73,8 @@ class PermissionIntegrationTest extends ApiIntegrationTest {
         put(base() + "/modules/CROP", owner, Map.of("enabled", true)).andExpect(status().isOk());
         get(base() + "/crops", owner).andExpect(status().isOk());
 
-        // Dairy (Phase 8) and Poultry (Phase 9) became available; Fish farming is still unavailable
-        put(base() + "/modules/AQUACULTURE", owner, Map.of("enabled", true)).andExpect(status().isConflict())
+        // Dairy (Phase 8), Poultry (Phase 9) and Fish farming (Phase 10) became available; Organic manure is still unavailable
+        put(base() + "/modules/ORGANIC", owner, Map.of("enabled", true)).andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("MODULE_NOT_AVAILABLE"));
     }
 
