@@ -3,8 +3,9 @@
 ## Current state
 
 - **Phase:** 7 (dashboard and core reports) complete on branch `feature/phase-7-reports` (based on
-  `feature/phase-6-workforce`). Next: Phases 8–12 (farming modules), starting with livestock and dairy. Nothing is pushed
-  yet.
+  `feature/phase-6-workforce`). Phase 8 (livestock and dairy) started on `feature/phase-8-livestock`: the
+  [livestock and dairy design](livestock/livestock-and-dairy.md) is awaiting review; no Phase 8 code yet. Nothing is
+  pushed yet.
 - **Production readiness:** not ready. Authentication, roles, tenant isolation, audit, the finance core and stock with
   movements are in place and tested, but no email provider is configured and hosting/backups are undecided.
 

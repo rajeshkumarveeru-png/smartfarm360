@@ -61,7 +61,7 @@ Approved design: [dashboard and reports](reports/dashboard-and-reports.md) (H1�
 
 ## Phases 8–12 — Farming modules
 
-8. Livestock core + dairy (animals, milk records and quality, feed, health, breeding, calving, milk sales, cost per litre)
+8. Livestock core + dairy — design for review: [livestock and dairy](livestock/livestock-and-dairy.md) (I1–I16) (animals, milk records and quality, feed, health, breeding, calving, milk sales, cost per litre)
 9. Poultry batches and eggs; goat/sheep herds
 10. Aquaculture (ponds, stocking batches, water quality, harvest and grading)
 11. Organic resources (compost/vermicompost batches, internal transfers without revenue)
