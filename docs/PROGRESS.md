@@ -2,10 +2,9 @@
 
 ## Current state
 
-- **Phase:** 11 (organic resources) complete on branch `feature/phase-11-organic` (based on
-  `feature/phase-10-aquaculture`). Phase 12 (processing and trading) started on
-  `feature/phase-12-processing`: the [processing and trading design](processing/processing-and-trading.md) is awaiting
-  review; no Phase 12 code yet. Nothing is pushed yet.
+- **Phase:** 12 (processing and trading) built on branch `feature/phase-12-processing` (based on
+  `feature/phase-11-organic`); the browser check waits for a sign-in. The farming modules (Phases 8–12) are complete. Next:
+  Phase 13 (mobile offline). Nothing is pushed yet.
 - **Production readiness:** not ready. Authentication, roles, tenant isolation, audit, the finance core and stock with
   movements are in place and tested, but no email provider is configured and hosting/backups are undecided.
 
@@ -1093,6 +1092,111 @@ Not verified:
 - A real phone.
 - Batch output, compost sales and average-cost transfers in the browser (they are covered by the API golden and rule
   tests and the screen tests).
+- GitHub Actions (nothing has been pushed).
+
+## Phase 12 — Processing and trading (2026-10-21)
+
+Commits on `feature/phase-12-processing` (based on `feature/phase-11-organic`):
+
+- `4bae8ce`: design.
+- A build commit with the backend, web, mobile, verification and docs.
+
+### Features completed
+
+- **Approved design.** [processing and trading](processing/processing-and-trading.md) is implemented with M1–M15 as
+  recommended. Implementation notes are in section 15 of the design.
+- **Processing batches** (M1, M2): one run of cleaning and grading, drying, milling, oil pressing or packing, as a cost
+  object with a code and a main product. Inputs come through internal transfers (own produce), stock uses (bought
+  produce, bags) and bills (hired milling, labour).
+- **Raw material carries its cost** (M3): own produce moved into a batch moves at average cost by default, so the crop's
+  cost follows its harvest; the farm's total profit is unchanged.
+- **Steps** (M4): kg in and out, moisture before and after, grade and notes; the step's loss is shown.
+- **Output** (M5): main product, byproducts and waste. Products go into stock at nil value with lots made from the batch
+  code; waste is recorded in kg only.
+- **Weight balance and figures** (M6, M7): input kg, each output's yield (the outturn), process loss, costs, revenue,
+  profit, cost per kg of the main product by the byproduct method, and the raw material's cost per kg.
+- **Lot trace** (M8): backward from a lot to its batch, input lots and crop cycle or supplier; forward to the batches, their
+  output lots and the customers. Printable.
+- **Trading margin** (M10): bought, sold, revenue, cost of sales, margin and stock for goods bought for resale, without the
+  module.
+- **Reports and dashboard** (M14): processing batches and trading margin, exported as CSV and Excel, in the report
+  catalogue; batches past their expected end on the dashboard.
+- **Module** (M12): *Processing and trading* is available, off by default, with new permissions `PROCESSING_READ` and
+  `PROCESSING_WRITE`. Every module is now available.
+- **Web**: a *Processing* section with Batches, a batch page, Lot trace and Reports; *Stock → Trading*.
+- **Phone** (M13): *More → Processing*: own produce into a batch (with lots), a step, and output. Online only.
+
+### Database migrations
+
+`014-processing.yaml` contains two changesets:
+
+- `051-processing-schema`: the cost object kind `PROCESSING_BATCH`, and the tables `sf_processing_batches`,
+  `sf_processing_steps` and `sf_processing_outputs`. All have tenant keys and composite foreign keys.
+- `052-processing-seed`: the permissions and their role grants. Existing farm businesses keep the module off.
+
+These were applied to the local database on 2026-10-21, after a `pg_dump` backup (`smartfarm360-before-phase12.backup`).
+No business data was changed.
+
+### APIs added
+
+- Under `/api/v1/tenants/{tenantId}/processing` (module *Processing and trading*):
+  - `GET|POST /batches`, `GET|PUT /batches/{id}`, `POST /batches/{id}/finish`, `POST /batches/{id}/reopen`
+  - `GET|POST /batches/{id}/steps`, `DELETE /steps/{id}`
+  - `GET|POST /batches/{id}/outputs`, `DELETE /outputs/{id}` (waste only)
+  - `GET /batches/{id}/report`, `GET /reports/batches` (accepts `format=csv|xlsx`)
+  - `GET /trace?lotNo=`
+- `GET /api/v1/tenants/{tenantId}/stock/reports/trading` (no module; `FINANCE_READ`; accepts `format=csv|xlsx`).
+
+### Tests and evidence
+
+| Command | Result |
+|---|---|
+| `backend: gradlew test --rerun bootJar` | Passed: **738 tests, 0 failures** (see below) |
+| `frontend: npm run lint`, `tsc --noEmit`, `npm run build` | Passed; the bundle is still over 500 kB |
+| `frontend: npm test` | Passed: **77 tests**, including 6 new processing and trading screen tests |
+| `mobile: npx tsc --noEmit`, `npm test`, `npx expo install --check` | Passed: **47 tests**, including 3 new processing tests |
+| Manual browser check | **Not done yet** (see below) |
+
+The backend run includes:
+
+- The golden scenario from section 10 of the design (dated 30 September – 9 October). Every figure is asserted:
+  - 2,000 kg of Samba paddy into batch RM-2610-01 at average cost: ₹15.00 per kg, ₹30,000 moved; Samba's costs
+    ₹30,000 after; the farm's October profit unchanged;
+  - the drying step's 80 kg loss;
+  - lots RM-2610-01-1, -2 and -3; waste with no stock record; the batch finished after 4 days;
+  - input 2,000 kg; rice 1,300 kg (65.0%), broken rice 100 kg (5.0%), bran 160 kg (8.0%), husk 340 kg (17.0%); process
+    loss 100 kg (5.0%);
+  - costs ₹37,000, revenue ₹83,400, profit ₹46,400, byproduct sales ₹5,400, rice ₹24.31 per kg, paddy ₹15.00 per kg;
+  - the trace backward from RM-2610-01-1 to SAMBA-2026-H1 and *Samba 2026*, with the sale to Lakshmi Stores, and forward
+    from SAMBA-2026-H1 to the batch, its three lots and their sales;
+  - trading: 2,000 kg bought for ₹1,60,000, 1,500 kg sold for ₹1,50,000, cost of sales ₹1,20,000, margin ₹30,000
+    (20.0%), 500 kg (₹40,000) in stock;
+  - the exports, and the books balance.
+- 6 rule tests:
+  - output roles, lots only for lot-tracked items, steps cannot gain weight, unique codes, code and main product fixed
+    after output;
+  - byproduct sales lower the main product's cost; a reversed output no longer counts;
+  - own produce into a batch carries its cost (a farm manager cannot change it); a finished batch refuses steps, output
+    and transfers until reopened; the overdue dashboard item;
+  - the trace through a bought lot to its supplier, with bought produce as raw material at its cost;
+  - permissions (viewer, worker, stock permission for output) and the module switch, and trading without the module;
+  - another farm business's batches, steps, outputs, lots, items, farm and batch cannot be reached or referenced.
+- An upgrade migration test: existing farms keep Processing off and the grants are in place.
+- 14 module-boundary rules.
+- 552 generated cross-tenant cases.
+- The dashboard performance test: **636 ms** at 50,000 journal lines (the budget is 1,000 ms).
+
+One existing test changed with the approved design: the permission test that tried to switch on an unavailable module now
+checks that every module reports available and can be switched on, because Processing was the last unavailable module
+(M12). The `MODULE_NOT_AVAILABLE` guard stays for future modules.
+
+Migrations 051–052 were applied at startup of the new jar, with no errors in the backend log. The **manual browser check
+is not done**: the browser session had expired after the restart and signing in needs the account's password, which the
+agent does not have. It will be done after the product owner signs in.
+
+Not verified:
+
+- The browser check (above), and a real phone.
 - GitHub Actions (nothing has been pushed).
 
 ## Known gaps and defects

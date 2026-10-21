@@ -65,6 +65,12 @@ import BatchesPage from './organic/BatchesPage';
 import OrganicLayout from './organic/OrganicLayout';
 import OrganicReportsPage from './organic/OrganicReportsPage';
 import OwnProducePage from './stock/OwnProducePage';
+import TradingPage from './stock/TradingPage';
+import ProcessingBatchPage from './processing/BatchPage';
+import ProcessingBatchesPage from './processing/BatchesPage';
+import ProcessingLayout from './processing/ProcessingLayout';
+import ProcessingReportsPage from './processing/ProcessingReportsPage';
+import TracePage from './processing/TracePage';
 import LivestockLayout from './livestock/LivestockLayout';
 import LivestockReportsPage from './livestock/LivestockReportsPage';
 import MilkPage from './livestock/MilkPage';
@@ -154,6 +160,12 @@ function App() {
               <Route path="water" element={<WaterPage />} />
               <Route path="reports" element={<AquaReportsPage />} />
             </Route>
+            <Route path="processing" element={<ProcessingLayout />}>
+              <Route index element={<ProcessingBatchesPage />} />
+              <Route path="batches/:batchId" element={<ProcessingBatchPage />} />
+              <Route path="trace" element={<TracePage />} />
+              <Route path="reports" element={<ProcessingReportsPage />} />
+            </Route>
             <Route path="organic" element={<OrganicLayout />}>
               <Route index element={<BatchesPage />} />
               <Route path="batches/:batchId" element={<BatchPage />} />
@@ -179,6 +191,7 @@ function App() {
               <Route path="reports" element={<StockReportsPage />} />
               <Route path="new/:kind" element={<StockRecordPage />} />
               <Route path="own-produce" element={<OwnProducePage />} />
+              <Route path="trading" element={<TradingPage />} />
             </Route>
             <Route path="workforce" element={<WorkforceLayout />}>
               <Route index element={<AttendancePage />} />

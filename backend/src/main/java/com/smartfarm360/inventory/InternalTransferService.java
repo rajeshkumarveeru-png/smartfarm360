@@ -74,8 +74,13 @@ public class InternalTransferService {
                 .orElseThrow(() -> ApiException.notFound("COST_OBJECT_NOT_FOUND", "Activity not found."));
     }
 
-    /** Organic batch output moves at average cost by default; byproducts and other produce at nil (L9). */
-    static String defaultMethod(String sourceKind) { return "ORGANIC_BATCH".equals(sourceKind) ? "AVERAGE_COST" : "NIL"; }
+    /**
+     * Organic batch output moves at average cost by default; byproducts and other produce at nil (L9). Own produce moved
+     * into a processing batch carries its average cost too, so the crop's cost follows its harvest (processing design, M3).
+     */
+    static String defaultMethod(String sourceKind, String targetKind) {
+        return "ORGANIC_BATCH".equals(sourceKind) || "PROCESSING_BATCH".equals(targetKind) ? "AVERAGE_COST" : "NIL";
+    }
 
     private record Checked(ItemService.ItemRow item, BigDecimal baseQuantity, CostObjectRow target, CostObjectRow source, Preview preview) {}
 
@@ -91,9 +96,13 @@ public class InternalTransferService {
                 .param("t", ctx.tenantId()).param("co", target.id()).query(Boolean.class).single()) {
             throw ApiException.conflict("BATCH_FINISHED", "This batch is finished. Reopen it to record more.");
         }
+        if ("PROCESSING_BATCH".equals(target.kind()) && jdbc.sql("select exists (select 1 from sf_processing_batches where tenant_id = :t and cost_object_id = :co and finished_on is not null)")
+                .param("t", ctx.tenantId()).param("co", target.id()).query(Boolean.class).single()) {
+            throw ApiException.conflict("BATCH_FINISHED", "This batch is finished. Reopen it to record more.");
+        }
         CostObjectRow source = r.fromCostObjectId() == null ? null : costObject(ctx.tenantId(), r.fromCostObjectId());
         if (source != null && source.id() == target.id()) throw ApiException.badRequest("SAME_ACTIVITY", "Choose a different activity to move it to.");
-        String def = source == null ? "NIL" : defaultMethod(source.kind());
+        String def = source == null ? "NIL" : defaultMethod(source.kind(), target.kind());
         String method = r.costMethod() == null ? def : r.costMethod();
         if ("AVERAGE_COST".equals(method) && source == null) throw ApiException.badRequest("SOURCE_REQUIRED", "Choose the activity that produced it to move its cost.");
         if (!method.equals(def) && !ctx.has(Permission.FINANCE_MANAGE)) {

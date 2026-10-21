@@ -81,3 +81,5 @@ a.finance-stat{color:inherit;text-decoration:none}a.finance-stat:hover{border-co
   .table-scroll{overflow:visible}
   a{color:inherit;text-decoration:none}
 }
+/* Lot trace (processing design, M8) */
+.trace-tree{margin:6px 0 6px 18px;padding:0;font-size:13px;line-height:1.6}.trace-tree li{margin:2px 0}

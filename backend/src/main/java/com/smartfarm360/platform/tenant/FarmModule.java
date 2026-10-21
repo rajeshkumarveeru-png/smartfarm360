@@ -12,7 +12,7 @@ public enum FarmModule {
     GOAT_SHEEP(true),
     AQUACULTURE(true),
     ORGANIC(true),
-    PROCESSING(false),
+    PROCESSING(true),
     WORKFORCE(true),
     ASSETS(true);
 

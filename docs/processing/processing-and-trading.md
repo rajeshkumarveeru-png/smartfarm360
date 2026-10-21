@@ -1,6 +1,7 @@
 # Processing and trading design (Phase 12)
 
-- Status: **Draft for product-owner review** (2026-10-21). No Phase 12 code is written until this is approved.
+- Status: **Approved** (2026-10-21) with the recommended answers to M1–M15, and implemented in Phase 12. Implementation
+  notes are in section 15.
 - Builds on:
   - the [stock movement design](../inventory/stock-movements.md): items with pack units, lots, moving-average cost,
     and stock that changes only through movements (ADR 0005);
@@ -43,8 +44,8 @@ A **batch** is one run of one process on a defined lot of produce:
 
 | Field | Notes |
 |---|---|
-| Code | Short and unique, for example *RM-2611-01*. Used in output lot numbers. |
-| Name | For example *Rice milling Nov 2026* |
+| Code | Short and unique, for example *RM-2610-01*. Used in output lot numbers. |
+| Name | For example *Rice milling Oct 2026* |
 | Kind | Cleaning and grading, drying, milling, oil pressing, packing, other |
 | Farm | Required |
 | Started on, expected end | The end date is optional, for reminders |
@@ -86,7 +87,7 @@ Output is recorded in parts. Each output line has:
 | Grade | Optional label, for example *Grade A* |
 
 - Main products and byproducts come into stock as farm produce at nil value (D3). For items that track lots, the lot
-  number is made from the batch code (*RM-2611-01-1*, *-2* and so on), so every finished lot is traceable.
+  number is made from the batch code (*RM-2610-01-1*, *-2* and so on), so every finished lot is traceable.
 - **Waste** (husk burnt for fuel, stones and dust) is recorded in kg for the weight balance, and does not enter stock.
 - Marking the last output finishes the batch.
 
@@ -138,27 +139,28 @@ for resale, and a sale that posts the cost of goods sold (5700) at moving-averag
 
 Produce bought and then processed is not trading; it is a batch input.
 
-## 10. Worked example (November 2026)
+## 10. Worked example (October 2026)
 
-**Rice milling, batch RM-2611-01.**
+**Rice milling, batch RM-2610-01.**
 - Samba 2026 produced 4,000 kg of paddy (lot SAMBA-2026-H1). Its costs so far: ₹60,000, so ₹15.00 per kg.
-- 1 November: the batch *Rice milling Nov 2026* (code RM-2611-01, main product *Rice*) is started.
+- 30 September: Samba's paddy comes into stock. 1 October: the batch *Rice milling Oct 2026* (code RM-2610-01, main
+  product *Rice*) is started.
 - 2,000 kg of paddy is moved into the batch from lot SAMBA-2026-H1 at average cost: **₹30,000** moves from Samba to the
   batch (principle 2).
 - Drying step: 2,000 kg at 17% moisture → 1,920 kg at 13.5% (80 kg of drying loss, recorded on the step).
 - Hired milling ₹4,000; 26 bags at ₹40 (₹1,040) used from stock; labour ₹1,960.
-- 5 November: output
+- 5 October: output (the batch is finished with the husk, the last output: 4 days)
 
 | Output | Role | kg | Yield |
 |---|---|---|---|
-| Rice (26 × 50 kg bags), lot RM-2611-01-1 | Main | 1,300 | 65.0% |
-| Broken rice, lot RM-2611-01-2 | Byproduct | 100 | 5.0% |
-| Bran, lot RM-2611-01-3 | Byproduct | 160 | 8.0% |
+| Rice (26 × 50 kg bags), lot RM-2610-01-1 | Main | 1,300 | 65.0% |
+| Broken rice, lot RM-2610-01-2 | Byproduct | 100 | 5.0% |
+| Bran, lot RM-2610-01-3 | Byproduct | 160 | 8.0% |
 | Husk (burnt in the dryer) | Waste | 340 | 17.0% |
 | **Process loss** (80 kg drying, 20 kg milling) | | **100** | **5.0%** |
 | **Input** | | **2,000** | |
 
-- November sales assigned to the batch: rice 1,300 kg at ₹60 (₹78,000), 1,000 kg of it to *Lakshmi Stores*; broken
+- October sales assigned to the batch: rice 1,300 kg at ₹60 (₹78,000), 1,000 kg of it to *Lakshmi Stores*; broken
   rice 100 kg at ₹30 (₹3,000); bran 160 kg at ₹15 (₹2,400).
 
 | Figure (batch) | Value |
@@ -172,10 +174,10 @@ Produce bought and then processed is not trading; it is a batch input.
 | The farm's total profit | **Unchanged** by the transfer |
 
 **Trace.**
-- Backward from lot RM-2611-01-1: batch RM-2611-01 → paddy lot SAMBA-2026-H1 → crop cycle *Samba 2026*, North field.
-- Forward from SAMBA-2026-H1: batch RM-2611-01 → lots RM-2611-01-1, -2, -3 → sales to Lakshmi Stores and the other buyers.
+- Backward from lot RM-2610-01-1: batch RM-2610-01 → paddy lot SAMBA-2026-H1 → crop cycle *Samba 2026*, North field.
+- Forward from SAMBA-2026-H1: batch RM-2610-01 → lots RM-2610-01-1, -2, -3 → sales to Lakshmi Stores and the other buyers.
 
-**Trading.** In November the farm bought 2,000 kg of turmeric for resale at ₹80 (₹1,60,000) and sold 1,500 kg at ₹100
+**Trading.** In October the farm bought 2,000 kg of turmeric for resale at ₹80 (₹1,60,000) and sold 1,500 kg at ₹100
 (₹1,50,000). The cost of goods sold is 1,500 × ₹80 = ₹1,20,000, so the gross margin is **₹30,000 (20.0%)**, with 500 kg
 (₹40,000) in stock.
 
@@ -257,3 +259,30 @@ gets cross-tenant and permission tests.
 - permissions and the module switch, and the trading report without the module;
 - cross-tenant tests for every new endpoint;
 - the migration on a copy of the current schema.
+
+## 15. Implementation notes (2026-10-21)
+
+- **Module.** The new `processing` package (batches, steps, output, figures and the lot trace); `ModuleBoundaryTest`
+  (rule `onlyReportingUsesProcessing`) allows only `reporting` to depend on it. The trading margin report lives in
+  `inventory` (`/stock/reports/trading`), needs `FINANCE_READ` and no module (M12).
+- **Worked example dates.** Records cannot be dated in the future, and the build ran on 21 October 2026, so the example
+  in section 10 runs from 30 September to 9 October 2026 (batch code RM-2610-01) instead of November.
+- **Inputs (M2, M3).** The internal-transfer default now also looks at the target: own produce moved into a processing
+  batch moves at average cost. Transfers into a finished processing batch are refused.
+- **Output (M5).** The main output must be the batch's main product. Lots are made only for items that track lots,
+  numbered in the order products and byproducts came out (waste takes no number). The code and main product cannot
+  change once output exists. Product output needs `INVENTORY_WRITE`; waste does not.
+- **Weight balance (M7).** Input is stock used on the batch in kg (own produce moved in and bought produce). Output in
+  litres (oil) has no weight yield. A reversed produce record no longer counts.
+- **Cost per kg (M6).** Byproduct sales are sale lines of the batch's byproduct items assigned to the batch. The raw
+  material cost per kg is the cost moved in with own produce plus the cost of bought produce used, ÷ input kg.
+- **Trace (M8).** The trace follows posted stock movements and lots, four levels deep. It is printable from the web page;
+  it is not exported to CSV or Excel.
+- **Trading (M10).** The report shows bought, sold, revenue, cost of sales, margin and stock. The "direct trading costs"
+  column of section 9 is left out: finance sales cannot carry cost lines, so those costs are not tied to an item.
+  Returns from customers are not netted from sales.
+- **Every module is available.** With Processing, no module is left "coming in a later release". The permission test
+  that switched on an unavailable module now checks that every module reports available and can be switched on; the
+  `MODULE_NOT_AVAILABLE` guard stays for future modules.
+- **Phone (M13).** Under *More → Processing*, with the lots of lot-tracked produce offered as chips.
+

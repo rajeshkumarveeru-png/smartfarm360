@@ -11,6 +11,7 @@ export const NAV_ITEMS: NavItem[] = [
   { key: 'livestock', path: 'livestock', permission: 'LIVESTOCK_READ', anyModule: ['DAIRY', 'POULTRY', 'GOAT_SHEEP'] },
   { key: 'aquaculture', path: 'aquaculture', permission: 'AQUACULTURE_READ', module: 'AQUACULTURE' },
   { key: 'organic', path: 'organic', permission: 'ORGANIC_READ', module: 'ORGANIC' },
+  { key: 'processing', path: 'processing', permission: 'PROCESSING_READ', module: 'PROCESSING' },
   { key: 'finance', path: 'finance', permission: 'FINANCE_READ' },
   { key: 'stock', path: 'stock', permission: 'INVENTORY_READ' },
   { key: 'workforce', path: 'workforce', permission: 'WORKFORCE_READ', module: 'WORKFORCE' },

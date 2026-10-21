@@ -25,3 +25,5 @@ databaseChangeLog:
       file: db/changelog/012-aquaculture.yaml
   - include:
       file: db/changelog/013-organic.yaml
+  - include:
+      file: db/changelog/014-processing.yaml

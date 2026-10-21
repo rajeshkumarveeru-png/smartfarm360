@@ -60,7 +60,7 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
                 "039-crop-v2-backfill",
                 "040-workforce-assets-schema",
                 "041-workforce-assets-seed", "042-report-indexes", "043-livestock-schema", "044-livestock-seed",
-                "045-poultry-goats-schema", "046-poultry-goats-seed", "047-aquaculture-schema", "048-aquaculture-seed", "049-organic-schema", "050-organic-seed");
+                "045-poultry-goats-schema", "046-poultry-goats-seed", "047-aquaculture-schema", "048-aquaculture-seed", "049-organic-schema", "050-organic-seed", "051-processing-schema", "052-processing-seed");
     }
 
     @Test
@@ -87,7 +87,8 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
                 "sf_batch_days", "sf_head_movements", "sf_egg_postings", "sf_health_plan_items",
                 "sf_ponds", "sf_pond_cycles", "sf_pond_stockings", "sf_pond_days", "sf_pond_day_feeds", "sf_pond_deaths", "sf_pond_samples",
                 "sf_water_readings", "sf_water_limits", "sf_pond_harvests", "sf_pond_harvest_lines",
-                "sf_internal_transfers", "sf_organic_batches", "sf_organic_logs");
+                "sf_internal_transfers", "sf_organic_batches", "sf_organic_logs", "sf_processing_batches", "sf_processing_steps",
+                "sf_processing_outputs");
     }
 
     @Test
@@ -430,6 +431,30 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
         db.update("insert into sf_finance_documents(tenant_id, doc_type, status, doc_date, total_amount) values (?, 'INTERNAL_TRANSFER', 'DRAFT', current_date, 0)", tenant);
         assertThatThrownBy(() -> db.update("insert into sf_finance_documents(tenant_id, doc_type, status, doc_date, total_amount) values (?, 'PAYMENT', 'DRAFT', current_date, 0)", tenant))
                 .hasMessageContaining("ck_sf_doc_total");
+    }
+
+    @Test
+    void upgradingLeavesProcessingOffAndGrantsItsPermissions() throws Exception {
+        DataSource legacy = newDatabase("legacy_pr_" + UUID.randomUUID().toString().replace("-", ""));
+        JdbcTemplate db = new JdbcTemplate(legacy);
+        runChangelog(legacy, 26); // everything before Phase 12 (changesets 025-050)
+        long tenant = db.queryForObject("insert into sf_tenants(name, slug) values ('Old farm', 'old-farm-pr') returning id", Long.class);
+        db.update("insert into sf_tenant_modules(tenant_id, module_code, enabled) values (?, 'CROP', true)", tenant);
+
+        runChangelog(legacy, null);
+
+        // M12: existing farm businesses keep Processing off until they switch it on
+        assertThat(db.queryForList("select module_code from sf_tenant_modules where tenant_id = ? and enabled", String.class, tenant))
+                .doesNotContain("PROCESSING");
+        assertThat(db.queryForList("select r.code from sf_role_permissions rp join sf_roles r on r.id = rp.role_id where r.tenant_id is null " +
+                "and rp.permission_code = 'PROCESSING_WRITE'", String.class))
+                .containsExactlyInAnyOrder("TENANT_OWNER", "FARM_ADMIN", "FARM_MANAGER", "FIELD_SUPERVISOR", "WORKER");
+        assertThat(db.queryForList("select r.code from sf_role_permissions rp join sf_roles r on r.id = rp.role_id where r.tenant_id is null " +
+                "and rp.permission_code = 'PROCESSING_READ'", String.class)).contains("ACCOUNTANT", "VIEWER");
+        // Processing batches are cost objects; other kinds are still refused
+        db.update("insert into sf_cost_objects(tenant_id, kind, name) values (?, 'PROCESSING_BATCH', 'RM-1')", tenant);
+        assertThatThrownBy(() -> db.update("insert into sf_cost_objects(tenant_id, kind, name) values (?, 'FACTORY', 'X')", tenant))
+                .hasMessageContaining("ck_sf_cost_object_kind");
     }
 
     /** Applies {@code count} changesets (all when null) to the given database. */

@@ -12,6 +12,7 @@ export default function StockLayout() {
     { to: `${base}/items`, label: t('items') },
     { to: `${base}/locations`, label: t('locations') },
     { to: `${base}/reports`, label: t('reports') },
+    { to: `${base}/trading`, label: t('trading.tab') },
   ];
   return (
     <section className="crop-page finance-page">

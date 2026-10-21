@@ -39,7 +39,8 @@ Record every command you ran and its result in `docs/PROGRESS.md` at the end of 
   `workforce` (workers, attendance, pay runs), `assets` (register, depreciation, maintenance), `livestock` (herd, milk,
   health, breeding, poultry batches, goat and sheep herds; only reporting depends on it), `aquaculture` (ponds, culture
   cycles, water quality, harvests; only reporting depends on it), `organic` (compost and manure batches; only reporting
-  depends on it; internal transfers of own produce live in `inventory`) and `reporting`
+  depends on it; internal transfers of own produce live in `inventory`), `processing` (processing batches and the lot
+  trace; only reporting depends on it; the trading margin report lives in `inventory`) and `reporting`
   (the dashboard: reads other modules, nothing depends on it). Report exports go through `platform.export`.
   Finance reaches stock only through
   `StockHook`; `ModuleBoundaryTest` enforces the boundaries.

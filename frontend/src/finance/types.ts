@@ -2,7 +2,7 @@ export type Category = { id: number; code: string | null; name: string | null; k
 export type FinancialAccount = { id: number; name: string; kind: 'CASH' | 'BANK' | 'UPI'; active: boolean; balance: number };
 export type Party = { id: number; name: string; phone?: string; village?: string; notes?: string; customer: boolean; supplier: boolean; lender: boolean; active: boolean; receivable: number; payable: number };
 export type Loan = { id: number; name: string; lenderPartyId: number; lenderName: string; startDate: string; outstanding: number };
-export type CostObject = { id: number; kind: 'OVERHEAD' | 'CROP_CYCLE' | 'ANIMAL_GROUP' | 'POND_CYCLE' | 'ORGANIC_BATCH'; name: string; cropCycleId?: number; farmId?: number; active: boolean };
+export type CostObject = { id: number; kind: 'OVERHEAD' | 'CROP_CYCLE' | 'ANIMAL_GROUP' | 'POND_CYCLE' | 'ORGANIC_BATCH' | 'PROCESSING_BATCH'; name: string; cropCycleId?: number; farmId?: number; active: boolean };
 export type FinanceSettings = { lockDate: string | null; fiscalYearStartMonth: number };
 
 export type DocType = 'BILL' | 'SALE' | 'PAYMENT' | 'RECEIPT' | 'TRANSFER' | 'OWNER_IN' | 'OWNER_OUT' | 'LOAN_RECEIVED' | 'LOAN_REPAYMENT'

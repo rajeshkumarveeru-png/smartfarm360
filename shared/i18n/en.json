@@ -134,7 +134,9 @@
     "aquacultureNotEnabled": "Fish farming is not switched on for this farm business, or your role cannot see it.",
     "compost": "Compost",
     "organicNotEnabled": "Organic manure is not switched on for this farm business, or your role cannot see it.",
-    "spreadOnField": "Spread on a field"
+    "spreadOnField": "Spread on a field",
+    "processing": "Processing",
+    "processingNotEnabled": "Processing is not switched on for this farm business, or your role cannot see it."
   },
   "common": {
     "appName": "SmartFarm360",
@@ -206,7 +208,8 @@
     "reports": "Reports",
     "livestock": "Livestock",
     "aquaculture": "Fish farming",
-    "organic": "Organic manure"
+    "organic": "Organic manure",
+    "processing": "Processing"
   },
   "tenant": {
     "title": "Create your farm business",
@@ -394,7 +397,15 @@
     "ORGANIC_LOG_RECORDED": "Compost log entry recorded",
     "ORGANIC_LOG_DELETED": "Compost log entry removed",
     "ORGANIC_OUTPUT_RECORDED": "Compost taken out into stock",
-    "INTERNAL_TRANSFER_RECORDED": "Own produce used on another activity"
+    "INTERNAL_TRANSFER_RECORDED": "Own produce used on another activity",
+    "PROCESSING_BATCH_STARTED": "Processing batch started",
+    "PROCESSING_BATCH_SAVED": "Processing batch changed",
+    "PROCESSING_BATCH_FINISHED": "Processing batch finished",
+    "PROCESSING_BATCH_REOPENED": "Processing batch reopened",
+    "PROCESSING_STEP_RECORDED": "Processing step recorded",
+    "PROCESSING_STEP_DELETED": "Processing step removed",
+    "PROCESSING_OUTPUT_RECORDED": "Processing output recorded",
+    "PROCESSING_OUTPUT_DELETED": "Processing waste removed"
   },
   "platform": {
     "title": "Platform administration",
@@ -495,9 +506,9 @@
     "LOCATION_HAS_STOCK": "Move the stock out of this location first.",
     "LOCATION_INACTIVE": "This location is not in use.",
     "LOCATION_NOT_FOUND": "Location not found.",
-    "LOT_REQUIRED": "Enter the lot or batch number.",
+    "LOT_REQUIRED": "Enter a lot number.",
     "LOT_NOT_TRACKED": "This item does not track lots.",
-    "LOT_NOT_FOUND": "There is no such lot for this item.",
+    "LOT_NOT_FOUND": "No lot with this number.",
     "INSUFFICIENT_STOCK": "Not enough in stock here; stock cannot go below zero.",
     "STOCK_ALREADY_USED": "Some of this stock has already been used, sold or moved, so the record cannot be reversed. Record a return or a stock count instead.",
     "SAME_LOCATION": "Choose two different locations.",
@@ -680,7 +691,17 @@
     "TARGET_REQUIRED": "Choose the activity that uses it.",
     "SAME_ACTIVITY": "Choose a different activity to move it to.",
     "SOURCE_REQUIRED": "Choose the activity that produced it to move its cost.",
-    "SOURCE_QUANTITY_EXCEEDED": "The activity has not produced that much that is still unmoved."
+    "SOURCE_QUANTITY_EXCEEDED": "The activity has not produced that much that is still unmoved.",
+    "PROCESSING_BATCH_NOT_FOUND": "Processing batch not found.",
+    "PROCESSING_STEP_NOT_FOUND": "Step not found.",
+    "PROCESSING_OUTPUT_NOT_FOUND": "Output not found.",
+    "BATCH_CODE_TAKEN": "Another batch has this code.",
+    "BATCH_HAS_OUTPUT": "The code and main product cannot change once output is recorded.",
+    "STEP_GAINS_WEIGHT": "More came out of the step than went in.",
+    "WASTE_DESCRIPTION_REQUIRED": "Say what the waste is, for example husk.",
+    "ITEM_REQUIRED": "Choose the item that came out.",
+    "MAIN_ITEM_MISMATCH": "The main output is the batch's main product; record other items as byproducts.",
+    "OUTPUT_HAS_RECORD": "This output is in stock; reverse its record instead."
   },
   "mobileAuth": {
     "chooseTenant": "Choose a farm business",
@@ -1206,6 +1227,23 @@
         "form": "Choose the produce, a quantity, and the activity that uses it."
       },
       "lot": "Lot"
+    },
+    "trading": {
+      "tab": "Trading",
+      "title": "Trading margin",
+      "help": "Goods bought for resale: what was bought and sold, the cost of what was sold at average cost, and the margin.",
+      "needsFinance": "The trading margin needs permission to see money.",
+      "none": "No goods bought for resale moved in this period.",
+      "bought": "Bought",
+      "boughtValue": "Bought for",
+      "sold": "Sold",
+      "costOfSales": "Cost of sales",
+      "margin": "Margin",
+      "marginPercent": "Margin %",
+      "inStock": "In stock",
+      "stockValue": "Stock value",
+      "total": "Total",
+      "note": "Produce bought and then processed is not trading; it is an input of the processing batch."
     }
   },
   "crop": {
@@ -1735,7 +1773,8 @@
       "assets": "Assets",
       "livestock": "Livestock",
       "aquaculture": "Fish farming",
-      "organic": "Organic manure"
+      "organic": "Organic manure",
+      "processing": "Processing and trading"
     },
     "catalog": {
       "income": "Profit and loss",
@@ -1761,7 +1800,10 @@
       "pondCycles": "Pond crops",
       "waterLog": "Water quality log",
       "organicBatches": "Compost and manure batches",
-      "internalTransfers": "Own produce used on the farm"
+      "internalTransfers": "Own produce used on the farm",
+      "processingBatches": "Processing batches",
+      "lotTrace": "Lot trace",
+      "tradingMargin": "Trading margin"
     },
     "catalogHint": {
       "income": "income, costs and profit for a period",
@@ -1787,7 +1829,10 @@
       "pondCycles": "Survival, FCR, yield and profit per acre for each pond crop",
       "waterLog": "Readings by pond, with values outside your limits marked",
       "organicBatches": "Yield, cost per kg and cost moved to your fields",
-      "internalTransfers": "Compost, dung, fodder and straw moved between activities, with the cost moved"
+      "internalTransfers": "Compost, dung, fodder and straw moved between activities, with the cost moved",
+      "processingBatches": "Outturn, process loss and cost per kg of the finished product",
+      "lotTrace": "From a bag of rice back to the field, and from a harvest to the customers",
+      "tradingMargin": "Goods bought for resale: sold, cost of sales and gross margin"
     },
     "help": {
       "monthly": "Each month's income and costs. The total column equals profit and loss for the whole period.",
@@ -1866,7 +1911,8 @@
       "WATER_OUT_OF_LIMITS": "Water outside your limits today in {{count}} ponds",
       "POND_RECORD_MISSING": "Today's pond record is missing for {{count}} ponds",
       "HARVEST_OVERDUE": "{{count}} pond crops are past their planned harvest",
-      "ORGANIC_OVERDUE": "{{count}} compost batches are past their ready date"
+      "ORGANIC_OVERDUE": "{{count}} compost batches are past their ready date",
+      "PROCESSING_OVERDUE": "{{count}} processing batches are past their expected end"
     }
   },
   "livestock": {
@@ -2567,6 +2613,142 @@
       "log": "Enter kg and temperature as numbers.",
       "output": "Choose the item and enter the quantity.",
       "manure": "Choose where it was collected, the item and the quantity."
+    }
+  },
+  "processing": {
+    "title": "Processing",
+    "batches": "Batches",
+    "trace": "Lot trace",
+    "reports": "Reports",
+    "report": {
+      "batches": "Processing batches"
+    },
+    "batchesHelp": "Each run of cleaning, drying, milling, pressing or packing: what went in, what came out, and the cost per kg.",
+    "startBatch": "Start batch",
+    "code": "Code",
+    "batch": "Batch",
+    "batchName": "Batch",
+    "batchExample": "Rice milling Oct 2026",
+    "batchHelp": "The code is used in the lot numbers of the output, so every bag can be traced.",
+    "kindLabel": "Process",
+    "kind": {
+      "GRADING": "Cleaning and grading",
+      "DRYING": "Drying",
+      "MILLING": "Milling",
+      "PRESSING": "Oil pressing",
+      "PACKING": "Packing",
+      "OTHER": "Other"
+    },
+    "mainProduct": "Main product",
+    "farm": "Farm",
+    "startedOn": "Started on",
+    "expectedEnd": "Expected end",
+    "expectedEndDate": "expected by {{date}}",
+    "finishedOn": "finished {{date}}",
+    "statusLabel": "Status",
+    "status": {
+      "RUNNING": "Running",
+      "OUTPUT": "Output taken",
+      "FINISHED": "Finished"
+    },
+    "noBatches": "No batches yet.",
+    "finish": "Mark finished",
+    "finished": "Batch marked finished.",
+    "confirmFinish": "A finished batch takes no more inputs, steps or output. Continue?",
+    "reopen": "Reopen",
+    "reopened": "Batch reopened.",
+    "from": "From",
+    "to": "To",
+    "period": "{{from}} – {{to}}",
+    "wholeBatch": "Whole batch: weight balance",
+    "balance": "Weight",
+    "inputs": "What went in",
+    "moveIn": "Put own produce in",
+    "inputsHelp": "Your own harvest comes in with its growing cost per kg. Bought produce and packing material are used from stock; hired milling and labour are bills to this batch.",
+    "steps": "Steps",
+    "stepLabel": "Step",
+    "step": {
+      "CLEANING": "Cleaning",
+      "DRYING": "Drying",
+      "GRADING": "Grading",
+      "MILLING": "Milling",
+      "PRESSING": "Pressing",
+      "PACKING": "Packing",
+      "OTHER": "Other"
+    },
+    "date": "Date",
+    "kgIn": "kg in",
+    "kgOut": "kg out",
+    "stepLoss": "Loss (kg)",
+    "moistureBefore": "Moisture before (%)",
+    "moistureAfter": "Moisture after (%)",
+    "moistureChange": "moisture {{before}}% → {{after}}%",
+    "grade": "Grade",
+    "notes": "Notes",
+    "details": "Details",
+    "stepsHelp": "Steps are a record of the work; they do not move stock. Output does.",
+    "recordStep": "Record step",
+    "stepSaved": "Step recorded.",
+    "noSteps": "No steps recorded yet.",
+    "removeStep": "Remove this step",
+    "confirmRemoveStep": "Remove this step?",
+    "stepRemoved": "Step removed.",
+    "outputs": "Output",
+    "roleLabel": "Role",
+    "role": {
+      "MAIN": "Main product",
+      "BYPRODUCT": "Byproduct",
+      "WASTE": "Waste"
+    },
+    "item": "Item",
+    "quantity": "Quantity",
+    "kg": "kg",
+    "lot": "Lot",
+    "wasteWhat": "What the waste is",
+    "wasteExample": "Husk, stones, dust",
+    "lastOutput": "This is the last output; mark the batch finished",
+    "outputNeedsStock": "Putting output into stock needs permission to record stock.",
+    "outputHelp": "Products and byproducts go into stock at nil value, with lot numbers made from the batch code when the item tracks lots. Waste is recorded in kg only.",
+    "recordOutput": "Record output",
+    "outputSaved": "Output recorded.",
+    "removeOutput": "Remove this waste line",
+    "confirmRemoveOutput": "Remove this waste line?",
+    "outputRemoved": "Waste line removed.",
+    "inputKg": "Input (kg)",
+    "daysValue": "{{days}} days",
+    "yield": "Yield",
+    "processLoss": "Process loss",
+    "mainKg": "Main product (kg)",
+    "mainYield": "Outturn",
+    "lossKg": "Loss (kg)",
+    "mainCostPerKg": "Cost per kg of main product",
+    "rawCostPerKg": "Raw material cost per kg",
+    "byproductSales": "Byproduct sales",
+    "profit": "Profit",
+    "tradingLink": "Trading margin",
+    "nothingInPeriod": "Nothing recorded in this period.",
+    "batchesHelpReport": "Cost per kg of the main product = (costs − byproduct sales) ÷ main product kg. Compare it with the raw material's cost per kg and the market price.",
+    "traceHelp": "Enter a lot number to see where it came from and where it went.",
+    "traceLot": "Trace",
+    "print": "Print",
+    "backward": "Where it came from",
+    "forward": "Where it went",
+    "notUsedYet": "Not used or sold yet.",
+    "origin": {
+      "BATCH": "made by batch {{code}} on {{date}}",
+      "PRODUCED": "harvested from {{activity}} on {{date}}",
+      "BOUGHT": "bought from {{party}} ({{number}}) on {{date}}",
+      "OTHER": "came into stock another way"
+    },
+    "cashPurchase": "a cash purchase",
+    "farmGeneral": "the farm",
+    "cashSale": "a cash buyer",
+    "soldTo": "sold {{quantity}} {{unit}} to {{party}} on {{date}} ({{number}})",
+    "usedIn": "{{quantity}} {{unit}} used in batch",
+    "errors": {
+      "batch": "Enter a code (letters, numbers and dashes), a name, the main product and the farm.",
+      "step": "Enter kg and moisture as numbers.",
+      "output": "Choose the item (or say what the waste is) and enter the quantity."
     }
   }
 }

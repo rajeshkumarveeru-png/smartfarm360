@@ -14,6 +14,7 @@ import com.smartfarm360.aquaculture.AquaReports;
 import com.smartfarm360.aquaculture.WaterService;
 import com.smartfarm360.livestock.FlockReports;
 import com.smartfarm360.organic.OrganicService;
+import com.smartfarm360.processing.ProcessingService;
 import com.smartfarm360.livestock.LivestockReports;
 import com.smartfarm360.operations.CropReportService;
 import com.smartfarm360.operations.OperationsDtos.CycleReport;
@@ -58,10 +59,12 @@ public class DashboardService {
     private final AquaReports aqua;
     private final WaterService water;
     private final OrganicService organic;
+    private final ProcessingService processing;
 
     public DashboardService(ReportService reports, LedgerReportService ledger, StockReportService stock, CropService crops,
                             CropReportService cropReports, WorkerService workers, AssetService assets,
-                            LivestockReports livestock, FlockReports flocks, AquaReports aqua, WaterService water, OrganicService organic) {
+                            LivestockReports livestock, FlockReports flocks, AquaReports aqua, WaterService water, OrganicService organic, ProcessingService processing) {
+        this.processing = processing;
         this.organic = organic;
         this.aqua = aqua;
         this.water = water;
@@ -181,6 +184,14 @@ public class DashboardService {
                 // Organic resources design, L14: batches past their expected ready date
                 int late = organic.overdue(ctx, asOf);
                 if (late > 0) attention.add(new Attention("ORGANIC_OVERDUE", late, null, null));
+                return null;
+            });
+        }
+        if (ctx.has(Permission.PROCESSING_READ) && module(ctx, FarmModule.PROCESSING)) {
+            tile("processing", errors, () -> {
+                // Processing and trading design, M14: batches past their expected end
+                int late = processing.overdue(ctx, asOf);
+                if (late > 0) attention.add(new Attention("PROCESSING_OVERDUE", late, null, null));
                 return null;
             });
         }

@@ -20,7 +20,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 class ModuleBoundaryTest {
     private static final String[] BUSINESS = {"com.smartfarm360.farm..", "com.smartfarm360.crop..", "com.smartfarm360.finance..",
             "com.smartfarm360.inventory..", "com.smartfarm360.costing..", "com.smartfarm360.operations..", "com.smartfarm360.workforce..", "com.smartfarm360.assets..",
-            "com.smartfarm360.reporting..", "com.smartfarm360.livestock..", "com.smartfarm360.aquaculture..", "com.smartfarm360.organic.."};
+            "com.smartfarm360.reporting..", "com.smartfarm360.livestock..", "com.smartfarm360.aquaculture..", "com.smartfarm360.organic..", "com.smartfarm360.processing.."};
 
     @ArchTest
     static final ArchRule platformDoesNotDependOnBusinessModules = noClasses().that().resideInAPackage("com.smartfarm360.platform..")
@@ -67,6 +67,10 @@ class ModuleBoundaryTest {
     @ArchTest
     static final ArchRule onlyReportingUsesOrganic = noClasses().that().resideOutsideOfPackages("com.smartfarm360.organic..", "com.smartfarm360.reporting..")
             .should().dependOnClassesThat().resideInAPackage("com.smartfarm360.organic..");
+
+    @ArchTest
+    static final ArchRule onlyReportingUsesProcessing = noClasses().that().resideOutsideOfPackages("com.smartfarm360.processing..", "com.smartfarm360.reporting..")
+            .should().dependOnClassesThat().resideInAPackage("com.smartfarm360.processing..");
 
     @ArchTest
     static final ArchRule nothingDependsOnReporting = noClasses().that().resideOutsideOfPackage("com.smartfarm360.reporting..")

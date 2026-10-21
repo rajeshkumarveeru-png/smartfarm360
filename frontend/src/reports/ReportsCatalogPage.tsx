@@ -30,12 +30,17 @@ const GROUPS: { key: string; entries: Entry[] }[] = [
     { key: 'pondCycles', path: 'aquaculture/reports', permission: 'AQUACULTURE_READ', module: 'AQUACULTURE' },
     { key: 'waterLog', path: 'aquaculture/water', permission: 'AQUACULTURE_READ', module: 'AQUACULTURE' },
   ] },
+  { key: 'processing', entries: [
+    { key: 'processingBatches', path: 'processing/reports', permission: 'PROCESSING_READ', module: 'PROCESSING' },
+    { key: 'lotTrace', path: 'processing/trace', permission: 'PROCESSING_READ', module: 'PROCESSING' },
+  ] },
   { key: 'organic', entries: [
     { key: 'organicBatches', path: 'organic/reports', permission: 'ORGANIC_READ', module: 'ORGANIC' },
   ] },
   { key: 'stock', entries: [
     { key: 'stockValue', path: 'stock/reports', permission: 'INVENTORY_READ' },
     { key: 'internalTransfers', path: 'stock/own-produce', permission: 'INVENTORY_READ' },
+    { key: 'tradingMargin', path: 'stock/trading', permission: 'FINANCE_READ' },
   ] },
   { key: 'workers', entries: [
     { key: 'wages', path: 'reports/wages', permission: 'WORKFORCE_READ', module: 'WORKFORCE' },

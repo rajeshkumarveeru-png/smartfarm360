@@ -73,9 +73,13 @@ class PermissionIntegrationTest extends ApiIntegrationTest {
         put(base() + "/modules/CROP", owner, Map.of("enabled", true)).andExpect(status().isOk());
         get(base() + "/crops", owner).andExpect(status().isOk());
 
-        // Dairy (8), Poultry (9), Fish farming (10) and Organic manure (11) became available; Processing is still unavailable
-        put(base() + "/modules/PROCESSING", owner, Map.of("enabled", true)).andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("MODULE_NOT_AVAILABLE"));
+        // With Processing (Phase 12) every module is available: each reports available and can be switched on.
+        // The MODULE_NOT_AVAILABLE guard stays for future modules; no module is left to exercise it.
+        for (com.smartfarm360.platform.tenant.FarmModule m : com.smartfarm360.platform.tenant.FarmModule.values()) {
+            put(base() + "/modules/" + m.name(), owner, Map.of("enabled", true)).andExpect(status().isOk())
+                    .andExpect(jsonPath("$[?(@.code == '" + m.name() + "')].available").value(org.hamcrest.Matchers.contains(true)))
+                    .andExpect(jsonPath("$[?(@.code == '" + m.name() + "')].enabled").value(org.hamcrest.Matchers.contains(true)));
+        }
     }
 
     @Test
