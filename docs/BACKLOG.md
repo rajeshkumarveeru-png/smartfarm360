@@ -79,5 +79,8 @@ Approved design: [mobile offline](mobile/mobile-offline.md) (N1–N15); [ADR 001
 
 ## Phase 14 — SaaS operations and production readiness
 
+Design for review: [SaaS operations](platform/saas-operations.md) (O1–O15).
+
+
 - Platform admin console, tenant status, usage limits, support tools, tenant export and deletion, privacy/consent.
 - Hosting and deployment, backups with a tested restore, monitoring, incident and release checklists, load tests.

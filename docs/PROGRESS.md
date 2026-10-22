@@ -4,7 +4,9 @@
 
 - **Phase:** 13 (mobile offline) built on branch `feature/phase-13-mobile-offline` (based on
   `feature/phase-12-processing`). Its browser check and a real-phone check are still to do. The farming modules
-  (Phases 8–12) are complete. Next is Phase 14 (SaaS operations and production readiness). Nothing is pushed yet.
+  (Phases 8–12) are complete. Phase 14 (SaaS operations and production readiness) started on
+  `feature/phase-14-saas-ops`: the [SaaS operations design](platform/saas-operations.md) is awaiting review; no
+  Phase 14 code yet. Nothing is pushed yet.
 - **Production readiness:** not ready. Authentication, roles, tenant isolation, audit, the finance core and stock with
   movements are in place and tested, but no email provider is configured and hosting/backups are undecided.
 
@@ -21,15 +23,15 @@
 | Test database | Embedded PostgreSQL (no Docker available) | ADR 0007 |
 | Attachment storage | Storage interface; local disk default, S3 later | ADR 0009 |
 | Offline records | Client ids with a server idempotency store; day-record versions as value hashes | ADR 0010 |
-| **Hosting / deployment target** | **Open** — needed before Phase 14 (and before choosing S3/email providers) | — |
-| **Desktop (Electron) scope** | **Open** — kept working as is; needs a decision because it requires a local PostgreSQL | — |
+| **Hosting / deployment target** | **Open** — proposed in the Phase 14 design (O1: Indian region, managed PostgreSQL; provider chosen by the product owner) | [SaaS operations](platform/saas-operations.md) |
+| **Desktop (Electron) scope** | **Open** — the Phase 14 design proposes freezing it (O15) | [SaaS operations](platform/saas-operations.md) |
 | **Tamil terminology reviewer** | **Open** — required before the first release | ADR 0008 |
 | Finance posting rules, D1–D12 | Approved as recommended (2026-10-20) | [posting rules](finance/posting-rules.md) |
 | Stock movement design, E1–E12 | Approved as recommended (2026-10-20) | [stock movements](inventory/stock-movements.md) |
 | Crop management design, F1–F12 | Approved as recommended (2026-10-20) | [crop management](crops/crop-management.md) |
 | **Workforce and assets design, G1–G15** | **Awaiting review** (draft 2026-10-20) | [workforce and assets](workforce/workforce-and-assets.md) |
 | **Stock inputs by field supervisors** | **Open** — today only roles with `INVENTORY_WRITE` (owner, farm admin, farm manager, accountant) can record stock used on a crop; field supervisors and workers record notes-only work and harvests. Should field supervisors get stock-use permission? | crop design §15 |
-| **Email provider** | **Open** — Phase 2 ships the `EmailSender` interface with a logging stub, as instructed. Reset and invitation emails are not delivered until a provider is chosen | ADR 0003 |
+| **Email provider** | **Open** — Phase 2 ships the `EmailSender` interface with a logging stub, as instructed. Reset and invitation emails are not delivered until a provider is chosen; the Phase 14 design proposes SMTP to a provider chosen with the host (O5) | ADR 0003 |
 
 ## Phase 1 — Baseline and hygiene (2026-10-19)
 
