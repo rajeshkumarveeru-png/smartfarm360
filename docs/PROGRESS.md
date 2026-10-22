@@ -3,7 +3,7 @@
 ## Current state
 
 - **Phase:** 12 (processing and trading) built on branch `feature/phase-12-processing` (based on
-  `feature/phase-11-organic`); the browser check waits for a sign-in. The farming modules (Phases 8–12) are complete. Next:
+  `feature/phase-11-organic`); its browser check was skipped at the product owner's request. The farming modules (Phases 8–12) are complete. Next:
   Phase 13 (mobile offline). Nothing is pushed yet.
 - **Production readiness:** not ready. Authentication, roles, tenant isolation, audit, the finance core and stock with
   movements are in place and tested, but no email provider is configured and hosting/backups are undecided.
@@ -1155,7 +1155,7 @@ No business data was changed.
 | `frontend: npm run lint`, `tsc --noEmit`, `npm run build` | Passed; the bundle is still over 500 kB |
 | `frontend: npm test` | Passed: **77 tests**, including 6 new processing and trading screen tests |
 | `mobile: npx tsc --noEmit`, `npm test`, `npx expo install --check` | Passed: **47 tests**, including 3 new processing tests |
-| Manual browser check | **Not done yet** (see below) |
+| Manual browser check | **Skipped** at the product owner's request (see below) |
 
 The backend run includes:
 
@@ -1190,18 +1190,22 @@ One existing test changed with the approved design: the permission test that tri
 checks that every module reports available and can be switched on, because Processing was the last unavailable module
 (M12). The `MODULE_NOT_AVAILABLE` guard stays for future modules.
 
-Migrations 051–052 were applied at startup of the new jar, with no errors in the backend log. The **manual browser check
-is not done**: the browser session had expired after the restart and signing in needs the account's password, which the
-agent does not have. It will be done after the product owner signs in.
+Migrations 051–052 were applied at startup of the new jar, with no errors in the backend log. The **manual browser check was
+skipped** at the product owner's request on 2026-10-22. The browser session had been revoked, and signing in needs the
+account's password, which the agent does not have. The revoked session comes from a defect in the existing sign-in
+handling, recorded under known gaps below.
 
 Not verified:
 
-- The browser check (above), and a real phone.
+- The browser check (skipped), and a real phone.
 - GitHub Actions (nothing has been pushed).
 
 ## Known gaps and defects
 
 Security and platform:
+- **Two open tabs can sign each other out.** On 2026-10-21 two tabs refreshed the same token within a second; the server
+  treated the second refresh as a stolen token (`REUSE_DETECTED`) and revoked the whole session. A fix (a short grace
+  window or reliable cross-tab coordination, with tests) is proposed as a separate task.
 - **No email provider:** reset and invitation emails are not delivered (invitation links can be shared by hand;
   password reset needs a provider before production).
 - Rate limits are in memory per instance; a shared store is needed before running more than one instance.
