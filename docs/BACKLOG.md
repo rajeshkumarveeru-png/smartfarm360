@@ -69,6 +69,8 @@ Approved design: [dashboard and reports](reports/dashboard-and-reports.md) (H1�
 
 ## Phase 13 — Mobile offline
 
+Design for review: [mobile offline](mobile/mobile-offline.md) (N1–N15).
+
 - Local persistence (expo-sqlite), UUIDv7 client ids, idempotent sync, retries, explicit conflict resolution,
   protected local data.
 

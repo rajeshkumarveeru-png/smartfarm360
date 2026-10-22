@@ -3,8 +3,9 @@
 ## Current state
 
 - **Phase:** 12 (processing and trading) built on branch `feature/phase-12-processing` (based on
-  `feature/phase-11-organic`); its browser check was skipped at the product owner's request. The farming modules (Phases 8–12) are complete. Next:
-  Phase 13 (mobile offline). Nothing is pushed yet.
+  `feature/phase-11-organic`); its browser check was skipped at the product owner's request. The farming modules (Phases 8–12) are complete. Phase 13
+  (mobile offline) started on `feature/phase-13-mobile-offline`: the [mobile offline design](mobile/mobile-offline.md) is
+  awaiting review; no Phase 13 code yet. Nothing is pushed yet.
 - **Production readiness:** not ready. Authentication, roles, tenant isolation, audit, the finance core and stock with
   movements are in place and tested, but no email provider is configured and hosting/backups are undecided.
 
