@@ -17,6 +17,7 @@ import com.smartfarm360.platform.audit.AuditService;
 import com.smartfarm360.platform.rbac.Permission;
 import com.smartfarm360.platform.security.TenantContext;
 import com.smartfarm360.platform.web.ApiException;
+import com.smartfarm360.platform.web.Versions;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -290,7 +291,14 @@ public class FlockService {
         if (deaths > 0 && deaths * 100 > (heads + deaths + intOf(row.get("culls")))) warnings.add("HIGH_MORTALITY");
         return new BatchDay(date, deaths, (String) row.get("death_cause"), intOf(row.get("culls")), intOf(row.get("eggs_good")), intOf(row.get("eggs_cracked")),
                 intOf(row.get("eggs_broken")), longOf(row.get("feed_item_id")), (BigDecimal) row.get("feed_kg"), longOf(row.get("feed_document_id")),
-                (Integer) row.get("weight_birds"), (BigDecimal) row.get("weight_kg"), (String) row.get("notes"), heads, warnings);
+                (Integer) row.get("weight_birds"), (BigDecimal) row.get("weight_kg"), (String) row.get("notes"), heads, warnings, dayVersion(row));
+    }
+
+    /** The version of a batch day: a hash of what the user recorded, not of derived figures (mobile offline design, N7). */
+    private static String dayVersion(Map<String, Object> row) {
+        if (row.isEmpty()) return Versions.NONE;
+        return Versions.token(row.get("deaths"), row.get("death_cause"), row.get("culls"), row.get("eggs_good"), row.get("eggs_cracked"), row.get("eggs_broken"),
+                row.get("feed_item_id"), row.get("feed_kg"), row.get("weight_birds"), row.get("weight_kg"), row.get("notes"));
     }
 
     private static int intOf(Object o) { return o == null ? 0 : ((Number) o).intValue(); }
@@ -308,6 +316,13 @@ public class FlockService {
         notFuture(date);
         Group g = counted(ctx, groupId);
         if (!"CHICKEN".equals(g.species())) throw ApiException.badRequest("NOT_A_BATCH", "Daily records are kept for poultry batches.");
+        if (r.baseVersion() != null) {
+            // One save of a batch day at a time, so the version check and the write see the same day (N7)
+            jdbc.sql("select pg_advisory_xact_lock(hashtext(:k))").param("k", "batchday:" + ctx.tenantId() + ":" + g.id() + ":" + date).query().listOfRows();
+            Map<String, Object> stored = jdbc.sql("select * from sf_batch_days where tenant_id = :t and group_id = :g and day = :d")
+                    .param("t", ctx.tenantId()).param("g", g.id()).param("d", date).query().listOfRows().stream().findFirst().orElse(Map.of());
+            Versions.requireCurrent(r.baseVersion(), dayVersion(stored));
+        }
         if (g.placedOn() != null && date.isBefore(g.placedOn())) throw ApiException.badRequest("BEFORE_PLACEMENT", "The batch was placed after this date.");
         if ((r.feedItemId() == null) != (r.feedKg() == null)) throw ApiException.badRequest("FEED_ITEM_AND_KG", "Choose the feed and enter the kg.");
         if ((r.weightBirds() == null) != (r.weightKg() == null)) throw ApiException.badRequest("WEIGHT_SAMPLE", "Enter the birds weighed and their total kg.");

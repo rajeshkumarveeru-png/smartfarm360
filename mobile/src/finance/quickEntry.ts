@@ -1,5 +1,6 @@
 import { ApiError, apiRequest } from '../services/api';
 import type { EntryKind, FarmEntry } from '../storage/entries';
+import type { OutboxRecord } from '../offline/types';
 
 /** Mobile quick-entry categories mapped to the system finance categories (shared/i18n `financeCategory.*`). */
 export const CATEGORY_CODES: Record<EntryKind, Record<string, string>> = {
@@ -25,24 +26,36 @@ export async function loadFinance(tenantId: number, today: string): Promise<Fina
   return { summary, categories, cashAccountId: cash?.id ?? null };
 }
 
-/**
- * Posts a quick entry as a cash expense or sale. The entry id is the Idempotency-Key, so retrying the same entry
- * (after a timeout or from the offline queue) can never record it twice.
- */
-export async function postEntry(tenantId: number, entry: FarmEntry, finance: FinanceContext): Promise<void> {
+/** The request that records a quick entry as a cash expense or sale. */
+export function entryRequest(tenantId: number, entry: FarmEntry, finance: FinanceContext): { path: string; body: Record<string, unknown> } {
   const code = CATEGORY_CODES[entry.kind][entry.category] ?? (entry.kind === 'expense' ? 'OTHER_EXPENSE' : 'OTHER_INCOME');
   const category = finance.categories.find(c => c.code === code && c.active);
   if (!category || !finance.cashAccountId) throw new ApiError(400, 'FINANCIAL_ACCOUNT_REQUIRED', '');
-  await apiRequest(`${base(tenantId)}/${entry.kind === 'expense' ? 'bills' : 'sales'}`, {
-    method: 'POST',
-    headers: { 'Idempotency-Key': entry.id },
+  return {
+    path: `${base(tenantId)}/${entry.kind === 'expense' ? 'bills' : 'sales'}`,
     body: {
       docDate: entry.date,
       financialAccountId: finance.cashAccountId,
       lines: [{ categoryId: category.id, description: entry.description, amount: entry.amount.toFixed(2) }],
       notes: entry.description,
     },
-  });
+  };
+}
+
+/**
+ * Posts a quick entry as a cash expense or sale. The entry id is the Idempotency-Key, so retrying the same entry
+ * (after a timeout or from the offline queue) can never record it twice.
+ */
+export async function postEntry(tenantId: number, entry: FarmEntry, finance: FinanceContext): Promise<void> {
+  const { path, body } = entryRequest(tenantId, entry, finance);
+  await apiRequest(path, { method: 'POST', headers: { 'Idempotency-Key': entry.id }, body });
+}
+
+/** A quick entry as an outbox record (mobile offline design, section 4): it keeps its id, so it is never recorded twice. */
+export function entryRecord(userId: number, tenantId: number, entry: FarmEntry, finance: FinanceContext): OutboxRecord {
+  const { path, body } = entryRequest(tenantId, entry, finance);
+  return { id: entry.id, userId, tenantId, kind: entry.kind, target: `entry:${entry.id}`, summary: `${entry.date} · ${entry.description} · ${entry.amount.toFixed(2)}`,
+    method: 'POST', path, body, createdAt: entry.createdAt, state: 'waiting', attempts: 0 };
 }
 
 /** True when the request never reached the server, so the entry should wait on the phone. */

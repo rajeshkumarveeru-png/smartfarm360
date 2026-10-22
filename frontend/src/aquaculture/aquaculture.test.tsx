@@ -107,7 +107,7 @@ describe('fish farming web', () => {
     await userEvent.click(day.getByRole('button', { name: 'Save the day' }));
     await waitFor(() => expect(calls((u, i) => u.includes('/cycles/4/days/') && i?.method === 'PUT')).toHaveLength(1));
     expect(calls((u, i) => u.includes('/days/') && i?.method === 'PUT')[0][1]!.body).toEqual({ feeds: [{ itemId: 8, kg: '25.5' }],
-      deaths: [{ species: 'ROHU', otherName: null, count: 3, cause: null }], notes: null });
+      deaths: [{ species: 'ROHU', otherName: null, count: 3, cause: null }], notes: null, baseVersion: null });
   });
 
   it('records a graded harvest sale with the buyer\'s commission', async () => {

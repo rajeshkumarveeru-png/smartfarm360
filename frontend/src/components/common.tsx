@@ -4,14 +4,14 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthContext';
 import { currentLanguage } from '../i18n';
 
-export function ErrorBanner({ message, onRetry }: { message: string; onRetry?: () => void }) {
+export function ErrorBanner({ message, onRetry, retryLabel }: { message: string; onRetry?: () => void; retryLabel?: string }) {
   const { t } = useTranslation();
   if (!message) return null;
   return (
     <div className="error-banner" role="alert">
       <CircleAlert size={18} aria-hidden />
       <span>{message}</span>
-      {onRetry && <button type="button" onClick={onRetry}>{t('common.retry')}</button>}
+      {onRetry && <button type="button" onClick={onRetry}>{retryLabel ?? t('common.retry')}</button>}
     </div>
   );
 }

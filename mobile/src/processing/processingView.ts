@@ -1,4 +1,5 @@
 import { apiRequest } from '../services/api';
+import { record } from '../offline/hub';
 
 /** Processing on the phone (processing and trading design, M13): steps, output and own produce into a batch. Online only. */
 export type Batch = { id: number; costObjectId: number; code: string; name: string; mainItemId: number; mainItemName: string; status: string; finishedOn: string | null };
@@ -37,7 +38,7 @@ const orNull = (v: string) => (v.trim() === '' ? null : v.trim());
 
 export function addStep(tenantId: number, batchId: number, date: string, kind: string, kgIn: string, kgOut: string, moistureBefore: string,
                         moistureAfter: string): Promise<unknown> {
-  return apiRequest(`${t(tenantId)}/processing/batches/${batchId}/steps`, { method: 'POST',
+  return record({ kind: 'processingStep', target: `processing:${batchId}`, summary: `${date} · ${kind}`, method: 'POST', path: `${t(tenantId)}/processing/batches/${batchId}/steps`,
     body: { date, kind, kgIn: orNull(kgIn), kgOut: orNull(kgOut), moistureBefore: orNull(moistureBefore), moistureAfter: orNull(moistureAfter) } });
 }
 

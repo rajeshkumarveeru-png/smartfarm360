@@ -23,7 +23,7 @@ test('only unfinished batches, farm produce and real activities are offered', as
 test('a log entry sends kg and notes only when entered', async () => {
   mockApiRequest.mockResolvedValue({});
   await addLog(7, 3, '2026-10-21', 'ADDED', ' 40 ', ' Dry leaves ');
-  expect(mockApiRequest).toHaveBeenLastCalledWith('/api/v1/tenants/7/organic/batches/3/logs', { method: 'POST',
+  expect(mockApiRequest).toHaveBeenLastCalledWith('/api/v1/tenants/7/organic/batches/3/logs', { method: 'POST', headers: { 'Idempotency-Key': expect.any(String) },
     body: { date: '2026-10-21', kind: 'ADDED', kg: '40', notes: 'Dry leaves' } });
   await addLog(7, 3, '2026-10-21', 'TURNED', '', '');
   expect(mockApiRequest.mock.calls[1][1].body).toEqual({ date: '2026-10-21', kind: 'TURNED', kg: null, notes: null });

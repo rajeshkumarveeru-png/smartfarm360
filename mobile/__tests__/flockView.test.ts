@@ -26,7 +26,7 @@ test('saving the day sends the numbers, keeps kg as a string and keeps what was 
   mockApiRequest.mockResolvedValue(day);
   const form = { ...toDayForm(day), deaths: '3', feedKg: ' 112.5 ' };
   await saveDay(7, 2, '2026-10-21', form, day);
-  expect(mockApiRequest).toHaveBeenCalledWith('/api/v1/tenants/7/livestock/flocks/2/days/2026-10-21', { method: 'PUT', body: {
+  expect(mockApiRequest).toHaveBeenCalledWith('/api/v1/tenants/7/livestock/flocks/2/days/2026-10-21', { method: 'PUT', headers: { 'Idempotency-Key': expect.any(String) }, body: {
     deathCause: 'Heat', weightBirds: 20, weightKg: 39.5, notes: 'Shed 1', deaths: 3, culls: null, eggsGood: 850, eggsCracked: 10, eggsBroken: null,
     feedItemId: 8, feedKg: '112.5' } });
 });
@@ -44,5 +44,5 @@ test('the day form needs whole numbers and the feed together with its kg', () =>
 test('a herd head change is a movement of whole heads', async () => {
   mockApiRequest.mockResolvedValue({});
   await recordHeads(7, 4, '2026-10-21', 'BORN', ' 2 ');
-  expect(mockApiRequest).toHaveBeenCalledWith('/api/v1/tenants/7/livestock/flocks/4/movements', { method: 'POST', body: { date: '2026-10-21', kind: 'BORN', heads: 2 } });
+  expect(mockApiRequest).toHaveBeenCalledWith('/api/v1/tenants/7/livestock/flocks/4/movements', { method: 'POST', headers: { 'Idempotency-Key': expect.any(String) }, body: { date: '2026-10-21', kind: 'BORN', heads: 2 } });
 });

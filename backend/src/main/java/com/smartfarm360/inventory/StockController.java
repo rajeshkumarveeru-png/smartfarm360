@@ -6,6 +6,7 @@ import com.smartfarm360.platform.export.ReportLabels;
 import com.smartfarm360.platform.rbac.Permission;
 import com.smartfarm360.platform.security.RequiresPermission;
 import com.smartfarm360.platform.security.TenantContext;
+import com.smartfarm360.platform.web.Idempotent;
 import com.smartfarm360.platform.web.PageResponse;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -143,6 +144,7 @@ public class StockController {
         return records.count(ctx, r, key);
     }
 
+    @Idempotent
     @PostMapping("/produce")
     @RequiresPermission(Permission.INVENTORY_WRITE)
     @ResponseStatus(HttpStatus.CREATED)

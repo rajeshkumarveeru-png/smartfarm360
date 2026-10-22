@@ -20,7 +20,7 @@ export type AnimalCard = { animal: Animal; moves: { groupId: number; groupName: 
   recentYields: { date: string; session: Session; litres: number }[] };
 export type YieldEntry = { animalId: number; litres: number };
 export type MilkSession = { id: number; session: Session; groupId: number; groupName: string; litres: number; fat: number | null; snf: number | null;
-  yields: YieldEntry[]; notes: string | null };
+  yields: YieldEntry[]; notes: string | null; version?: string };
 export type Withheld = { animalId: number; tag: string; name: string | null; until: string };
 export type MilkDay = { date: string; sessions: MilkSession[]; total: number; withheld: Withheld[]; inStock: number };
 export type MilkRow = { date: string; groupId: number; groupName: string; morning: number; evening: number; total: number; fat: number | null; snf: number | null };
@@ -41,7 +41,7 @@ export type Movement = { id: number; date: string; kind: string; heads: number; 
   batchDayId: number | null; pairGroupId: number | null; pairGroupName: string | null; reversed: boolean };
 export type BatchDay = { day: string; deaths: number; deathCause: string | null; culls: number; eggsGood: number; eggsCracked: number; eggsBroken: number;
   feedItemId: number | null; feedKg: number | null; feedDocumentId: number | null; weightBirds: number | null; weightKg: number | null; notes: string | null;
-  headsAtEnd: number; warnings: string[] };
+  headsAtEnd: number; warnings: string[]; version?: string };
 export type Figures = { from: string; to: string; openingHeads: number; closingHeads: number; arrived: number; born: number; died: number; culled: number;
   sold: number; movedOut: number; soldKg: number; headDays: number; eggsGood: number; eggsCracked: number; eggsBroken: number; eggs: number;
   henDayPercent: number | null; feedKg: number; feedPerDozen: number | null; mortalityPercent: number | null; averageWeight: number | null; fcr: number | null;

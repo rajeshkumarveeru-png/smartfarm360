@@ -7,6 +7,7 @@ import com.smartfarm360.platform.rbac.Permission;
 import com.smartfarm360.platform.security.RequiresModule;
 import com.smartfarm360.platform.security.RequiresPermission;
 import com.smartfarm360.platform.security.TenantContext;
+import com.smartfarm360.platform.web.Idempotent;
 import com.smartfarm360.platform.tenant.FarmModule;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -115,6 +116,7 @@ public class AquacultureController {
         return ponds.day(ctx, cycleId, date);
     }
 
+    @Idempotent
     @PutMapping("/cycles/{cycleId}/days/{date}")
     @RequiresPermission(Permission.AQUACULTURE_WRITE)
     public Day saveDay(TenantContext ctx, @PathVariable long cycleId, @PathVariable @DateTimeFormat(pattern = ISO) LocalDate date,
@@ -128,6 +130,7 @@ public class AquacultureController {
     @RequiresPermission(Permission.AQUACULTURE_READ)
     public List<Sample> samples(TenantContext ctx, @PathVariable long cycleId) { return ponds.samples(ctx, cycleId); }
 
+    @Idempotent
     @PostMapping("/cycles/{cycleId}/samples")
     @RequiresPermission(Permission.AQUACULTURE_WRITE)
     @ResponseStatus(HttpStatus.CREATED)
@@ -169,6 +172,7 @@ public class AquacultureController {
         return export.export(ctx, exports.water(ReportLabels.language(lang), from, to, list), format, lang, "water-quality", from, to);
     }
 
+    @Idempotent
     @PostMapping("/ponds/{pondId}/readings")
     @RequiresPermission(Permission.AQUACULTURE_WRITE)
     @ResponseStatus(HttpStatus.CREATED)

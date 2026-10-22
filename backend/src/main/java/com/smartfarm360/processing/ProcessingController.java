@@ -9,6 +9,7 @@ import com.smartfarm360.platform.security.RequiresPermission;
 import com.smartfarm360.platform.security.TenantContext;
 import com.smartfarm360.platform.tenant.FarmModule;
 import com.smartfarm360.platform.web.ApiException;
+import com.smartfarm360.platform.web.Idempotent;
 import com.smartfarm360.processing.ProcessingDtos.*;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -68,6 +69,7 @@ public class ProcessingController {
     @RequiresPermission(Permission.PROCESSING_READ)
     public List<Step> steps(TenantContext ctx, @PathVariable long batchId) { return processing.steps(ctx, batchId); }
 
+    @Idempotent
     @PostMapping("/batches/{batchId}/steps")
     @RequiresPermission(Permission.PROCESSING_WRITE)
     @ResponseStatus(HttpStatus.CREATED)

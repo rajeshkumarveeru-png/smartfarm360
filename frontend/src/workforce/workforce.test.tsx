@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { ApiError } from '../api/client';
 import type { Permission, TenantSummary } from '../api/types';
 import { setLanguage } from '../i18n';
 import AssetPage from '../assets/AssetPage';
@@ -88,7 +89,31 @@ describe('workforce web', () => {
     const puts = () => apiMock.mock.calls.filter(([u, i]) => String(u).includes('/attendance/') && i?.method === 'PUT');
     await waitFor(() => expect(puts().length).toBe(1));
     const put = puts()[0];
-    expect(put?.[1].body).toEqual({ entries: [{ workerId: 1, status: 'PRESENT', costObjectId: 11, hours: null }] });
+    expect(put?.[1].body).toEqual({ entries: [{ workerId: 1, status: 'PRESENT', costObjectId: 11, hours: null }], baseVersion: null });
+  });
+
+  it('sends the version it loaded and, when someone else changed the day, offers to load theirs (N7)', async () => {
+    let version = 'v1';
+    apiMock.mockImplementation((url: string, init?: { method?: string }) => {
+      if (url.includes('/workforce/attendance/') && init?.method === 'PUT') {
+        return Promise.reject(new ApiError(409, 'STALE_RECORD', 'Someone else changed this since you opened it. Check their version first.'));
+      }
+      if (url.includes('/workforce/attendance/')) return Promise.resolve({ ...muster, version });
+      return routeApi(url, init);
+    });
+    renderAt('/t/9/workforce', <AttendancePage />, '/t/:tenantId/workforce');
+    await userEvent.click(await screen.findByRole('button', { name: 'All present on Samba 2026' }));
+    version = 'v2';   // Selvi saves the same day on another phone
+    await userEvent.click(screen.getByRole('button', { name: 'Save attendance' }));
+    expect(await screen.findByText('Someone else changed this since you opened it. Check their version first.')).toBeInTheDocument();
+    const put = apiMock.mock.calls.find(([u, i]) => String(u).includes('/attendance/') && i?.method === 'PUT')!;
+    expect((put[1].body as { baseVersion: string }).baseVersion).toBe('v1');
+    const reads = () => apiMock.mock.calls.filter(([u, i]) => String(u).includes('/attendance/') && !i?.method).length;
+    const before = reads();
+    await userEvent.click(screen.getByRole('button', { name: 'Load the latest version' }));
+    await waitFor(() => expect(reads()).toBe(before + 1));
+    expect(screen.queryByText('Someone else changed this since you opened it. Check their version first.')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Worked on, Murugan')).toHaveValue('');   // the form now shows the server's day
   });
 
   it('previews a pay run with where the cost goes, then pays wages recovering the advance', async () => {

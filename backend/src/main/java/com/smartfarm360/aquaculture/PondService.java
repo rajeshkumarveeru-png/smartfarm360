@@ -14,6 +14,7 @@ import com.smartfarm360.platform.audit.AuditService;
 import com.smartfarm360.platform.rbac.Permission;
 import com.smartfarm360.platform.security.TenantContext;
 import com.smartfarm360.platform.web.ApiException;
+import com.smartfarm360.platform.web.Versions;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -327,14 +328,25 @@ public class PondService {
     private Day toDay(TenantContext ctx, long cycleId, LocalDate date) {
         Optional<Map<String, Object>> row = jdbc.sql("select id, notes, feed_document_id from sf_pond_days where tenant_id = :t and cycle_id = :c and day = :d")
                 .param("t", ctx.tenantId()).param("c", cycleId).param("d", date).query().listOfRows().stream().findFirst();
-        if (row.isEmpty()) return new Day(date, List.of(), List.of(), null, null);
+        if (row.isEmpty()) return new Day(date, List.of(), List.of(), null, null, Versions.NONE);
         long id = ((Number) row.get().get("id")).longValue();
         List<FeedLine> feeds = jdbc.sql("select item_id, kg from sf_pond_day_feeds where tenant_id = :t and day_id = :d order by id")
                 .param("t", ctx.tenantId()).param("d", id).query((rs, i) -> new FeedLine(rs.getLong(1), rs.getBigDecimal(2))).list();
         List<DeathLine> deaths = jdbc.sql("select species, other_name, fish_count, cause from sf_pond_deaths where tenant_id = :t and day_id = :d order by id")
                 .param("t", ctx.tenantId()).param("d", id).query((rs, i) -> new DeathLine(rs.getString(1), rs.getString(2), rs.getInt(3), rs.getString(4))).list();
         Object doc = row.get().get("feed_document_id");
-        return new Day(date, feeds, deaths, (String) row.get().get("notes"), doc == null ? null : ((Number) doc).longValue());
+        String notes = (String) row.get().get("notes");
+        return new Day(date, feeds, deaths, notes, doc == null ? null : ((Number) doc).longValue(), dayVersion(feeds, deaths, notes));
+    }
+
+    /** The version of a pond day: a hash of what the user recorded (mobile offline design, N7). */
+    private static String dayVersion(List<FeedLine> feeds, List<DeathLine> deaths, String notes) {
+        List<Object> parts = new ArrayList<>();
+        parts.add(notes);
+        feeds.forEach(f -> { parts.add(f.itemId()); parts.add(f.kg()); });
+        parts.add("deaths");
+        deaths.forEach(d -> { parts.add(d.species()); parts.add(d.otherName()); parts.add(d.count()); parts.add(d.cause()); });
+        return Versions.token(parts.toArray());
     }
 
     @Transactional
@@ -342,6 +354,11 @@ public class PondService {
         notFuture(date);
         Cycle c = open(ctx, cycleId);
         notBeforeStart(c, date);
+        if (r.baseVersion() != null) {
+            // One save of a pond day at a time, so the version check and the write see the same day (N7)
+            jdbc.sql("select pg_advisory_xact_lock(hashtext(:k))").param("k", "pondday:" + ctx.tenantId() + ":" + cycleId + ":" + date).query().listOfRows();
+            Versions.requireCurrent(r.baseVersion(), toDay(ctx, cycleId, date).version());
+        }
         List<FeedLine> feeds = r.feeds() == null ? List.of() : r.feeds();
         List<DeathLine> deaths = r.deaths() == null ? List.of() : r.deaths();
         if (!deaths.isEmpty() && (c.stockedOn() == null || date.isBefore(c.stockedOn()))) throw ApiException.badRequest("NOTHING_STOCKED", "No fish were stocked by this date.");

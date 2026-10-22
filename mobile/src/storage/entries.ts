@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { uuid7 } from '../offline/uuid7';
 
 export type EntryKind = 'expense' | 'income';
 export type FarmEntry = {
@@ -17,7 +18,7 @@ export const LEGACY_KEY = '@smartfarm360/entries/v1';
 
 /**
  * Entries are stored per user and tenant so that switching farm business or account on a shared phone never shows
- * another tenant's records. (Server sync of these entries is Phase 13.)
+ * another tenant's records. Entries waiting to be posted move into the outbox (mobile offline design, section 4).
  */
 export function scopeKey(userId: number, tenantId: number) {
   return `@smartfarm360/entries/v2/${userId}/${tenantId}`;
@@ -56,10 +57,7 @@ export async function claimLegacyEntries(key: string): Promise<number> {
   return legacy.length;
 }
 
-/** Collision-resistant id for entries created offline (will become the idempotency key for sync). */
+/** A time-ordered client id (UUIDv7) for anything recorded on the phone; it is the record's Idempotency-Key (N4). */
 export function newEntryId(): string {
-  const c = globalThis.crypto as Crypto | undefined;
-  if (c?.randomUUID) return c.randomUUID();
-  const bytes = Array.from({ length: 16 }, () => Math.floor(Math.random() * 256));
-  return bytes.map(b => b.toString(16).padStart(2, '0')).join('');
+  return uuid7();
 }

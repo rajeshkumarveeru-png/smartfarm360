@@ -1,12 +1,13 @@
 import { apiRequest } from '../services/api';
+import { record } from '../offline/hub';
 
-/** Fish farming on the phone (aquaculture design, K13): the daily pond record, water readings and weight samples. Online only. */
+/** Fish farming on the phone (aquaculture design, K13): the daily pond record, water readings and weight samples, offline too (N2). */
 export type OpenCycle = { id: number; name: string; status: 'PREPARING' | 'GROWING' | 'HARVESTED'; stockedOn: string | null };
 export type Pond = { id: number; name: string; active: boolean; openCycle: OpenCycle | null;
   latestReading: { takenAt: string; outOfLimits: string[] } | null };
 export type Species = { species: string; otherName: string | null };
 export type PondDay = { day: string; feeds: { itemId: number; kg: number }[]; deaths: { species: string; otherName: string | null; count: number; cause: string | null }[];
-  notes: string | null };
+  notes: string | null; version?: string };
 export type Reading = { id: number; outOfLimits: string[] };
 export type ReadingForm = { dissolvedOxygen: string; ph: string; temperature: string; ammonia: string };
 
@@ -46,17 +47,21 @@ export function saveDay(tenantId: number, cycleId: number, date: string, loaded:
   }
   const list = loaded.deaths.map(d => ({ species: d.species, otherName: d.otherName, count: d.count, cause: d.cause }));
   if (deaths) list.push({ species: deaths.species.species, otherName: deaths.species.otherName, count: Number(deaths.count.trim()), cause: null });
-  return apiRequest<PondDay>(`${base(tenantId)}/cycles/${cycleId}/days/${date}`, { method: 'PUT', body: { feeds, deaths: list, notes: loaded.notes } });
+  const path = `${base(tenantId)}/cycles/${cycleId}/days/${date}`;
+  return record<PondDay>({ kind: 'pondDay', target: `pondDay:${cycleId}:${date}`, summary: date, method: 'PUT', path, day: { readPath: path },
+    body: { feeds, deaths: list, notes: loaded.notes, ...(loaded.version ? { baseVersion: loaded.version } : {}) } });
 }
 
 /** A water reading taken now (K7); the out-of-limit flags come back with it. */
 export function recordReading(tenantId: number, pondId: number, form: ReadingForm, now: Date = new Date()): Promise<Reading> {
   const v = (s: string) => (s.trim() === '' ? null : s.trim());
-  return apiRequest<Reading>(`${base(tenantId)}/ponds/${pondId}/readings`, { method: 'POST', body: { takenAt: now.toISOString(),
+  return record<Reading>({ kind: 'reading', target: `pond:${pondId}`, summary: now.toISOString().slice(0, 16).replace('T', ' '), method: 'POST',
+    path: `${base(tenantId)}/ponds/${pondId}/readings`, body: { takenAt: now.toISOString(),
     dissolvedOxygen: v(form.dissolvedOxygen), ph: v(form.ph), temperature: v(form.temperature), ammonia: v(form.ammonia) } });
 }
 
 /** A mixed weight sample (K6): fish weighed and their total kg; the average comes back in grams. */
 export function recordSample(tenantId: number, cycleId: number, date: string, fishWeighed: string, kg: string): Promise<{ averageGrams: number }> {
-  return apiRequest(`${base(tenantId)}/cycles/${cycleId}/samples`, { method: 'POST', body: { date, fishWeighed: Number(fishWeighed.trim()), kg: kg.trim() } });
+  return record({ kind: 'sample', target: `pondCycle:${cycleId}`, summary: `${date} · ${kg.trim()} kg`, method: 'POST', path: `${base(tenantId)}/cycles/${cycleId}/samples`,
+    body: { date, fishWeighed: Number(fishWeighed.trim()), kg: kg.trim() } });
 }

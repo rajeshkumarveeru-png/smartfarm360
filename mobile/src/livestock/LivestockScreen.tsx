@@ -51,7 +51,7 @@ export default function LivestockScreen({ tenant, language }: { tenant: TenantSu
     if (values.length === 0 || !values.every(isLitres)) { Alert.alert(t('livestock.milk'), t('livestock.errors.litres')); return; }
     setBusy(true);
     try {
-      setDay(await saveSession(tenant.id, today, session, group.id, totals[group.id] ?? '', perAnimal));
+      setDay(await saveSession(tenant.id, today, session, group.id, totals[group.id] ?? '', perAnimal, day, group.name));
       setTotals(x => ({ ...x, [group.id]: '' }));
       setYields(x => { const y = { ...x }; herd.forEach(a => delete y[a.id]); return y; });
       Alert.alert(t('livestock.milk'), t('livestock.milkSaved', { date: today }));

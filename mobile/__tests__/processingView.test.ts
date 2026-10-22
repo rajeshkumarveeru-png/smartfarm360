@@ -23,7 +23,7 @@ test('running batches, open lots and producing activities are offered', async ()
 test('a step sends only what was entered', async () => {
   mockApiRequest.mockResolvedValue({});
   await addStep(7, 3, '2026-10-02', 'DRYING', ' 2000 ', '1920', '17', '');
-  expect(mockApiRequest).toHaveBeenLastCalledWith('/api/v1/tenants/7/processing/batches/3/steps', { method: 'POST',
+  expect(mockApiRequest).toHaveBeenLastCalledWith('/api/v1/tenants/7/processing/batches/3/steps', { method: 'POST', headers: { 'Idempotency-Key': expect.any(String) },
     body: { date: '2026-10-02', kind: 'DRYING', kgIn: '2000', kgOut: '1920', moistureBefore: '17', moistureAfter: null } });
 });
 

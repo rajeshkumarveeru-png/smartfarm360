@@ -44,7 +44,10 @@ public final class WorkforceDtos {
                                   @Size(max = 300) String notes) {}
 
     /** A day's muster roll. An entry with no status clears that worker's day. */
-    public record MusterRequest(@NotEmpty @Size(max = 500) List<@Valid AttendanceEntry> entries) {}
+    /** {@code baseVersion}: the version of the day the user started from (mobile offline design, N7); null skips the check. */
+    public record MusterRequest(@NotEmpty @Size(max = 500) List<@Valid AttendanceEntry> entries, @Size(max = 20) String baseVersion) {
+        public MusterRequest(List<AttendanceEntry> entries) { this(entries, null); }
+    }
 
     /**
      * {@code locked}: used by a posted pay run; reverse the pay run to change it (principle 4). {@code paidByBill}: the worker is
@@ -53,7 +56,8 @@ public final class WorkforceDtos {
     public record AttendanceRow(long workerId, String workerName, String payType, String status, BigDecimal hours, Long costObjectId,
                                 String costObjectName, String notes, boolean locked, boolean paidByBill) {}
 
-    public record Muster(LocalDate date, List<AttendanceRow> workers) {}
+    /** {@code version}: changes whenever the day's attendance changes (N7). */
+    public record Muster(LocalDate date, List<AttendanceRow> workers, String version) {}
 
     public record MonthRow(long workerId, String workerName, String payType, BigDecimal present, BigDecimal halfDays, BigDecimal absent,
                            BigDecimal paidLeave, BigDecimal unpaidLeave, BigDecimal days) {}

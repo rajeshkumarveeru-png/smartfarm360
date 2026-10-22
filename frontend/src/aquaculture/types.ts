@@ -16,7 +16,7 @@ export type Stocking = { id: number; date: string; species: string; otherName: s
   documentId: number | null; reversed: boolean };
 export type FeedLine = { itemId: number; kg: number };
 export type DeathLine = { species: string; otherName: string | null; count: number; cause: string | null };
-export type Day = { day: string; feeds: FeedLine[]; deaths: DeathLine[]; notes: string | null; feedDocumentId: number | null };
+export type Day = { day: string; feeds: FeedLine[]; deaths: DeathLine[]; notes: string | null; feedDocumentId: number | null; version?: string };
 export type Sample = { id: number; date: string; species: string | null; otherName: string | null; fishWeighed: number; kg: number; averageGrams: number };
 export type HarvestLine = { species: string; otherName: string | null; grade: string | null; kg: number; count: number | null; use: 'SOLD' | 'HOME' | 'GIVEN';
   rate: number | null; amount: number | null };

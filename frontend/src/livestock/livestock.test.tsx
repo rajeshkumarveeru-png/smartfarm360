@@ -80,8 +80,8 @@ describe('livestock web', () => {
     await waitFor(() => expect(apiMock.mock.calls.some(([, i]) => i?.method === 'PUT')).toBe(true));
     const body = apiMock.mock.calls.find(([, i]) => i?.method === 'PUT')![1].body as { sessions: unknown[] };
     expect(body.sessions).toEqual([
-      { session: 'MORNING', groupId: 1, litres: null, fat: null, snf: null, yields: [{ animalId: 6, litres: '4.5' }] },
-      { session: 'EVENING', groupId: 1, litres: '9', fat: null, snf: null, yields: [] }]);
+      { session: 'MORNING', groupId: 1, litres: null, fat: null, snf: null, yields: [{ animalId: 6, litres: '4.5' }], baseVersion: '0' },
+      { session: 'EVENING', groupId: 1, litres: '9', fat: null, snf: null, yields: [], baseVersion: '0' }]);
     expect(screen.getByRole('button', { name: 'Record sale' })).toBeInTheDocument();
   });
 

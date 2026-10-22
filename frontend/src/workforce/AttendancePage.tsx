@@ -4,7 +4,7 @@ import { api } from '../api/client';
 import { useTenant } from '../auth/useCurrentTenant';
 import { ErrorBanner, Loading } from '../components/common';
 import { currentLanguage, useNs } from '../i18n';
-import { describeError } from '../lib/errors';
+import { describeError, isStale } from '../lib/errors';
 import { formatDate, formatMoney, formatNumber, today } from '../lib/format';
 import { can } from '../lib/nav';
 import type { AttendanceRow, AttendanceStatus, Muster, PieceWork } from './types';
@@ -29,9 +29,10 @@ export default function AttendancePage() {
   const [piece, setPiece] = useState({ workerId: '', quantity: '', unit: '', rate: '', costObjectId: '' });
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
+  const [stale, setStale] = useState(false);
 
   const load = useCallback(async () => {
-    setError(''); setSaved(false);
+    setError(''); setSaved(false); setStale(false);
     try {
       const [m, p] = await Promise.all([api<Muster>(`${base}/attendance/${date}`), api<PieceWork[]>(`${base}/piece-work?from=${date}&to=${date}`)]);
       setMuster(m); setPieces(p);
@@ -57,7 +58,9 @@ export default function AttendancePage() {
       const e = edits[w.workerId];
       return { workerId: w.workerId, status: e.status || null, costObjectId: e.costObjectId ? Number(e.costObjectId) : null, hours: e.hours || null };
     });
-    try { setMuster(await api<Muster>(`${base}/attendance/${date}`, { method: 'PUT', body: { entries } })); setSaved(true); } catch (e) { setError(describeError(e)); }
+    try {
+      setMuster(await api<Muster>(`${base}/attendance/${date}`, { method: 'PUT', body: { entries, baseVersion: muster.version ?? null } })); setSaved(true);
+    } catch (e) { setError(describeError(e)); setStale(isStale(e)); }
   }
 
   async function addPiece(e: React.FormEvent) {
@@ -78,7 +81,7 @@ export default function AttendancePage() {
   return (
     <>
       <div className="crop-page-head"><div><h2>{t('attendance')}</h2><p>{t('attendanceHelp')}</p></div></div>
-      <ErrorBanner message={error} />
+      <ErrorBanner message={error} onRetry={stale ? () => void load() : undefined} retryLabel={tc('loadLatest')} />
       <div className="form-card form-grid filters">
         <label>{t('date')}<input type="date" max={today()} value={date} onChange={e => setDate(e.target.value)} /></label>
       </div>

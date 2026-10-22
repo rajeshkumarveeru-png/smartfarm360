@@ -7,6 +7,7 @@ import com.smartfarm360.platform.rbac.Permission;
 import com.smartfarm360.platform.security.RequiresModule;
 import com.smartfarm360.platform.security.RequiresPermission;
 import com.smartfarm360.platform.security.TenantContext;
+import com.smartfarm360.platform.web.Idempotent;
 import com.smartfarm360.platform.tenant.FarmModule;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -100,6 +101,7 @@ public class LivestockController {
         return herd.insurance(ctx, animalId, r, key, events);
     }
 
+    @Idempotent
     @PostMapping("/animals/{animalId}/breeding")
     @RequiresPermission(Permission.LIVESTOCK_WRITE)
     @ResponseStatus(HttpStatus.CREATED)
@@ -126,6 +128,7 @@ public class LivestockController {
         return events.events(ctx, animalId, from, to);
     }
 
+    @Idempotent
     @PostMapping("/health")
     @RequiresPermission(Permission.LIVESTOCK_WRITE)
     @ResponseStatus(HttpStatus.CREATED)
@@ -145,6 +148,7 @@ public class LivestockController {
     @RequiresPermission(Permission.LIVESTOCK_READ)
     public MilkDay milkDay(TenantContext ctx, @PathVariable @DateTimeFormat(pattern = ISO) LocalDate date) { return milk.day(ctx, date); }
 
+    @Idempotent
     @PutMapping("/milk/{date}")
     @RequiresModule(FarmModule.DAIRY)
     @RequiresPermission(Permission.LIVESTOCK_WRITE)

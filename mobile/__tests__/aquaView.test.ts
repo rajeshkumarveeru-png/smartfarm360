@@ -22,7 +22,7 @@ test('stocked species are listed once, without reversed stockings', async () => 
 test('saving from the phone keeps the day\'s other entries, replaces the same feed and adds deaths seen', async () => {
   mockApiRequest.mockResolvedValue(loaded);
   await saveDay(7, 4, '2026-10-21', loaded, { itemId: 8, kg: ' 25.5 ' }, { species: { species: 'CATLA', otherName: null }, count: ' 3 ' });
-  expect(mockApiRequest).toHaveBeenCalledWith('/api/v1/tenants/7/aquaculture/cycles/4/days/2026-10-21', { method: 'PUT', body: {
+  expect(mockApiRequest).toHaveBeenCalledWith('/api/v1/tenants/7/aquaculture/cycles/4/days/2026-10-21', { method: 'PUT', headers: { 'Idempotency-Key': expect.any(String) }, body: {
     feeds: [{ itemId: 8, kg: '25.5' }],
     deaths: [{ species: 'ROHU', otherName: null, count: 2, cause: 'Birds' }, { species: 'CATLA', otherName: null, count: 3, cause: null }],
     notes: 'Rain' } });
@@ -34,14 +34,14 @@ test('a water reading sends only the values entered, as strings, with the time',
   mockApiRequest.mockResolvedValue({ id: 1, outOfLimits: ['DISSOLVED_OXYGEN'] });
   const now = new Date('2026-10-21T00:30:00Z');
   await recordReading(7, 2, { dissolvedOxygen: ' 3.2 ', ph: '', temperature: '29', ammonia: '' }, now);
-  expect(mockApiRequest).toHaveBeenCalledWith('/api/v1/tenants/7/aquaculture/ponds/2/readings', { method: 'POST', body: {
+  expect(mockApiRequest).toHaveBeenCalledWith('/api/v1/tenants/7/aquaculture/ponds/2/readings', { method: 'POST', headers: { 'Idempotency-Key': expect.any(String) }, body: {
     takenAt: '2026-10-21T00:30:00.000Z', dissolvedOxygen: '3.2', ph: null, temperature: '29', ammonia: null } });
 });
 
 test('samples and validation', async () => {
   mockApiRequest.mockResolvedValue({ averageGrams: 600 });
   await recordSample(7, 4, '2026-08-01', '50', '30');
-  expect(mockApiRequest).toHaveBeenCalledWith('/api/v1/tenants/7/aquaculture/cycles/4/samples', { method: 'POST', body: { date: '2026-08-01', fishWeighed: 50, kg: '30' } });
+  expect(mockApiRequest).toHaveBeenCalledWith('/api/v1/tenants/7/aquaculture/cycles/4/samples', { method: 'POST', headers: { 'Idempotency-Key': expect.any(String) }, body: { date: '2026-08-01', fishWeighed: 50, kg: '30' } });
   expect(isWhole('0')).toBe(false);
   expect(isWhole('12')).toBe(true);
   expect(isKg('1.2345')).toBe(false);

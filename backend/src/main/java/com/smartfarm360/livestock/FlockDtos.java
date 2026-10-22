@@ -55,12 +55,19 @@ public final class FlockDtos {
                                   @PositiveOrZero @Max(10_000_000) Integer eggsGood, @PositiveOrZero @Max(10_000_000) Integer eggsCracked,
                                   @PositiveOrZero @Max(10_000_000) Integer eggsBroken, Long feedItemId,
                                   @Positive @Digits(integer = 9, fraction = 3) BigDecimal feedKg, @Positive @Max(100_000) Integer weightBirds,
-                                  @Positive @Digits(integer = 7, fraction = 3) BigDecimal weightKg, @Size(max = 300) String notes) {}
+                                  @Positive @Digits(integer = 7, fraction = 3) BigDecimal weightKg, @Size(max = 300) String notes,
+                                  @Size(max = 20) String baseVersion) {
+        /** {@code baseVersion}: the day's version the user started from (mobile offline design, N7); null skips the check. */
+        public BatchDayRequest(Integer deaths, String deathCause, Integer culls, Integer eggsGood, Integer eggsCracked, Integer eggsBroken, Long feedItemId,
+                               BigDecimal feedKg, Integer weightBirds, BigDecimal weightKg, String notes) {
+            this(deaths, deathCause, culls, eggsGood, eggsCracked, eggsBroken, feedItemId, feedKg, weightBirds, weightKg, notes, null);
+        }
+    }
 
     /** {@code warnings}: EGGS_WITHHELD while a withdrawal applies to the batch (J9); HIGH_MORTALITY above 1% of the birds. */
     public record BatchDay(LocalDate day, int deaths, String deathCause, int culls, int eggsGood, int eggsCracked, int eggsBroken, Long feedItemId,
                            BigDecimal feedKg, Long feedDocumentId, Integer weightBirds, BigDecimal weightKg, String notes, int headsAtEnd,
-                           List<String> warnings) {}
+                           List<String> warnings, String version) {}
 
     // ---- Eggs (J5) ----
 

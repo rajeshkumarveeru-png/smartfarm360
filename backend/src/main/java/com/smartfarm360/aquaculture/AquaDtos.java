@@ -54,9 +54,14 @@ public final class AquaDtos {
     public record DeathLine(@NotNull @Pattern(regexp = SPECIES) String species, @Size(max = 60) String otherName,
                             @NotNull @Positive @Max(10_000_000) Integer count, @Size(max = 120) String cause) {}
 
-    public record DayRequest(@Size(max = 10) List<@Valid FeedLine> feeds, @Size(max = 20) List<@Valid DeathLine> deaths, @Size(max = 300) String notes) {}
+    /** {@code baseVersion}: the day's version the user started from (mobile offline design, N7); null skips the check. */
+    public record DayRequest(@Size(max = 10) List<@Valid FeedLine> feeds, @Size(max = 20) List<@Valid DeathLine> deaths, @Size(max = 300) String notes,
+                             @Size(max = 20) String baseVersion) {
+        public DayRequest(List<FeedLine> feeds, List<DeathLine> deaths, String notes) { this(feeds, deaths, notes, null); }
+    }
 
-    public record Day(LocalDate day, List<FeedLine> feeds, List<DeathLine> deaths, String notes, Long feedDocumentId) {}
+    /** {@code version}: changes whenever the day's record changes (N7). */
+    public record Day(LocalDate day, List<FeedLine> feeds, List<DeathLine> deaths, String notes, Long feedDocumentId, String version) {}
 
     // ---- Samples (K6) ----
 

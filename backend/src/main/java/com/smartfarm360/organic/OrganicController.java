@@ -9,6 +9,7 @@ import com.smartfarm360.platform.security.RequiresModule;
 import com.smartfarm360.platform.security.RequiresPermission;
 import com.smartfarm360.platform.security.TenantContext;
 import com.smartfarm360.platform.tenant.FarmModule;
+import com.smartfarm360.platform.web.Idempotent;
 import com.smartfarm360.platform.web.ApiException;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -66,6 +67,7 @@ public class OrganicController {
     @RequiresPermission(Permission.ORGANIC_READ)
     public List<Log> logs(TenantContext ctx, @PathVariable long batchId) { return organic.logs(ctx, batchId); }
 
+    @Idempotent
     @PostMapping("/batches/{batchId}/logs")
     @RequiresPermission(Permission.ORGANIC_WRITE)
     @ResponseStatus(HttpStatus.CREATED)

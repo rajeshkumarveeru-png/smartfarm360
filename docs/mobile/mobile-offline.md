@@ -1,6 +1,6 @@
 # Mobile offline design (Phase 13)
 
-- Status: **Draft for product-owner review** (2026-10-22). No Phase 13 code is written until this is approved.
+- Status: **Approved** (2026-10-22, N1–N15 as recommended) and **built** in Phase 13. Implementation notes are in section 14.
 - Builds on:
   - the phone app as it stands after Phase 12: money quick entries already wait on the phone when offline and are retried
     with their entry id as the idempotency key; every other phone form is online only;
@@ -250,3 +250,61 @@ one farm business never replays a response in another.
 - sign-in as another user, sign-out choices, lost membership;
 - the move of existing quick entries without loss or duplicates;
 - the migration on a copy of the current schema.
+
+## 14. Implementation notes (2026-10-22)
+
+N1–N15 were approved as recommended. The server decisions are recorded in [ADR 0010](../adr/0010-offline-sync.md).
+Where the build differs from the sections above:
+
+**Server**
+- **Versions are content hashes, not stored numbers (N7).** A day record's version is a 16-character hash of the values
+  the user can change: attendance rows; a milking session's litres, fat, SNF, notes and per-animal litres; the poultry
+  day's entries; the pond day's feeds, deaths and notes.
+  - No `version` column was added. The only migration is `053-idempotent-requests`.
+  - `"0"` means nothing is stored yet.
+  - Milk is versioned per group and session, not per day, so two people milking different groups do not conflict.
+- **The refusal carries no copy of the record.** `STALE_RECORD` is a plain 409. The phone reads the day again (the
+  same request as its form) to show *Yours* and *On the server*.
+  - *Changed by Selvi at 08:15* is not shown: day records have no last editor (the audit log has it).
+- **Old idempotency rows are removed as new keys are claimed** in the same farm business, not by a daily job.
+- **Which endpoints are `@Idempotent`:**
+
+  | Area | Endpoints |
+  |---|---|
+  | Workforce | attendance |
+  | Crops | field notes |
+  | Livestock | milk, heat seen and other breeding notes, health records |
+  | Poultry and herds | the poultry day, head movements |
+  | Fish farming | the pond day, water readings, weight samples |
+  | Organic manure | compost log entries, manure collected (`POST /stock/produce`) |
+  | Processing | steps |
+
+  Finance records, crop activities and harvests keep their own idempotency.
+- **Example in section 10.** The test uses a farm manager for Murugan. A field supervisor has neither stock nor finance
+  permissions, so he could not record the Urea or the diesel expense; that limit is unchanged and still open.
+
+**Phone**
+- **Offline reads come from a read-through cache.** Every successful read of a farm business's data is kept in the
+  user's database. When the network is down, the same read is answered from the phone. So every list and view the
+  forms use works offline once it has been opened online.
+  - The status line shows *Showing data as of …*, with a warning after 7 days, rather than a time on each list.
+- **What a form shows when its record waits.** It shows *Saved on this phone. It will be sent when there is signal*,
+  and keeps what was entered.
+  - Online use is as before: the record is sent at once, and a refusal is shown on the form and not kept.
+  - A record waits without being sent while an earlier record of the same target is still on the phone, so their order
+    is kept.
+- **Badges.** The record badges appear on the Sync screen and on the quick entries in *Entries*.
+  - Lists loaded from the server (field notes, readings, the milk day) do not yet show the phone's waiting records
+    inline; the status line counts them.
+- **Editing a record that needs attention** uses a form of its amounts, counts, dates and notes on the Sync screen,
+  not the original screen's form. Ids and choices (crop, item, kind) are not editable there; for those, discard the
+  record and record it again.
+- **A later save of a day already waiting.** When it is based on the day the phone just sent, the engine moves its base
+  version forward to the version in the server's reply. A user's own second edit is therefore not refused as stale.
+- **Signing in offline** needs the refresh token still in the keystore and the last session's user. The farm business
+  list, roles and modules come from that last session.
+- **Lost membership is found in two ways:** the farm business list no longer has the business, or a record is refused
+  with `TENANT_NOT_FOUND`. Either way the business's cached data is removed and its records are locked.
+- **The app version** is `app.json`'s `expo.version`, sent as `X-Client-Version` on every request.
+- **Migration of quick entries.** Waiting quick entries move into the outbox the first time the accounts load,
+  keeping their ids. Entries made with no access to the accounts stay device-only notes, as before.

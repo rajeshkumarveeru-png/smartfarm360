@@ -27,3 +27,5 @@ databaseChangeLog:
       file: db/changelog/013-organic.yaml
   - include:
       file: db/changelog/014-processing.yaml
+  - include:
+      file: db/changelog/015-offline.yaml

@@ -1,4 +1,5 @@
 import { apiRequest } from '../services/api';
+import { record } from '../offline/hub';
 
 /** Organic manure on the phone (organic resources design, L13): batch log, output, manure collection and compost to a field. Online only. */
 export type Batch = { id: number; costObjectId: number; name: string; kind: string; status: 'MAKING' | 'READY' | 'FINISHED'; finishedOn: string | null };
@@ -30,7 +31,7 @@ export async function loadActivities(tenantId: number): Promise<Activity[]> {
 export const isQuantity = (v: string) => /^\d{1,9}(\.\d{1,3})?$/.test(v.trim()) && Number(v) > 0;
 
 export function addLog(tenantId: number, batchId: number, date: string, kind: string, kg: string, notes: string): Promise<unknown> {
-  return apiRequest(`${t(tenantId)}/organic/batches/${batchId}/logs`, { method: 'POST',
+  return record({ kind: 'compostLog', target: `organic:${batchId}`, summary: `${date} · ${kind}`, method: 'POST', path: `${t(tenantId)}/organic/batches/${batchId}/logs`,
     body: { date, kind, kg: kg.trim() === '' ? null : kg.trim(), notes: notes.trim() === '' ? null : notes.trim() } });
 }
 
@@ -42,7 +43,7 @@ export function recordOutput(tenantId: number, batchId: number, date: string, it
 
 /** Dung or litter into stock as produce of the herd or batch it came from (L3), at nil value. */
 export function collectManure(tenantId: number, date: string, fromCostObjectId: number, itemId: number, quantity: string, key: string): Promise<unknown> {
-  return apiRequest(`${t(tenantId)}/stock/produce`, { method: 'POST', headers: { 'Idempotency-Key': key },
+  return record({ kind: 'manure', target: `manure:${fromCostObjectId}`, summary: `${date} · ${quantity.trim()}`, method: 'POST', path: `${t(tenantId)}/stock/produce`, id: key,
     body: { docDate: date, costObjectId: fromCostObjectId, lines: [{ itemId, quantity: quantity.trim() }] } });
 }
 

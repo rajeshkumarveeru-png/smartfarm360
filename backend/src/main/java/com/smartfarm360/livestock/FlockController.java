@@ -9,6 +9,7 @@ import com.smartfarm360.platform.rbac.Permission;
 import com.smartfarm360.platform.security.RequiresModule;
 import com.smartfarm360.platform.security.RequiresPermission;
 import com.smartfarm360.platform.security.TenantContext;
+import com.smartfarm360.platform.web.Idempotent;
 import com.smartfarm360.platform.tenant.FarmModule;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -59,6 +60,7 @@ public class FlockController {
     @RequiresPermission(Permission.LIVESTOCK_READ)
     public List<Movement> movements(TenantContext ctx, @PathVariable long groupId) { return flocks.movements(ctx, groupId); }
 
+    @Idempotent
     @PostMapping("/flocks/{groupId}/movements")
     @RequiresPermission(Permission.LIVESTOCK_WRITE)
     @ResponseStatus(HttpStatus.CREATED)
@@ -101,6 +103,7 @@ public class FlockController {
         return flocks.day(ctx, groupId, date);
     }
 
+    @Idempotent
     @PutMapping("/flocks/{groupId}/days/{date}")
     @RequiresPermission(Permission.LIVESTOCK_WRITE)
     @RequiresModule(FarmModule.POULTRY)

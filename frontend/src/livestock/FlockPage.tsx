@@ -7,7 +7,7 @@ import { ErrorBanner, Loading } from '../components/common';
 import type { FinancialAccount, Party } from '../finance/types';
 import { newIdempotencyKey } from '../finance/useFinanceData';
 import { currentLanguage, useNs } from '../i18n';
-import { describeError } from '../lib/errors';
+import { describeError, isStale } from '../lib/errors';
 import { formatDate, formatMoney, formatNumber, today } from '../lib/format';
 import { can } from '../lib/nav';
 import type { Item } from '../stock/types';
@@ -51,6 +51,8 @@ export default function FlockPage() {
   const [date, setDate] = useState(today());
   const [day, setDay] = useState<BatchDay | null>(null);
   const [dayForm, setDayForm] = useState<DayForm | null>(null);
+  const [dayLoads, setDayLoads] = useState(0);
+  const [stale, setStale] = useState(false);
   const [move, setMove] = useState({ date: today(), kind: 'DIED', heads: '', toGroupId: '', countedHeads: '', cause: '' });
   const [buy, setBuy] = useState({ date: today(), heads: '', amount: '', partyId: '', financialAccountId: '' });
   const [sale, setSale] = useState({ date: today(), heads: '', kg: '', rateBasis: 'KG', rate: '', partyId: '', financialAccountId: '' });
@@ -79,8 +81,9 @@ export default function FlockPage() {
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
     if (!poultry) return;
+    setStale(false);
     api<BatchDay>(`${flock}/days/${date}`).then(d => { setDay(d); setDayForm(toForm(d)); }).catch(e => setError(describeError(e)));
-  }, [flock, date, poultry]);
+  }, [flock, date, poultry, dayLoads]);
   useEffect(() => {
     if (poultry && can(tenant, 'INVENTORY_READ')) api<Item[]>(`/api/v1/tenants/${tenant.id}/stock/items`)
       .then(i => setFeeds(i.filter(x => x.active && x.kind === 'INPUT' && x.dimension === 'MASS'))).catch(() => undefined);
@@ -102,6 +105,7 @@ export default function FlockPage() {
       setMessage(done(result));
     } catch (e) {
       setError(describeError(e));
+      setStale(isStale(e));
     }
   }
   const payer = (f: { partyId: string; financialAccountId: string }) => ({ partyId: f.partyId ? Number(f.partyId) : null,
@@ -119,7 +123,7 @@ export default function FlockPage() {
     if (Boolean(f.feedItemId) !== Boolean(f.feedKg)) { setError(t('errors.feed')); return; }
     void send<BatchDay>(`${flock}/days/${date}`, 'PUT', { deaths: num(f.deaths), deathCause: f.deathCause || null, culls: num(f.culls), eggsGood: num(f.eggsGood),
       eggsCracked: num(f.eggsCracked), eggsBroken: num(f.eggsBroken), feedItemId: f.feedItemId ? Number(f.feedItemId) : null, feedKg: f.feedKg || null,
-      weightBirds: num(f.weightBirds), weightKg: f.weightKg || null, notes: f.notes || null }, null,
+      weightBirds: num(f.weightBirds), weightKg: f.weightKg || null, notes: f.notes || null, baseVersion: day?.version ?? null }, null,
     d => { setDay(d); setDayForm(toForm(d)); return t('dayRecordSaved', { date: formatDate(date, lang) }); });
   }
 
@@ -144,7 +148,7 @@ export default function FlockPage() {
             {group.strain && <> · {group.strain}</>} · <b>{t('headsNow', { count: formatNumber(report.heads, lang, 0) })}</b></p>
         </div>
       </div>
-      <ErrorBanner message={error} />
+      <ErrorBanner message={error} onRetry={stale ? () => { setError(''); setDayLoads(n => n + 1); } : undefined} retryLabel={tc('loadLatest')} />
       {message && <p className="hint" role="status">{message}</p>}
 
       <div className="form-card form-grid filters">

@@ -7,7 +7,7 @@ import { ErrorBanner, Loading } from '../components/common';
 import type { FinancialAccount, Party } from '../finance/types';
 import { newIdempotencyKey } from '../finance/useFinanceData';
 import { currentLanguage, useNs } from '../i18n';
-import { describeError } from '../lib/errors';
+import { describeError, isStale } from '../lib/errors';
 import { formatDate, formatMoney, formatNumber, today } from '../lib/format';
 import { can } from '../lib/nav';
 import type { Item } from '../stock/types';
@@ -48,6 +48,9 @@ export default function CyclePage() {
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
   const [date, setDate] = useState(today());
   const [day, setDay] = useState<{ feeds: { itemId: string; kg: string }[]; deaths: { key: string; count: string; cause: string }[]; notes: string } | null>(null);
+  const [dayVersion, setDayVersion] = useState<string | null>(null);
+  const [dayLoads, setDayLoads] = useState(0);
+  const [stale, setStale] = useState(false);
   const [stock, setStock] = useState({ date: today(), species: 'ROHU', otherName: '', count: '', kg: '', hatchery: '', amount: '', partyId: '', financialAccountId: '' });
   const [sample, setSample] = useState({ date: today(), key: '', fishWeighed: '', kg: '' });
   const [harvest, setHarvest] = useState({ date: today(), kind: 'PARTIAL', lines: [emptyLine()], partyId: '', financialAccountId: '', commission: '', transport: '' });
@@ -66,9 +69,10 @@ export default function CyclePage() {
   }, [cycle, range.from, range.to]);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
-    api<Day>(`${cycle}/days/${date}`).then(d => setDay({ feeds: d.feeds.map(f => ({ itemId: String(f.itemId), kg: String(f.kg) })),
-      deaths: d.deaths.map(x => ({ key: keyOf(x), count: String(x.count), cause: x.cause ?? '' })), notes: d.notes ?? '' })).catch(e => setError(describeError(e)));
-  }, [cycle, date]);
+    setStale(false);
+    api<Day>(`${cycle}/days/${date}`).then(d => { setDayVersion(d.version ?? null); setDay({ feeds: d.feeds.map(f => ({ itemId: String(f.itemId), kg: String(f.kg) })),
+      deaths: d.deaths.map(x => ({ key: keyOf(x), count: String(x.count), cause: x.cause ?? '' })), notes: d.notes ?? '' }); }).catch(e => setError(describeError(e)));
+  }, [cycle, date, dayLoads]);
   useEffect(() => {
     if (can(tenant, 'INVENTORY_READ')) api<Item[]>(`/api/v1/tenants/${tenant.id}/stock/items`)
       .then(i => setFeeds(i.filter(x => x.active && x.kind === 'INPUT' && x.dimension === 'MASS'))).catch(() => undefined);
@@ -90,6 +94,7 @@ export default function CyclePage() {
       setMessage(done(result));
     } catch (e) {
       setError(describeError(e));
+      setStale(isStale(e));
     }
   }
 
@@ -103,8 +108,8 @@ export default function CyclePage() {
     if (!day) return;
     if (!day.feeds.every(f => f.itemId && kgOk(f.kg)) || !day.deaths.every(d => d.key && whole(d.count))) { setError(t('errors.day')); return; }
     void send<Day>(`${cycle}/days/${date}`, 'PUT', { feeds: day.feeds.map(f => ({ itemId: Number(f.itemId), kg: f.kg.trim() })),
-      deaths: day.deaths.map(d => ({ ...fromKey(d.key), count: Number(d.count), cause: d.cause.trim() || null })), notes: day.notes.trim() || null }, null,
-    () => t('daySaved', { date: formatDate(date, lang) }));
+      deaths: day.deaths.map(d => ({ ...fromKey(d.key), count: Number(d.count), cause: d.cause.trim() || null })), notes: day.notes.trim() || null, baseVersion: dayVersion }, null,
+    saved => { setDayVersion(saved.version ?? null); return t('daySaved', { date: formatDate(date, lang) }); });
   }
 
   function saveHarvest(e: React.FormEvent) {
@@ -135,7 +140,7 @@ export default function CyclePage() {
             {c.harvestedOn && ` · ${t('harvestedOn', { date: formatDate(c.harvestedOn, lang) })}`}</p>
         </div>
       </div>
-      <ErrorBanner message={error} />
+      <ErrorBanner message={error} onRetry={stale ? () => { setError(''); setDayLoads(n => n + 1); } : undefined} retryLabel={tc('loadLatest')} />
       {message && <p className="hint" role="status">{message}</p>}
 
       <div className="form-card form-grid filters">

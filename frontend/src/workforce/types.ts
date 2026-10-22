@@ -10,7 +10,8 @@ export type Worker = {
 };
 export type AttendanceRow = { workerId: number; workerName: string; payType: PayType; status: AttendanceStatus | null; hours: number | null;
   costObjectId: number | null; costObjectName: string | null; notes: string | null; locked: boolean; paidByBill: boolean };
-export type Muster = { date: string; workers: AttendanceRow[] };
+/** {@code version}: sent back as baseVersion, so a day someone else changed meanwhile is not overwritten (N7). */
+export type Muster = { date: string; workers: AttendanceRow[]; version?: string };
 export type MonthRow = { workerId: number; workerName: string; payType: PayType; present: number; halfDays: number; absent: number; paidLeave: number;
   unpaidLeave: number; days: number };
 export type MonthSheet = { month: string; workers: MonthRow[] };

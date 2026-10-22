@@ -8,6 +8,7 @@ import com.smartfarm360.platform.security.RequiresModule;
 import com.smartfarm360.platform.security.RequiresPermission;
 import com.smartfarm360.platform.security.TenantContext;
 import com.smartfarm360.platform.tenant.FarmModule;
+import com.smartfarm360.platform.web.Idempotent;
 import com.smartfarm360.workforce.WorkforceDtos.*;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -74,6 +75,7 @@ public class WorkforceController {
     @RequiresPermission(Permission.WORKFORCE_READ)
     public Muster muster(TenantContext ctx, @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) { return workers.muster(ctx, date); }
 
+    @Idempotent
     @PutMapping("/attendance/{date}")
     @RequiresPermission(Permission.WORKFORCE_WRITE)
     public Muster saveMuster(TenantContext ctx, @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date, @Valid @RequestBody MusterRequest r) {

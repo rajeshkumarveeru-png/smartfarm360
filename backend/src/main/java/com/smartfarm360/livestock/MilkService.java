@@ -14,6 +14,7 @@ import com.smartfarm360.platform.audit.AuditService;
 import com.smartfarm360.platform.rbac.Permission;
 import com.smartfarm360.platform.security.TenantContext;
 import com.smartfarm360.platform.web.ApiException;
+import com.smartfarm360.platform.web.Versions;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -77,11 +78,31 @@ public class MilkService {
                         join sf_cost_objects co on co.id = g.cost_object_id and co.tenant_id = s.tenant_id
                         where s.tenant_id = :t and s.milk_date = :d order by co.name, s.session desc""")
                 .param("t", ctx.tenantId()).param("d", date)
-                .query((rs, i) -> new Session(rs.getLong(1), rs.getString(2), rs.getLong(3), rs.getString(4), rs.getBigDecimal(5), rs.getBigDecimal(6),
-                        rs.getBigDecimal(7), yields(ctx.tenantId(), rs.getLong(1)), rs.getString(8))).list();
+                .query((rs, i) -> {
+                    List<YieldEntry> y = yields(ctx.tenantId(), rs.getLong(1));
+                    return new Session(rs.getLong(1), rs.getString(2), rs.getLong(3), rs.getString(4), rs.getBigDecimal(5), rs.getBigDecimal(6),
+                            rs.getBigDecimal(7), y, rs.getString(8), sessionVersion(rs.getBigDecimal(5), rs.getBigDecimal(6), rs.getBigDecimal(7), rs.getString(8), y));
+                }).list();
         BigDecimal total = sessions.stream().map(Session::litres).reduce(ZERO, BigDecimal::add);
         BigDecimal inStock = items.item(ctx, milkItem(ctx)).quantity();
         return new MilkDay(date, sessions, total, withheld(ctx.tenantId(), date), inStock);
+    }
+
+    /** The version of a milking session: a hash of what the user recorded (mobile offline design, N7). */
+    private static String sessionVersion(BigDecimal litres, BigDecimal fat, BigDecimal snf, String notes, List<YieldEntry> yields) {
+        List<Object> parts = new ArrayList<>(List.of(litres));
+        parts.add(fat);
+        parts.add(snf);
+        parts.add(notes);
+        yields.forEach(y -> { parts.add(y.animalId()); parts.add(y.litres()); });
+        return Versions.token(parts.toArray());
+    }
+
+    private String storedSessionVersion(long tenantId, LocalDate date, String session, long groupId) {
+        return jdbc.sql("select id, litres, fat, snf, notes from sf_milk_sessions where tenant_id = :t and milk_date = :d and session = :s and group_id = :g")
+                .param("t", tenantId).param("d", date).param("s", session).param("g", groupId)
+                .query((rs, i) -> sessionVersion(rs.getBigDecimal(2), rs.getBigDecimal(3), rs.getBigDecimal(4), rs.getString(5), yields(tenantId, rs.getLong(1))))
+                .optional().orElse(Versions.NONE);
     }
 
     private List<YieldEntry> yields(long tenantId, long sessionId) {
@@ -107,9 +128,12 @@ public class MilkService {
         if (date.isAfter(LocalDate.now())) throw ApiException.badRequest("FUTURE_DATE", "This can only be recorded for today or earlier.");
         Set<Long> touched = new LinkedHashSet<>();
         Set<String> seen = new HashSet<>();
+        // One save of a day at a time, so the version checks and the writes see the same day (N7)
+        jdbc.sql("select pg_advisory_xact_lock(hashtext(:k))").param("k", "milk:" + ctx.tenantId() + ":" + date).query().listOfRows();
         for (SessionEntry s : r.sessions()) {
             if (!seen.add(s.session() + "|" + s.groupId())) throw ApiException.badRequest("DUPLICATE_LINE", "Each group's session can appear only once.");
             Group g = herd.group(ctx, s.groupId());
+            if (s.baseVersion() != null) Versions.requireCurrent(s.baseVersion(), storedSessionVersion(ctx.tenantId(), date, s.session(), g.id()));
             List<YieldEntry> yields = s.yields() == null ? List.of() : s.yields();
             Set<Long> animals = new HashSet<>();
             for (YieldEntry y : yields) {

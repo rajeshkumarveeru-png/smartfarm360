@@ -103,17 +103,25 @@ public final class LivestockDtos {
 
     public record YieldEntry(@NotNull Long animalId, @NotNull @PositiveOrZero @Digits(integer = 6, fraction = 2) BigDecimal litres) {}
 
-    /** {@code litres}: the group total; with {@code yields} it is their sum. No litres and no yields clears the session. */
+    /**
+     * {@code litres}: the group total; with {@code yields} it is their sum. No litres and no yields clears the session.
+     * {@code baseVersion}: the session's version the user started from (mobile offline design, N7); null skips the check.
+     */
     public record SessionEntry(@NotNull @Pattern(regexp = SESSIONS) String session, @NotNull Long groupId,
                                @PositiveOrZero @Digits(integer = 8, fraction = 2) BigDecimal litres,
                                @DecimalMin("0") @DecimalMax("15") @Digits(integer = 2, fraction = 2) BigDecimal fat,
                                @DecimalMin("0") @DecimalMax("15") @Digits(integer = 2, fraction = 2) BigDecimal snf,
-                               @Size(max = 300) List<@Valid YieldEntry> yields, @Size(max = 300) String notes) {}
+                               @Size(max = 300) List<@Valid YieldEntry> yields, @Size(max = 300) String notes, @Size(max = 20) String baseVersion) {
+        public SessionEntry(String session, Long groupId, BigDecimal litres, BigDecimal fat, BigDecimal snf, List<YieldEntry> yields, String notes) {
+            this(session, groupId, litres, fat, snf, yields, notes, null);
+        }
+    }
 
     public record MilkDayRequest(@NotEmpty @Size(max = 40) List<@Valid SessionEntry> sessions) {}
 
+    /** {@code version}: changes whenever this session's figures change (N7). */
     public record Session(long id, String session, long groupId, String groupName, BigDecimal litres, BigDecimal fat, BigDecimal snf,
-                          List<YieldEntry> yields, String notes) {}
+                          List<YieldEntry> yields, String notes, String version) {}
 
     /** {@code withheld}: milking animals whose milk must not be sold today (I9). */
     public record WithheldAnimal(long animalId, String tag, String name, LocalDate until) {}

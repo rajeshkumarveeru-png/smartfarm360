@@ -215,13 +215,25 @@ public class WorkerService {
                     e == null ? null : (String) e.get("co_name"), e == null ? null : (String) e.get("notes"), locked(ctx.tenantId(), w.id(), date),
                     billed.contains(w.partyId())));
         }
-        return new Muster(date, rows);
+        return new Muster(date, rows, musterVersion(ctx.tenantId(), date));
+    }
+
+    /** The version of a day's attendance: a hash of what was recorded (mobile offline design, N7). */
+    private String musterVersion(long tenantId, LocalDate date) {
+        List<Object> parts = new ArrayList<>();
+        jdbc.sql("select worker_id, status, hours, cost_object_id, notes from sf_attendance where tenant_id = :t and work_date = :d order by worker_id")
+                .param("t", tenantId).param("d", date).query().listOfRows()
+                .forEach(r -> { parts.add(r.get("worker_id")); parts.add(r.get("status")); parts.add(r.get("hours")); parts.add(r.get("cost_object_id")); parts.add(r.get("notes")); });
+        return parts.isEmpty() ? com.smartfarm360.platform.web.Versions.NONE : com.smartfarm360.platform.web.Versions.token(parts.toArray());
     }
 
     /** Saves a day's muster roll: one entry per worker; an entry without a status clears the day. */
     @Transactional
     public Muster saveMuster(TenantContext ctx, LocalDate date, MusterRequest r) {
         if (date.isAfter(LocalDate.now())) throw ApiException.badRequest("FUTURE_DATE", "This can only be recorded for today or earlier.");
+        // One save of a day at a time, so the version check and the write see the same day (N7)
+        jdbc.sql("select pg_advisory_xact_lock(hashtext(:k))").param("k", "attendance:" + ctx.tenantId() + ":" + date).query().listOfRows();
+        com.smartfarm360.platform.web.Versions.requireCurrent(r.baseVersion(), musterVersion(ctx.tenantId(), date));
         Set<Long> seen = new HashSet<>();
         for (AttendanceEntry e : r.entries()) {
             if (!seen.add(e.workerId())) throw ApiException.badRequest("DUPLICATE_LINE", "Each worker can appear only once per day.");

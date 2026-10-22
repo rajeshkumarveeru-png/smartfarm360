@@ -1,12 +1,13 @@
 import { apiRequest } from '../services/api';
+import { record } from '../offline/hub';
 
-/** Livestock on the phone (livestock design, I15): milk by session, quick heat and treatment notes, the animal list. Online only. */
+/** Livestock on the phone (livestock design, I15): milk by session, quick heat and treatment notes, the animal list. Records work offline (N2). */
 export type Session = 'MORNING' | 'EVENING';
 export type Group = { id: number; name: string; purpose: string; active: boolean };
 export type Animal = { id: number; tag: string; name: string | null; sex: 'FEMALE' | 'MALE'; groupId: number | null; groupName: string | null;
   breeding: { repro: string | null; checkDueFrom: string | null; expectedCalving: string | null; dryOffDue: string | null; inMilk: boolean; withheldUntil: string | null } };
 export type MilkDay = { date: string; total: number; withheld: { animalId: number; tag: string; until: string }[];
-  sessions: { session: Session; groupId: number; litres: number; yields: { animalId: number; litres: number }[] }[] };
+  sessions: { session: Session; groupId: number; litres: number; yields: { animalId: number; litres: number }[]; version?: string }[] };
 
 const base = (tenantId: number) => `/api/v1/tenants/${tenantId}/livestock`;
 
@@ -33,20 +34,25 @@ export function isLitres(value: string): boolean {
  * Saves one session for one group: the group total, or per-animal litres when any are entered (their sum is the total).
  * Litres stay strings so nothing is rounded on the phone.
  */
-export function saveSession(tenantId: number, date: string, session: Session, groupId: number, total: string, perAnimal: Record<number, string>): Promise<MilkDay> {
+export function saveSession(tenantId: number, date: string, session: Session, groupId: number, total: string, perAnimal: Record<number, string>,
+                            loaded?: MilkDay | null, groupName = ''): Promise<MilkDay> {
   const yields = Object.entries(perAnimal).filter(([, v]) => v.trim() !== '').map(([id, v]) => ({ animalId: Number(id), litres: v.trim() }));
-  const entry = yields.length > 0 ? { session, groupId, yields } : { session, groupId, litres: total.trim() === '' ? null : total.trim(), yields: [] };
-  return apiRequest<MilkDay>(`${base(tenantId)}/milk/${date}`, { method: 'PUT', body: { sessions: [entry] } });
+  const entry: Record<string, unknown> = yields.length > 0 ? { session, groupId, yields } : { session, groupId, litres: total.trim() === '' ? null : total.trim(), yields: [] };
+  // The version of this group's session as the user saw it (N7); none stored yet is "0"
+  if (loaded) entry.baseVersion = loaded.sessions.find(s => s.session === session && s.groupId === groupId)?.version ?? '0';
+  const path = `${base(tenantId)}/milk/${date}`;
+  return record<MilkDay>({ kind: 'milk', target: `milk:${date}:${session}:${groupId}`, summary: [date, session, groupName].filter(Boolean).join(' · '),
+    method: 'PUT', path, body: { sessions: [entry] }, day: { readPath: path, session, groupId } });
 }
 
 /** Heat seen: the quickest breeding note from the field. */
 export function recordHeat(tenantId: number, animalId: number, date: string): Promise<unknown> {
-  return apiRequest(`${base(tenantId)}/animals/${animalId}/breeding`, { method: 'POST', body: { kind: 'HEAT', date } });
+  return record({ kind: 'heat', target: `animal:${animalId}`, summary: date, method: 'POST', path: `${base(tenantId)}/animals/${animalId}/breeding`, body: { kind: 'HEAT', date } });
 }
 
 /** A treatment with its milk withdrawal days (I9); {@code key} is the Idempotency-Key. */
 export function recordTreatment(tenantId: number, animalId: number, date: string, description: string, withdrawalDays: string, key: string): Promise<unknown> {
-  return apiRequest(`${base(tenantId)}/health`, { method: 'POST', headers: { 'Idempotency-Key': key },
+  return record({ kind: 'treatment', target: `animal:${animalId}`, summary: `${date} · ${description.trim()}`, method: 'POST', path: `${base(tenantId)}/health`, id: key,
     body: { animalId, kind: 'TREATMENT', date, description: description.trim(), withdrawalDays: withdrawalDays.trim() === '' ? null : Number(withdrawalDays) } });
 }
 

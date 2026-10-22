@@ -67,12 +67,15 @@ Approved design: [dashboard and reports](reports/dashboard-and-reports.md) (H1�
 11. Organic resources — done 2026-10-21 ([organic resources](organic/organic-resources.md), L1–L15). Left for later: certification records (L10); overhead allocation to organic batches (L15); refusing bills to finished batches; offline compost records on the phone (Phase 13)
 12. Processing and trading — done 2026-10-21 ([processing and trading](processing/processing-and-trading.md), M1–M15). Left for later: food-safety and certification records (M11); label and barcode printing (M9); direct trading costs by item and customer returns in the trading report; trace export; overhead allocation to batches (M15); offline processing on the phone (Phase 13)
 
-## Phase 13 — Mobile offline
+## Phase 13 — Mobile offline (done 2026-10-22)
 
-Design for review: [mobile offline](mobile/mobile-offline.md) (N1–N15).
+Approved design: [mobile offline](mobile/mobile-offline.md) (N1–N15); [ADR 0010](adr/0010-offline-sync.md). Left for later:
 
-- Local persistence (expo-sqlite), UUIDv7 client ids, idempotent sync, retries, explicit conflict resolution,
-  protected local data.
+- Show the phone's waiting records inline in the lists loaded from the server.
+- Edit a record that needs attention in its original form (today: amounts, dates and notes on the Sync screen).
+- Show who changed a day record and when, next to *On the server*.
+- Stock records, set-up work and party records offline; photos (N15, with attachment storage).
+- A browser check of the web stale-record handling, and a real-phone check of offline mode.
 
 ## Phase 14 — SaaS operations and production readiness
 

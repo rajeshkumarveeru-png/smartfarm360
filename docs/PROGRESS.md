@@ -2,10 +2,9 @@
 
 ## Current state
 
-- **Phase:** 12 (processing and trading) built on branch `feature/phase-12-processing` (based on
-  `feature/phase-11-organic`); its browser check was skipped at the product owner's request. The farming modules (Phases 8–12) are complete. Phase 13
-  (mobile offline) started on `feature/phase-13-mobile-offline`: the [mobile offline design](mobile/mobile-offline.md) is
-  awaiting review; no Phase 13 code yet. Nothing is pushed yet.
+- **Phase:** 13 (mobile offline) built on branch `feature/phase-13-mobile-offline` (based on
+  `feature/phase-12-processing`). Its browser check and a real-phone check are still to do. The farming modules
+  (Phases 8–12) are complete. Next is Phase 14 (SaaS operations and production readiness). Nothing is pushed yet.
 - **Production readiness:** not ready. Authentication, roles, tenant isolation, audit, the finance core and stock with
   movements are in place and tested, but no email provider is configured and hosting/backups are undecided.
 
@@ -21,6 +20,7 @@
 | Inventory valuation | Moving weighted average, 4 dp unit cost | ADR 0005 |
 | Test database | Embedded PostgreSQL (no Docker available) | ADR 0007 |
 | Attachment storage | Storage interface; local disk default, S3 later | ADR 0009 |
+| Offline records | Client ids with a server idempotency store; day-record versions as value hashes | ADR 0010 |
 | **Hosting / deployment target** | **Open** — needed before Phase 14 (and before choosing S3/email providers) | — |
 | **Desktop (Electron) scope** | **Open** — kept working as is; needs a decision because it requires a local PostgreSQL | — |
 | **Tamil terminology reviewer** | **Open** — required before the first release | ADR 0008 |
@@ -1201,6 +1201,157 @@ Not verified:
 - The browser check (skipped), and a real phone.
 - GitHub Actions (nothing has been pushed).
 
+## Phase 13 — Mobile offline (2026-10-22)
+
+Commits on `feature/phase-13-mobile-offline` (based on `feature/phase-12-processing`):
+
+- `cab3593`: design.
+- A build commit with the backend, web, mobile, verification and docs.
+
+### Features completed
+
+- **Approved design.** [mobile offline](mobile/mobile-offline.md) is implemented with N1–N15 as recommended.
+  Implementation notes are in section 14 of the design. The server decisions are in [ADR 0010](adr/0010-offline-sync.md).
+- **The phone keeps one store per user** (N1, `expo-sqlite`). It holds:
+  - the outbox;
+  - a read-through cache of everything the user opened online (reference lists and last views, each with its "as of"
+    time, N3).
+- **Offline records** (N2):
+  - the day's attendance;
+  - crop activities, harvests and field notes;
+  - milk by session, heat seen and treatments;
+  - the poultry daily record and herd head counts;
+  - the pond daily record, water readings and weight samples;
+  - compost log entries and manure collected;
+  - processing steps;
+  - cash quick entries.
+
+  Online, every one of these is sent at once, as before. Set-up work, stock output, transfers and party records stay
+  online only.
+- **Client ids and the server idempotency store** (N4):
+  - each record has a UUIDv7 id that is its `Idempotency-Key`;
+  - the server keeps the reply for 60 days and replays it to the same user;
+  - a different body or user is refused;
+  - a failed request frees its key.
+- **The sync engine** (N5, N6):
+  - it sends oldest first;
+  - only the target of a refused record is held back;
+  - network and server failures wait 30 s, 2 min, 10 min, then every 30 min;
+  - it sends at most 5 requests a second;
+  - it runs when the app opens or comes to the front, when the network returns, on *Sync now*, and every 5 minutes
+    while records are waiting.
+- **Day-record versions** (N7). Attendance, milking sessions, the poultry day and the pond day return a version, and
+  saves send `baseVersion`. A stale save is refused with `STALE_RECORD`. This applies:
+  - on the phone: *Compare* shows yours and the server's, then *Keep mine*, *Use the server's* or *Edit*;
+  - on the web: *Load the latest version*.
+- **Needs attention** (N8): the server's reason in the user's language, edit and resend, or discard. Discarded records
+  stay in a 30-day list; sent records stay 7 days.
+- **Offline sign-in and protection** (N9–N12):
+  - the app opens offline with the last user and farm business;
+  - only that user's store is opened, so another user's records are never sent;
+  - signing out with records waiting asks *Send now*, *Keep for my next sign-in* or *Discard them*;
+  - a farm business the user has left is cleared from the phone, and its records are locked;
+  - phone clocks more than 10 minutes off the server's get a warning.
+- **Status** (N13): a status line on every phone screen, record badges, and *More → Sync* with the outbox, *Sync now*,
+  the last sync, the clock check and the app version.
+- **Compatibility** (N14): the phone sends `X-Client-Version`. `APP_MIN_CLIENT_VERSION` (empty by default) refuses
+  older apps with `CLIENT_UPGRADE_REQUIRED`, and the phone keeps the outbox.
+- **Quick entries** saved before this phase move into the outbox once, keeping their ids.
+
+### Database migrations
+
+`015-offline.yaml` contains one changeset:
+
+- `053-idempotent-requests`: the table `sf_idempotent_requests`, with:
+  - a unique key on (tenant, key);
+  - a check that a reply is stored only with its completion time;
+  - an index on (tenant, created at).
+
+No version columns were added: versions are hashes of the stored values (ADR 0010).
+
+It was applied to the local database on 2026-10-22 at startup of the new jar, after a `pg_dump` backup
+(`smartfarm360-before-phase13.backup`, 89 tables). No business data was changed.
+
+### APIs changed
+
+- New request header `Idempotency-Key` on the `@Idempotent` endpoints listed in the design (section 14).
+  - Replays carry `Idempotent-Replayed: true`.
+  - New error codes: `IDEMPOTENCY_KEY_INVALID`, `IDEMPOTENCY_KEY_REUSED`, `IDEMPOTENCY_IN_PROGRESS`.
+- `GET|PUT /workforce/attendance/{date}`, `GET|PUT /livestock/milk/{date}` (per session),
+  `GET|PUT /livestock/flocks/{id}/days/{date}` and `GET|PUT /aquaculture/cycles/{id}/days/{date}`:
+  - reads return `version`;
+  - saves take an optional `baseVersion`;
+  - a stale save is refused with 409 `STALE_RECORD`.
+- Header `X-Client-Version` (logged; 426 `CLIENT_UPGRADE_REQUIRED` below `app.min-client-version`).
+
+### Tests and evidence
+
+| Command | Result |
+|---|---|
+| `backend: gradlew test bootJar` | Passed: **746 tests, 0 failures** (8 new) |
+| `frontend: npm run lint`, `npm test`, `npm run build` | Passed: **78 tests** (1 new); the bundle is still over 500 kB |
+| `mobile: npx tsc --noEmit`, `npm test`, `npx expo install --check` | Passed: **74 tests** (27 new); dependencies up to date |
+| Migration on the local database | Applied (`053-idempotent-requests`), no errors in the log; health 200 |
+| Manual browser check | **Not done**: restarting the backend ended the browser session, and signing in needs the owner's password |
+
+The new backend tests (`OfflineSyncTest`) are:
+
+- **Replay.** The same key and body get the stored reply and record once. Without a key, every save records.
+- **Refusals.** A different body or a different user is refused, as is a key still in progress or a badly formed key.
+- **Release.** A refused request frees its key, so the corrected record can be sent with the same id.
+- **Cross-tenant.** Another farm business's owner gets 404 and no replay. The same key in their own business is a new
+  record there.
+- **Stale saves.** These are refused on attendance, milking sessions (per group and session), the poultry day and the
+  pond day. Saves without a base version are unchecked.
+- **Client version.** The filter compares versions (1.10 is newer than 1.9) and refuses below the minimum. Requests
+  without the header pass.
+- **The section 10 example**, end to end (dated 20 October 2026):
+  - attendance for 6 workers, sent;
+  - the milk based on version 1 is refused as stale after Selvi's correction;
+  - the poultry day is sent, with feed issued;
+  - the Urea activity is refused for short stock, then resent with 10 kg under the same id;
+  - the diesel expense is sent;
+  - the water reading is sent, flagged out of limits;
+  - the retried attendance returns the stored reply byte for byte, and there are 6 attendance rows, not 12;
+  - Urea ends at 0 kg, the feed at 390 kg, and the books balance.
+
+  Murugan is a farm manager in the test: a field supervisor has neither stock nor finance permission (open decision
+  below).
+
+The new mobile tests cover:
+
+- UUIDv7 ids;
+- reply classification;
+- oldest-first order with only the refused target held;
+- backoff;
+- the 5-a-second pacing;
+- a lost reply resent under the same id and recorded once;
+- stops for an old app version and an ended session;
+- lost membership locking a business's records;
+- a later save of the same day carried onto the version just sent;
+- the 7- and 30-day pruning;
+- keep mine, edit and discard;
+- the status line, the conflict figures and the edit form;
+- the hub: online send, online refusal not kept, offline wait then send with the same key, order behind an earlier
+  record of the same target, keep mine and use the server's;
+- another user on the same phone, the sign-out choices, lost membership clearing the cache, and quick entries moved
+  once without duplicates;
+- the API client: the version header, offline reads served from the cache, outbox sends that never throw, and a 401
+  refreshed once.
+
+Existing tests changed with the approved design:
+
+- 9 phone view tests now also expect the record's `Idempotency-Key`.
+- 3 web tests now also expect the `baseVersion` sent.
+
+Nothing was removed from those tests.
+
+Not verified:
+
+- The web pages in a browser.
+- A real phone: SQLite, NetInfo, the app going to the background, and a signal lost in the middle of a send.
+- GitHub Actions (nothing has been pushed).
+
 ## Known gaps and defects
 
 Security and platform:
@@ -1233,7 +1384,11 @@ Finance and stock:
 - Removing a match after a later report date is not reflected historically in dues ageing (matches have no history).
 
 Clients:
-- Mobile money entries wait on the phone when offline; crop recording, attendance and livestock are online only (offline in Phase 13).
+- Phone lists loaded from the server do not yet show the phone's waiting records inline (the status line and the Sync
+  screen do).
+- On the phone, a record that needs attention can be corrected only in its amounts, dates and notes. Records with the
+  wrong crop, item or kind must be discarded and recorded again.
+- The phone's offline mode has not been tried on a real device.
 
 Tooling (left unchanged by policy — user scripts):
 - `dev.bat` uses port 5173 (Vite runs on 5174) and sets `SMART_BILLING_LOG_DIR` while logback reads `SMARTFARM_LOG_DIR`.

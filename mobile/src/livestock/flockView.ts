@@ -1,10 +1,11 @@
 import { apiRequest } from '../services/api';
+import { record } from '../offline/hub';
 
-/** Poultry batches and goat and sheep herds on the phone (poultry, goats and sheep design, J12): the daily batch record and quick head counts. Online only. */
+/** Poultry batches and goat and sheep herds on the phone (poultry, goats and sheep design, J12): the daily batch record and quick head counts, offline too (N2). */
 export type FlockSpecies = 'CHICKEN' | 'GOAT' | 'SHEEP';
 export type Flock = { id: number; name: string; species: 'CATTLE' | FlockSpecies; purpose: string; animals: number; closed: boolean };
 export type BatchDay = { day: string; deaths: number; culls: number; eggsGood: number; eggsCracked: number; eggsBroken: number; feedItemId: number | null;
-  feedKg: number | null; deathCause: string | null; weightBirds: number | null; weightKg: number | null; notes: string | null; headsAtEnd: number; warnings: string[] };
+  feedKg: number | null; deathCause: string | null; weightBirds: number | null; weightKg: number | null; notes: string | null; headsAtEnd: number; warnings: string[]; version?: string };
 export type FeedItem = { id: number; name: string };
 export type DayForm = { deaths: string; culls: string; eggsGood: string; eggsCracked: string; eggsBroken: string; feedItemId: number | null; feedKg: string };
 
@@ -59,12 +60,15 @@ export function toDayForm(d: BatchDay): DayForm {
 export function saveDay(tenantId: number, groupId: number, date: string, f: DayForm, loaded: BatchDay): Promise<BatchDay> {
   const keep = { deathCause: loaded.deathCause, weightBirds: loaded.weightBirds, weightKg: loaded.weightKg, notes: loaded.notes };
   const n = (v: string) => (v.trim() === '' ? null : Number(v.trim()));
-  return apiRequest<BatchDay>(`${base(tenantId)}/flocks/${groupId}/days/${date}`, { method: 'PUT', body: { ...keep, deaths: n(f.deaths), culls: n(f.culls),
+  const path = `${base(tenantId)}/flocks/${groupId}/days/${date}`;
+  return record<BatchDay>({ kind: 'flockDay', target: `flockDay:${groupId}:${date}`, summary: date, method: 'PUT', path, day: { readPath: path },
+    body: { ...keep, ...(loaded.version ? { baseVersion: loaded.version } : {}), deaths: n(f.deaths), culls: n(f.culls),
     eggsGood: n(f.eggsGood), eggsCracked: n(f.eggsCracked), eggsBroken: n(f.eggsBroken), feedItemId: f.feedKg.trim() === '' ? null : f.feedItemId,
     feedKg: f.feedKg.trim() === '' ? null : f.feedKg.trim() } });
 }
 
 /** A quick head change for a herd: died, culled or born (J7). */
 export function recordHeads(tenantId: number, groupId: number, date: string, kind: 'DIED' | 'CULLED' | 'BORN', heads: string): Promise<unknown> {
-  return apiRequest(`${base(tenantId)}/flocks/${groupId}/movements`, { method: 'POST', body: { date, kind, heads: Number(heads.trim()) } });
+  return record({ kind: 'flockHeads', target: `flock:${groupId}`, summary: `${date} · ${heads.trim()}`, method: 'POST', path: `${base(tenantId)}/flocks/${groupId}/movements`,
+    body: { date, kind, heads: Number(heads.trim()) } });
 }

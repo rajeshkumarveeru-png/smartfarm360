@@ -1,12 +1,14 @@
 import { apiRequest } from '../services/api';
+import { record } from '../offline/hub';
 
-/** Attendance marking and worker balances on the phone (workforce design, section 10). Online only; offline recording is Phase 13. */
+/** Attendance marking and worker balances on the phone (workforce design, section 10); the day works offline (mobile offline design, N2). */
 export type AttendanceStatus = 'PRESENT' | 'HALF_DAY' | 'ABSENT' | 'PAID_LEAVE' | 'UNPAID_LEAVE';
 export const ATTENDANCE: AttendanceStatus[] = ['PRESENT', 'HALF_DAY', 'ABSENT', 'PAID_LEAVE', 'UNPAID_LEAVE'];
 
 export type MusterRow = { workerId: number; workerName: string; payType: string; status: AttendanceStatus | null; hours: number | null;
   costObjectId: number | null; costObjectName: string | null; locked: boolean; paidByBill?: boolean };
-export type Muster = { date: string; workers: MusterRow[] };
+/** {@code version}: the day's version, sent back as baseVersion so a day changed by someone else is not overwritten (N7). */
+export type Muster = { date: string; workers: MusterRow[]; version?: string };
 export type WorkerBalance = { id: number; name: string; payType: string; owed: number; advance: number };
 export type Activity = { costObjectId: number; name: string };
 export type Mark = { status: AttendanceStatus | null; costObjectId: number | null };
@@ -47,7 +49,9 @@ export function saveMuster(tenantId: number, muster: Muster, marks: Record<numbe
       return { workerId: w.workerId, status: m.status, costObjectId: working ? m.costObjectId : null, hours: w.hours };
     });
   if (entries.length === 0) return null;
-  return apiRequest<Muster>(`${base(tenantId)}/attendance/${muster.date}`, { method: 'PUT', body: { entries } });
+  const path = `${base(tenantId)}/attendance/${muster.date}`;
+  return record<Muster>({ kind: 'attendance', target: `attendance:${muster.date}`, summary: muster.date, method: 'PUT', path,
+    body: { entries, ...(muster.version ? { baseVersion: muster.version } : {}) }, day: { readPath: path } });
 }
 
 export async function loadBalances(tenantId: number): Promise<WorkerBalance[]> {

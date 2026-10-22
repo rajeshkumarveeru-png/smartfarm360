@@ -60,7 +60,7 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
                 "039-crop-v2-backfill",
                 "040-workforce-assets-schema",
                 "041-workforce-assets-seed", "042-report-indexes", "043-livestock-schema", "044-livestock-seed",
-                "045-poultry-goats-schema", "046-poultry-goats-seed", "047-aquaculture-schema", "048-aquaculture-seed", "049-organic-schema", "050-organic-seed", "051-processing-schema", "052-processing-seed");
+                "045-poultry-goats-schema", "046-poultry-goats-seed", "047-aquaculture-schema", "048-aquaculture-seed", "049-organic-schema", "050-organic-seed", "051-processing-schema", "052-processing-seed", "053-idempotent-requests");
     }
 
     @Test
@@ -88,7 +88,7 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
                 "sf_ponds", "sf_pond_cycles", "sf_pond_stockings", "sf_pond_days", "sf_pond_day_feeds", "sf_pond_deaths", "sf_pond_samples",
                 "sf_water_readings", "sf_water_limits", "sf_pond_harvests", "sf_pond_harvest_lines",
                 "sf_internal_transfers", "sf_organic_batches", "sf_organic_logs", "sf_processing_batches", "sf_processing_steps",
-                "sf_processing_outputs");
+                "sf_processing_outputs", "sf_idempotent_requests");
     }
 
     @Test

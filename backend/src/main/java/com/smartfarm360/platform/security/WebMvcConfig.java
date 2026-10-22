@@ -14,16 +14,22 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.util.List;
 
-/** Registers the tenant interceptor and lets controllers declare {@link TenantContext} and {@link CurrentUser} parameters. */
+/** Registers the tenant and idempotency interceptors and lets controllers declare {@link TenantContext} and {@link CurrentUser} parameters. */
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
     private final TenantContextInterceptor tenantInterceptor;
+    private final com.smartfarm360.platform.web.IdempotencyInterceptor idempotencyInterceptor;
 
-    public WebMvcConfig(TenantContextInterceptor tenantInterceptor) { this.tenantInterceptor = tenantInterceptor; }
+    public WebMvcConfig(TenantContextInterceptor tenantInterceptor, com.smartfarm360.platform.web.IdempotencyInterceptor idempotencyInterceptor) {
+        this.tenantInterceptor = tenantInterceptor;
+        this.idempotencyInterceptor = idempotencyInterceptor;
+    }
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(tenantInterceptor).addPathPatterns("/api/**");
+        // After the tenant check, so a key is only honoured for a member (mobile offline design, N4)
+        registry.addInterceptor(idempotencyInterceptor).addPathPatterns("/api/v1/tenants/**");
     }
 
     @Override

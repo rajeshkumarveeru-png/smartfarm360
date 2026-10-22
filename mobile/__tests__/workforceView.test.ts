@@ -25,7 +25,7 @@ test('only changed, unlocked days are saved, keeping hours entered on the web an
   const marks = { ...initialMarks(muster), 1: { status: 'PRESENT' as const, costObjectId: 11 }, 2: { status: 'PAID_LEAVE' as const, costObjectId: 11 },
     3: { status: 'PRESENT' as const, costObjectId: null } };
   await saveMuster(7, muster, marks);
-  expect(mockApiRequest).toHaveBeenCalledWith('/api/v1/tenants/7/workforce/attendance/2026-10-20', { method: 'PUT', body: { entries: [
+  expect(mockApiRequest).toHaveBeenCalledWith('/api/v1/tenants/7/workforce/attendance/2026-10-20', { method: 'PUT', headers: { 'Idempotency-Key': expect.any(String) }, body: { entries: [
     { workerId: 1, status: 'PRESENT', costObjectId: 11, hours: null },
     { workerId: 2, status: 'PAID_LEAVE', costObjectId: null, hours: 6 }] } });
 });

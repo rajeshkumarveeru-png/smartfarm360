@@ -46,6 +46,9 @@ Record every command you ran and its result in `docs/PROGRESS.md` at the end of 
   `StockHook`; `ModuleBoundaryTest` enforces the boundaries.
 - Tenant endpoints live under `/api/v1/tenants/{tenantId}/...`, take a `TenantContext` parameter and must declare
   `@RequiresPermission` (and `@RequiresModule` for optional modules). Never accept a tenant id in a request body.
+- Endpoints the phone uses offline are marked `@Idempotent` and get a replay test (ADR 0010). Records that replace a
+  day return a `version` and refuse a stale `baseVersion` with `STALE_RECORD` (`Versions`). Phone forms save
+  through the outbox (`mobile/src/offline/hub.ts` `record()`), never with `apiRequest` directly.
 - Errors: throw `ApiException` with a stable `code`, and add that code to `errors.*` in both catalogs.
 - Every tenant-data change that matters to owners is recorded with `AuditService` (no secrets in details).
 - Controllers stay thin; business rules live in services; typed request/response records with Bean Validation.

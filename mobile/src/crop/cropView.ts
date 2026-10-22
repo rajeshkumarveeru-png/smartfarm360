@@ -1,4 +1,5 @@
 import { apiRequest } from '../services/api';
+import { record } from '../offline/hub';
 import { tr, type Language } from '../i18n/translations';
 
 /** Crop cycles and their figures as the web app sees them (crop design, F12). Online only; offline recording is Phase 13. */
@@ -36,16 +37,18 @@ export async function loadInputs(tenantId: number): Promise<StockItem[]> {
 /** {@code key} is the Idempotency-Key, so a retry after a timeout never records the work twice. */
 export function recordActivity(tenantId: number, body: { cycleId: number; activityType: string; activityDate: string; notes?: string | null;
   inputs?: StockInput[] }, key: string): Promise<{ warnings: string[] }> {
-  return apiRequest(`${base(tenantId)}/activities`, { method: 'POST', headers: { 'Idempotency-Key': key },
-    body: { ...body, notes: body.notes || null, inputs: body.inputs ?? [] } });
+  return record({ kind: 'activity', target: `cycle:${body.cycleId}`, summary: `${body.activityDate} · ${body.activityType}`, method: 'POST', path: `${base(tenantId)}/activities`,
+    id: key, body: { ...body, notes: body.notes || null, inputs: body.inputs ?? [] } });
 }
 
 export function recordHarvest(tenantId: number, body: { cycleId: number; harvestDate: string; quantity: string; unit: string }, key: string): Promise<unknown> {
-  return apiRequest(`${base(tenantId)}/harvests`, { method: 'POST', headers: { 'Idempotency-Key': key }, body });
+  return record({ kind: 'harvest', target: `cycle:${body.cycleId}`, summary: `${body.harvestDate} · ${body.quantity} ${body.unit}`, method: 'POST',
+    path: `${base(tenantId)}/harvests`, id: key, body });
 }
 
 export function addObservation(tenantId: number, cycleId: number, body: { observedOn: string; kind: string; severity: string; notes?: string | null }): Promise<unknown> {
-  return apiRequest(`${base(tenantId)}/cultivation-cycles/${cycleId}/observations`, { method: 'POST', body: { ...body, notes: body.notes || null } });
+  return record({ kind: 'observation', target: `cycle:${cycleId}`, summary: `${body.observedOn} · ${body.kind}`, method: 'POST',
+    path: `${base(tenantId)}/cultivation-cycles/${cycleId}/observations`, body: { ...body, notes: body.notes || null } });
 }
 
 /** "Growing · 30 days since sowing" */

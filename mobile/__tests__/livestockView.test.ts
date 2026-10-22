@@ -15,7 +15,7 @@ beforeEach(() => mockApiRequest.mockReset());
 test('a session with per-animal litres sends the yields; without them, the group total, as exact strings', async () => {
   mockApiRequest.mockResolvedValue({});
   await saveSession(7, '2026-07-22', 'MORNING', 1, '', { 5: '5.5', 6: '' });
-  expect(mockApiRequest).toHaveBeenLastCalledWith('/api/v1/tenants/7/livestock/milk/2026-07-22', { method: 'PUT',
+  expect(mockApiRequest).toHaveBeenLastCalledWith('/api/v1/tenants/7/livestock/milk/2026-07-22', { method: 'PUT', headers: { 'Idempotency-Key': expect.any(String) },
     body: { sessions: [{ session: 'MORNING', groupId: 1, yields: [{ animalId: 5, litres: '5.5' }] }] } });
   await saveSession(7, '2026-07-22', 'EVENING', 1, ' 18 ', {});
   expect(mockApiRequest.mock.calls[1][1].body).toEqual({ sessions: [{ session: 'EVENING', groupId: 1, litres: '18', yields: [] }] });

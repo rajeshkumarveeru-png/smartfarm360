@@ -5,7 +5,7 @@ import { ErrorBanner, Loading } from '../components/common';
 import type { FinancialAccount, Party } from '../finance/types';
 import { newIdempotencyKey } from '../finance/useFinanceData';
 import { currentLanguage, useNs } from '../i18n';
-import { describeError } from '../lib/errors';
+import { describeError, isStale } from '../lib/errors';
 import { formatDate, formatNumber, today } from '../lib/format';
 import { can } from '../lib/nav';
 import { useGroups } from './LivestockLayout';
@@ -37,10 +37,12 @@ export default function MilkPage() {
   const [keys, setKeys] = useState({ uses: newIdempotencyKey(), sale: newIdempotencyKey() });
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [stale, setStale] = useState(false);
+  const tc = useNs('common');
 
   const milkGroups = useMemo(() => groups.filter(g => g.purpose === 'MILKING' || animals.some(a => a.groupId === g.id && a.breeding.inMilk)), [groups, animals]);
   const load = useCallback(async () => {
-    setError(''); setMessage('');
+    setError(''); setMessage(''); setStale(false);
     try {
       const [d, a] = await Promise.all([api<MilkDay>(`${base}/milk/${date}`), api<Animal[]>(`${base}/animals`)]);
       setDay(d); setAnimals(a.filter(x => x.sex === 'FEMALE'));
@@ -69,7 +71,9 @@ export default function MilkPage() {
     const sessions = milkGroups.flatMap(g => SESSIONS.map(s => {
       const e = entry(s, g.id);
       const yields = e.perAnimal ? Object.entries(e.yields).filter(([, v]) => v !== '').map(([id, v]) => ({ animalId: Number(id), litres: v })) : [];
-      return { session: s, groupId: g.id, litres: !e.perAnimal && e.total !== '' ? e.total : null, fat: e.fat || null, snf: e.snf || null, yields, _touched: key(s, g.id) in entries };
+      // Each session's version as loaded ("0" when none was stored), so another person's change is not overwritten (N7)
+      const baseVersion = day?.sessions.find(x => x.session === s && x.groupId === g.id)?.version ?? '0';
+      return { session: s, groupId: g.id, litres: !e.perAnimal && e.total !== '' ? e.total : null, fat: e.fat || null, snf: e.snf || null, yields, baseVersion, _touched: key(s, g.id) in entries };
     })).filter(x => x._touched || x.litres != null || x.yields.length > 0).map(({ _touched, ...rest }) => { void _touched; return rest; });
     if (sessions.length === 0) { setError(t('errors.noMilk')); return; }
     const values = sessions.flatMap(s => [s.litres ?? '', ...s.yields.map(y => y.litres)]);
@@ -79,6 +83,7 @@ export default function MilkPage() {
       setMessage(t('milkSaved', { date: formatDate(date, lang) }));
     } catch (e) {
       setError(describeError(e));
+      setStale(isStale(e));
     }
   }
 
@@ -99,7 +104,7 @@ export default function MilkPage() {
   return (
     <>
       <div className="crop-page-head"><div><h2>{t('milk')}</h2><p>{t('milkHelp')}</p></div></div>
-      <ErrorBanner message={error} />
+      <ErrorBanner message={error} onRetry={stale ? () => void load() : undefined} retryLabel={tc('loadLatest')} />
       {message && <p className="hint" role="status">{message}</p>}
       <div className="form-card form-grid filters">
         <label>{tf('date')}<input type="date" max={today()} value={date} onChange={e => setDate(e.target.value)} /></label>
