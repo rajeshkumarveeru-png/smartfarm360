@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import TenantOperations from './TenantOperations';
 import { api } from '../api/client';
 import type { ModuleStatus, Settings, TenantDetail } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
@@ -137,7 +138,10 @@ export default function SettingsPage() {
         ))}
       </div>
 
+      <TenantOperations />
+
       <h3>{t('profile')}</h3>
+      <p><Link className="text-link" to="/account">{t('accountLink')}</Link></p>
       <form className="form-card form-grid" onSubmit={changePassword}>
         <label>{t('currentPassword')}<input type="password" autoComplete="current-password" value={passwords.currentPassword}
                                             onChange={e => setPasswords({ ...passwords, currentPassword: e.target.value })} /></label>

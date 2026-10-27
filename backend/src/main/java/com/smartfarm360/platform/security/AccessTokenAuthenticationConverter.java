@@ -29,6 +29,10 @@ public class AccessTokenAuthenticationConverter implements Converter<Jwt, Abstra
         } catch (NumberFormatException e) {
             throw new InvalidBearerTokenException("Invalid token subject");
         }
+        // A second-step challenge proves only the password; it is never an access token (O6)
+        if (AccessTokenService.SECOND_STEP.equals(jwt.getClaimAsString(AccessTokenService.TYPE_CLAIM))) {
+            throw new InvalidBearerTokenException("Not an access token");
+        }
         SfUserAccount user = users.findById(userId).filter(SfUserAccount::isActive)
                 .orElseThrow(() -> new InvalidBearerTokenException("Unknown or inactive user"));
         Instant issuedAt = jwt.getIssuedAt();
@@ -36,6 +40,7 @@ public class AccessTokenAuthenticationConverter implements Converter<Jwt, Abstra
         if (issuedAt == null || issuedAt.isBefore(user.getPasswordChangedAt().truncatedTo(ChronoUnit.SECONDS))) {
             throw new InvalidBearerTokenException("Token issued before the last password change");
         }
-        return new CurrentUserAuthentication(new CurrentUser(user.getId(), user.getEmail(), user.isPlatformAdmin()), jwt);
+        return new CurrentUserAuthentication(new CurrentUser(user.getId(), user.getEmail(), user.isPlatformAdmin(),
+                Boolean.TRUE.equals(jwt.getClaimAsBoolean(AccessTokenService.MFA_CLAIM))), jwt);
     }
 }

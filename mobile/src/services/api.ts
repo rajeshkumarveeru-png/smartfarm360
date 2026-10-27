@@ -9,8 +9,11 @@ export const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').trim().repla
 export const isApiConfigured = API_BASE_URL.length > 0;
 export const REFRESH_TOKEN_KEY = 'sf360.refreshToken';
 
-export type User = { id: number; email: string; displayName: string; preferredLanguage: 'en' | 'ta'; platformAdmin: boolean };
-export type TokenResponse = { accessToken: string; refreshToken: string; expiresIn: number; user: User };
+/** {@code pendingConsents}: new terms or privacy notice to accept first, as KIND:version (SaaS operations design, O12). */
+export type User = { id: number; email: string; displayName: string; preferredLanguage: 'en' | 'ta'; platformAdmin: boolean;
+  emailVerified?: boolean; twoStepEnabled?: boolean; pendingConsents?: string[] };
+/** With two-step sign-in on, the password step returns only {@code secondStepChallenge} (O6). */
+export type TokenResponse = { accessToken: string; refreshToken: string; expiresIn: number; user: User; secondStepChallenge?: string | null };
 
 export class ApiError extends Error {
   constructor(public status: number, public code: string, message: string) {
@@ -79,6 +82,17 @@ async function storeSession(session: TokenResponse) {
 
 export async function signIn(email: string, password: string): Promise<TokenResponse> {
   const response = await raw('/api/v1/auth/login', { method: 'POST', body: { email, password, refreshTokenDelivery: 'BODY' } });
+  if (!response.ok) throw await toError(response);
+  const session = (await response.json()) as TokenResponse;
+  if (session.secondStepChallenge) return session; // the code from the authenticator app comes next
+  await storeSession(session);
+  return session;
+}
+
+/** The second sign-in step: a code from the authenticator app, or one recovery code (O6). */
+export async function completeSecondStep(challenge: string, code: string, recoveryCode = false): Promise<TokenResponse> {
+  const body = { challenge, refreshTokenDelivery: 'BODY', ...(recoveryCode ? { recoveryCode: code.trim() } : { code: code.trim() }) };
+  const response = await raw('/api/v1/auth/login/second-step', { method: 'POST', body });
   if (!response.ok) throw await toError(response);
   const session = (await response.json()) as TokenResponse;
   await storeSession(session);

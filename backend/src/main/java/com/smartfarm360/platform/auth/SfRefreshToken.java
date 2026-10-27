@@ -25,6 +25,8 @@ public class SfRefreshToken {
     @Column(name = "revoked_at") private Instant revokedAt;
     @Column(name = "revoke_reason", length = 30) private String revokeReason;
     @Column(name = "replaced_by_id") private Long replacedById;
+    /** The session was opened with the second sign-in step (O6); its access tokens say so. */
+    @Column(nullable = false) private boolean mfa;
 
     public void revoke(String reason, Instant now) {
         if (revokedAt == null) {

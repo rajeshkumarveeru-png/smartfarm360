@@ -7,7 +7,7 @@ import { AuthProvider, useAuth } from './auth/AuthContext';
 import Layout from './components/Layout';
 import { Loading } from './components/common';
 import { visibleNav } from './lib/nav';
-import { AcceptInvitationPage, ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage } from './pages/AuthPages';
+import { AcceptInvitationPage, ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage, ConsentPage, VerifyEmailPage } from './pages/AuthPages';
 import AuditPage from './pages/AuditPage';
 import ComparisonPage from './crop/ComparisonPage';
 import CropLayout from './crop/CropLayout';
@@ -77,12 +77,15 @@ import MilkPage from './livestock/MilkPage';
 import MembersPage from './pages/MembersPage';
 import OnboardingPage from './pages/OnboardingPage';
 import PlatformPage from './pages/PlatformPage';
+import AccountPage from './pages/AccountPage';
 import SettingsPage from './pages/SettingsPage';
 
+/** Signed-in users first accept new terms or a new privacy notice, if any were published (O12). */
 function RequireAuth() {
-  const { status } = useAuth();
+  const { status, user } = useAuth();
   if (status === 'loading') return <Loading />;
-  return status === 'signedIn' ? <Outlet /> : <Navigate to="/login" replace />;
+  if (status !== 'signedIn') return <Navigate to="/login" replace />;
+  return user?.pendingConsents?.length ? <ConsentPage /> : <Outlet />;
 }
 
 function PublicOnly({ children }: { children: React.ReactNode }) {
@@ -120,6 +123,7 @@ function App() {
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route element={<RequireAuth />}>
         <Route path="/" element={<Home />} />
         <Route path="/onboarding" element={<OnboardingPage />} />
@@ -210,6 +214,7 @@ function App() {
             <Route path="settings" element={<SettingsPage />} />
             <Route path="audit" element={<AuditPage />} />
           </Route>
+          <Route path="/account" element={<AccountPage />} />
           <Route path="/platform" element={<RequirePlatformAdmin />}>
             <Route index element={<PlatformPage />} />
           </Route>

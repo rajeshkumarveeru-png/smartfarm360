@@ -11,11 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class PlatformAdminIntegrationTest extends ApiIntegrationTest {
 
-    private User platformAdmin() throws Exception {
-        User user = newUser("platform-admin");
-        jdbc.update("update sf_users set platform_role = 'PLATFORM_ADMIN' where id = ?", user.id());
-        return user;
-    }
+    private User platformAdmin() throws Exception { return platformAdmin("platform-admin"); }
 
     @Test
     void ordinaryUsersAndTenantOwnersCannotUsePlatformAdministration() throws Exception {
@@ -32,7 +28,10 @@ class PlatformAdminIntegrationTest extends ApiIntegrationTest {
         long tenant = newTenant(owner, "To suspend");
 
         get("/api/v1/platform/tenants?size=100", admin).andExpect(status().isOk()).andExpect(jsonPath("$.items").isArray());
-        patch("/api/v1/platform/tenants/" + tenant, admin, Map.of("active", false)).andExpect(status().isOk())
+        // A suspension needs a reason, shown to the members (O6)
+        patch("/api/v1/platform/tenants/" + tenant, admin, Map.of("active", false)).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("REASON_REQUIRED"));
+        patch("/api/v1/platform/tenants/" + tenant, admin, Map.of("active", false, "reason", "Unpaid hosting test")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.active").value(false));
         get("/api/v1/tenants/" + tenant + "/farms", owner).andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("TENANT_SUSPENDED"));

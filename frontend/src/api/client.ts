@@ -14,8 +14,11 @@ export class ApiError extends Error {
   }
 }
 
-export type User = { id: number; email: string; displayName: string; preferredLanguage: 'en' | 'ta'; platformAdmin: boolean };
-export type TokenResponse = { accessToken: string; tokenType: string; expiresIn: number; user: User };
+/** {@code pendingConsents}: legal documents to accept before anything else, as KIND:version (O12). */
+export type User = { id: number; email: string; displayName: string; preferredLanguage: 'en' | 'ta'; platformAdmin: boolean;
+  emailVerified?: boolean; twoStepEnabled?: boolean; pendingConsents?: string[] };
+/** With two-step sign-in on, the password step returns only {@code secondStepChallenge} (O6). */
+export type TokenResponse = { accessToken: string; tokenType: string; expiresIn: number; user: User; secondStepChallenge?: string | null };
 
 let accessToken: string | null = null;
 let refreshing: Promise<TokenResponse | null> | null = null;

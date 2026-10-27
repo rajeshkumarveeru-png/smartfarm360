@@ -18,8 +18,11 @@ public class FarmService {
     private final SfLandParcelRepository parcels;
     private final SfTenantRepository tenants;
     private final AuditService audit;
+    private final com.smartfarm360.platform.plan.PlanLimits limits;
 
-    public FarmService(SfFarmRepository farms, SfLandParcelRepository parcels, SfTenantRepository tenants, AuditService audit) {
+    public FarmService(SfFarmRepository farms, SfLandParcelRepository parcels, SfTenantRepository tenants, AuditService audit,
+                       com.smartfarm360.platform.plan.PlanLimits limits) {
+        this.limits = limits;
         this.farms = farms;
         this.parcels = parcels;
         this.tenants = tenants;
@@ -38,6 +41,7 @@ public class FarmService {
 
     @Transactional
     public Farm createFarm(TenantContext ctx, FarmRequest request) {
+        limits.requireFarmSlot(ctx.tenantId());
         SfFarm farm = new SfFarm();
         farm.setTenant(tenants.getReferenceById(ctx.tenantId()));
         farm.setName(request.name().trim());

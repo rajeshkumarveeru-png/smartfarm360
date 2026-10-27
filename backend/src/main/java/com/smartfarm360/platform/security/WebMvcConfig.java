@@ -28,6 +28,18 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(tenantInterceptor).addPathPatterns("/api/**");
+        // The platform console needs the second sign-in step (SaaS operations design, O6)
+        registry.addInterceptor(new org.springframework.web.servlet.HandlerInterceptor() {
+            @Override
+            public boolean preHandle(jakarta.servlet.http.HttpServletRequest request, jakarta.servlet.http.HttpServletResponse response, Object handler) {
+                Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+                if (auth != null && auth.getPrincipal() instanceof CurrentUser user && user.platformAdmin() && !user.secondStep()) {
+                    throw com.smartfarm360.platform.web.ApiException.forbidden("TWO_STEP_REQUIRED",
+                            "Turn on two-step sign-in and sign in with it to use the platform console.");
+                }
+                return true;
+            }
+        }).addPathPatterns("/api/v1/platform/**");
         // After the tenant check, so a key is only honoured for a member (mobile offline design, N4)
         registry.addInterceptor(idempotencyInterceptor).addPathPatterns("/api/v1/tenants/**");
     }

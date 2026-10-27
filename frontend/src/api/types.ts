@@ -14,6 +14,7 @@ export const ROLE_CODES: RoleCode[] = ['TENANT_OWNER', 'FARM_ADMIN', 'FARM_MANAG
 export type TenantSummary = {
   id: number; name: string; slug: string; preferredLanguage: 'en' | 'ta'; active: boolean;
   roles: RoleCode[]; permissions: Permission[]; enabledModules: ModuleCode[]; createdAt: string;
+  suspendedReason?: string | null; deletionScheduledFor?: string | null;
 };
 
 export type Settings = { timezone: string; currencyCode: string; areaUnit: string; weightUnit: string; volumeUnit: string };
@@ -31,4 +32,25 @@ export type Invitation = { id: number; email: string; roles: RoleCode[]; expires
 
 export type Page<T> = { items: T[]; page: number; size: number; totalItems: number; totalPages: number };
 export type AuditEntry = { id: number; actorUserId?: number; actorEmail?: string; action: string; entityType: string; entityId?: string; details: Record<string, unknown>; occurredAt: string };
-export type PlatformTenant = { id: number; name: string; slug: string; active: boolean; planCode: string; memberCount: number; createdAt: string };
+export type PlatformTenant = { id: number; name: string; slug: string; active: boolean; planCode: string; memberCount: number; farmCount: number;
+  modules: string[]; lastActivity: string | null; createdAt: string; suspendedReason: string | null; deletionScheduledFor: string | null };
+export type Usage = { limit: 'MEMBERS' | 'FARMS' | 'EXPORTS_PER_DAY'; used: number; max: number; nearLimit: boolean; overridden: boolean };
+export type HistoryEntry = { at: string; action: string; actorUserId: number | null; actorEmail: string | null; details: string };
+export type GrantRow = { id: number; grantedByEmail: string; grantedToEmail: string | null; reason: string; startsAt: string; endsAt: string; endedAt: string | null };
+export type PlatformTenantDetail = { tenant: PlatformTenant; owners: { userId: number; email: string; displayName: string }[]; usage: Usage[];
+  history: HistoryEntry[]; supportGrants: GrantRow[] };
+export type PlatformUser = { id: number; email: string; displayName: string; active: boolean; platformAdmin: boolean; emailVerified: boolean; twoStep: boolean;
+  createdAt: string; memberships: { tenantId: number; tenantName: string; roles: string[] }[] };
+export type OpsCheck = { kind: string; ok: boolean; details: string | null; durationMs: number | null; recordedAt: string };
+export type Operations = { version: string; lastBackup: OpsCheck | null; lastRestoreTest: OpsCheck | null; lastAlertTest: OpsCheck | null;
+  lastLoadTest: OpsCheck | null; alertEmailSet: boolean };
+export type PlatformAuditEntry = { id: number; at: string; actorUserId: number | null; actorEmail: string | null; action: string; targetType: string;
+  targetId: number | null; details: string };
+export type Announcement = { id: number; messageEn: string; messageTa: string; startsAt: string; endsAt: string; maintenance: boolean; endedAt: string | null };
+export type LegalDocument = { kind: 'TERMS' | 'PRIVACY'; version: number; language: 'en' | 'ta'; title: string; body: string; changes: string | null; publishedAt: string };
+export type Consent = { kind: 'TERMS' | 'PRIVACY' | 'MARKETING'; version: number; accepted: boolean; client: string; recordedAt: string };
+export type SupportGrant = { id: number; grantedByEmail: string; grantedToEmail: string | null; reason: string; startsAt: string; endsAt: string;
+  endedAt: string | null; active: boolean };
+export type TenantExport = { id: number; status: 'QUEUED' | 'RUNNING' | 'READY' | 'FAILED' | 'EXPIRED'; sizeBytes: number | null; requestedAt: string;
+  readyAt: string | null; expiresAt: string | null; requestedByEmail: string };
+export type DeletionState = { pending: boolean; requestedAt: string | null; scheduledFor: string | null; requestedByEmail: string | null };

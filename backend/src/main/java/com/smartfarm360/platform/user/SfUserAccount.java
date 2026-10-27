@@ -22,6 +22,11 @@ public class SfUserAccount {
     @Column(name = "failed_login_attempts", nullable = false) private int failedLoginAttempts;
     @Column(name = "locked_until") private Instant lockedUntil;
     @Column(name = "password_changed_at", nullable = false) private Instant passwordChangedAt = Instant.now();
+    /** Set once the address is verified (O5); null blocks creating a farm business. */
+    @Column(name = "email_verified_at") private Instant emailVerifiedAt;
+    /** Set when the account was deleted and its personal data replaced (O11). */
+    @Column(name = "anonymised_at") private Instant anonymisedAt;
+    @Column(name = "marketing_opt_in", nullable = false) private boolean marketingOptIn;
     @Column(name = "created_at", nullable = false) private Instant createdAt = Instant.now();
     @Column(name = "updated_at", nullable = false) private Instant updatedAt = Instant.now();
 

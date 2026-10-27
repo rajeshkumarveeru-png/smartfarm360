@@ -10,7 +10,10 @@ type AuthState = {
   user: User | null;
   tenants: TenantSummary[];
   sessionExpired: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  /** Resolves with a challenge when the account has two-step sign-in on; the page then asks for the code (O6). */
+  login: (email: string, password: string) => Promise<string | null>;
+  completeSecondStep: (challenge: string, code: string, recoveryCode?: boolean) => Promise<void>;
+  reloadUser: () => Promise<void>;
   register: (email: string, password: string, displayName: string) => Promise<void>;
   logout: () => Promise<void>;
   reloadTenants: () => Promise<TenantSummary[]>;
@@ -59,8 +62,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const session = await api<TokenResponse>('/api/v1/auth/login', { method: 'POST', body: { email, password } });
+    if (session.secondStepChallenge) return session.secondStepChallenge;
+    await startSession(session);
+    return null;
+  }, [startSession]);
+
+  const completeSecondStep = useCallback(async (challenge: string, code: string, recoveryCode = false) => {
+    const session = await api<TokenResponse>('/api/v1/auth/login/second-step', { method: 'POST',
+      body: recoveryCode ? { challenge, recoveryCode: code.trim() } : { challenge, code: code.trim() } });
     await startSession(session);
   }, [startSession]);
+
+  const reloadUser = useCallback(async () => {
+    setUser(await api<User>('/api/v1/auth/me'));
+  }, []);
 
   const register = useCallback(async (email: string, password: string, displayName: string) => {
     await api('/api/v1/auth/register', { method: 'POST', body: { email, password, displayName, preferredLanguage: currentLanguage() } });
@@ -82,8 +97,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user]);
 
-  const value = useMemo(() => ({ status, user, tenants, sessionExpired, login, register, logout, reloadTenants, changeLanguage }),
-    [status, user, tenants, sessionExpired, login, register, logout, reloadTenants, changeLanguage]);
+  const value = useMemo(() => ({ status, user, tenants, sessionExpired, login, completeSecondStep, reloadUser, register, logout, reloadTenants, changeLanguage }),
+    [status, user, tenants, sessionExpired, login, completeSecondStep, reloadUser, register, logout, reloadTenants, changeLanguage]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

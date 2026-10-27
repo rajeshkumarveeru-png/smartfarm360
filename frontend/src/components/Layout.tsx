@@ -1,10 +1,22 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LogOut, ShieldCheck, Sprout } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { LogOut, ShieldCheck, Sprout, UserRound } from 'lucide-react';
+import { api } from '../api/client';
+import type { Announcement } from '../api/types';
+import { currentLanguage } from '../i18n';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthContext';
 import { useCurrentTenant } from '../auth/useCurrentTenant';
 import { visibleNav } from '../lib/nav';
 import { LanguageToggle } from './common';
+
+/** Announcements and maintenance notices from the platform, in the user's language (O8). */
+export function AnnouncementBanner() {
+  const [items, setItems] = useState<Announcement[]>([]);
+  const lang = currentLanguage();
+  useEffect(() => { api<Announcement[]>('/api/v1/announcements').then(setItems).catch(() => setItems([])); }, []);
+  return <>{items.map(a => <div key={a.id} className={a.maintenance ? 'error-banner' : 'info-banner'} role="status">{lang === 'ta' ? a.messageTa : a.messageEn}</div>)}</>;
+}
 
 export default function Layout() {
   const { t } = useTranslation();
@@ -43,6 +55,7 @@ export default function Layout() {
           )}
         </nav>
         <div className="side-bottom">
+          <NavLink to="/account" className={({ isActive }) => `side-link${isActive ? ' active' : ''}`}><UserRound size={15} aria-hidden />{t('nav.account')}</NavLink>
           <small>{t('auth.signedInAs', { email: user?.email ?? '' })}</small>
           <button type="button" className="side-signout" onClick={() => void logout().then(() => navigate('/login'))}>
             <LogOut size={15} aria-hidden />{t('auth.signOut')}
@@ -54,7 +67,13 @@ export default function Layout() {
           <div><span className="eyebrow">SMARTFARM360</span><h1>{tenant?.name ?? t('common.appName')}</h1></div>
           <LanguageToggle />
         </header>
-        {tenant && !tenant.active && <div className="error-banner" role="alert">{t('tenant.suspended')}</div>}
+        <AnnouncementBanner />
+        {user && user.emailVerified === false && (
+          <div className="info-banner" role="status">{t('account.verifyBanner')} <Link to="/account">{t('account.verifyBannerLink')}</Link></div>
+        )}
+        {tenant && !tenant.active && (
+          <div className="error-banner" role="alert">{t('tenant.suspended')}{tenant.suspendedReason ? ` ${t('tenant.suspendedReason', { reason: tenant.suspendedReason })}` : ''}</div>
+        )}
         <Outlet />
       </main>
     </div>

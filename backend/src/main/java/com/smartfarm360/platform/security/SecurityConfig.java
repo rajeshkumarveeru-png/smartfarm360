@@ -23,6 +23,14 @@ import java.util.List;
 @Configuration
 @EnableConfigurationProperties(AuthProperties.class)
 public class SecurityConfig {
+    /**
+     * The web app's Content-Security-Policy (O13): its own scripts only, styles and fonts from Google Fonts, and no
+     * framing. API responses carry it too; it costs nothing there.
+     */
+    public static final String CONTENT_SECURITY_POLICY = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            + "font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; "
+            + "base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
+
     /** Header the web client must send when the refresh token travels in a cookie (forces a CORS preflight). */
     public static final String REFRESH_HEADER = "X-SF360-Refresh";
 
@@ -38,11 +46,19 @@ public class SecurityConfig {
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .headers(h -> h
                 .referrerPolicy(r -> r.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
-                .permissionsPolicyHeader(p -> p.policy("camera=(), microphone=(), geolocation=()")))
+                .permissionsPolicyHeader(p -> p.policy("camera=(), microphone=(), geolocation=()"))
+                .contentSecurityPolicy(c -> c.policyDirectives(CONTENT_SECURITY_POLICY))
+                .frameOptions(f -> f.deny())
+                .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31_536_000)))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.POST,
                         "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout",
-                        "/api/v1/auth/password-reset/request", "/api/v1/auth/password-reset/confirm").permitAll()
+                        "/api/v1/auth/password-reset/request", "/api/v1/auth/password-reset/confirm", "/api/v1/auth/login/second-step",
+                        "/api/v1/auth/verify-email").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/legal/current", "/api/v1/announcements").permitAll()
+                // The built web app (served from the same address in production): its files and its page routes
+                .requestMatchers(r -> "GET".equals(r.getMethod()) && !r.getRequestURI().startsWith("/api/")
+                        && !r.getRequestURI().startsWith("/actuator") && !r.getRequestURI().startsWith("/v3/")).permitAll()
                 .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/error").permitAll()
                 .requestMatchers("/api/v1/platform/**").hasRole("PLATFORM_ADMIN")

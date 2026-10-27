@@ -49,6 +49,12 @@ Record every command you ran and its result in `docs/PROGRESS.md` at the end of 
 - Endpoints the phone uses offline are marked `@Idempotent` and get a replay test (ADR 0010). Records that replace a
   day return a `version` and refuse a stale `baseVersion` with `STALE_RECORD` (`Versions`). Phone forms save
   through the outbox (`mobile/src/offline/hub.ts` `record()`), never with `apiRequest` directly.
+- Every table with a `tenant_id` gets the forced `sf_tenant_isolation` Row-Level Security policy in its own migration
+  (ADR 0011; `RowLevelSecurityCoverageTest`). Tests run as an ordinary role, so RLS applies to them. Code outside a
+  tenant request runs in the "all" scope and must filter by tenant itself.
+- The platform console (`/api/v1/platform`) shows counts and status, never books; every change goes to `PlatformAudit`.
+  Plan limits go through `PlanLimits`. The `prod` profile refuses unsafe settings (`ProductionSettings`); new
+  production settings get a rule there. Operations runbooks are in `docs/ops/`.
 - Errors: throw `ApiException` with a stable `code`, and add that code to `errors.*` in both catalogs.
 - Every tenant-data change that matters to owners is recorded with `AuditService` (no secrets in details).
 - Controllers stay thin; business rules live in services; typed request/response records with Bean Validation.

@@ -54,7 +54,30 @@ public abstract class ApiIntegrationTest extends EmbeddedPostgresSupport {
     protected User newUser(String prefix) throws Exception {
         String email = uniqueEmail(prefix);
         post("/api/v1/auth/register", null, Map.of("email", email, "password", PASSWORD, "displayName", prefix)).andExpect(status().isAccepted());
+        // New accounts verify their address before creating a farm business (O5)
+        post("/api/v1/auth/verify-email", null, Map.of("token", mail.lastToken(email, "VERIFY_EMAIL"))).andExpect(status().isNoContent());
         return login(email, PASSWORD);
+    }
+
+    /**
+     * A platform administrator signed in with the second step, as the platform console requires (O6). Returns the
+     * session and the authenticator secret, for tests that sign in again.
+     */
+    protected User platformAdmin(String prefix) throws Exception {
+        User user = newUser(prefix);
+        jdbc.update("update sf_users set platform_role = 'PLATFORM_ADMIN' where id = ?", user.id());
+        String secret = body(post("/api/v1/auth/me/two-step/setup", user, Map.of("password", PASSWORD)).andExpect(status().isOk())).get("secret").asText();
+        long step = com.smartfarm360.platform.auth.Totp.step(java.time.Instant.now().getEpochSecond());
+        post("/api/v1/auth/me/two-step/enable", user, Map.of("code", com.smartfarm360.platform.auth.Totp.code(secret, step))).andExpect(status().isOk());
+        return loginWithSecondStep(user.email(), secret, step + 1);
+    }
+
+    protected User loginWithSecondStep(String email, String secret, long step) throws Exception {
+        String challenge = body(post("/api/v1/auth/login", null, Map.of("email", email, "password", PASSWORD, "refreshTokenDelivery", "BODY"))
+                .andExpect(status().isOk())).get("secondStepChallenge").asText();
+        JsonNode s = body(post("/api/v1/auth/login/second-step", null, Map.of("challenge", challenge,
+                "code", com.smartfarm360.platform.auth.Totp.code(secret, step), "refreshTokenDelivery", "BODY")).andExpect(status().isOk()));
+        return new User(s.at("/user/id").asLong(), email, s.get("accessToken").asText());
     }
 
     protected User login(String email, String password) throws Exception {

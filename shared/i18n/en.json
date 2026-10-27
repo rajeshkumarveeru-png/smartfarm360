@@ -292,7 +292,25 @@
     "acceptIntro": "You have been invited to join a farm business on SmartFarm360.",
     "accept": "Accept invitation",
     "signInToAccept": "Sign in (or create an account) with the invited email, then open the link again.",
-    "signedInAs": "Signed in as {{email}}"
+    "signedInAs": "Signed in as {{email}}",
+    "secondStepTitle": "Two-step sign-in",
+    "secondStepHelp": "Enter the 6-digit code from your authenticator app.",
+    "recoveryHelp": "Enter one of the recovery codes you saved. Each works once.",
+    "appCode": "Code from the app",
+    "recoveryCode": "Recovery code",
+    "verifyCode": "Continue",
+    "useAppCode": "Use the code from the app",
+    "useRecoveryCode": "Use a recovery code instead",
+    "verifyTitle": "Email address",
+    "verifyIntro": "Confirming that this email address is yours.",
+    "verifyDone": "Thank you. Your email address is confirmed.",
+    "continue": "Continue",
+    "consentTitle": "Before you go on",
+    "consentIntro": "Please read and accept the updated documents.",
+    "whatChanged": "What changed: {{changes}}",
+    "consentAgree": "I have read and accept these documents.",
+    "consentAccept": "Accept and continue",
+    "consentRequired": "Tick the box to accept, or sign out."
   },
   "nav": {
     "farms": "Farms & land",
@@ -313,7 +331,8 @@
     "livestock": "Livestock",
     "aquaculture": "Fish farming",
     "organic": "Organic manure",
-    "processing": "Processing"
+    "processing": "Processing",
+    "account": "Your account"
   },
   "tenant": {
     "title": "Create your farm business",
@@ -321,7 +340,8 @@
     "name": "Farm business name",
     "namePlaceholder": "e.g. Green Valley Farms",
     "create": "Create farm business",
-    "suspended": "This farm business is suspended. Contact support."
+    "suspended": "This farm business is suspended. Contact support.",
+    "suspendedReason": "Reason: {{reason}}"
   },
   "roles": {
     "TENANT_OWNER": "Owner",
@@ -366,7 +386,8 @@
     "changePassword": "Change password",
     "currentPassword": "Current password",
     "passwordChanged": "Password changed. Please sign in again.",
-    "readOnly": "You can view these settings but not change them."
+    "readOnly": "You can view these settings but not change them.",
+    "accountLink": "Two-step sign-in, privacy and deleting your account are on Your account."
   },
   "units": {
     "ACRE": "Acre",
@@ -509,7 +530,21 @@
     "PROCESSING_STEP_RECORDED": "Processing step recorded",
     "PROCESSING_STEP_DELETED": "Processing step removed",
     "PROCESSING_OUTPUT_RECORDED": "Processing output recorded",
-    "PROCESSING_OUTPUT_DELETED": "Processing waste removed"
+    "PROCESSING_OUTPUT_DELETED": "Processing waste removed",
+    "EMAIL_VERIFIED": "Confirmed the email address",
+    "MEMBER_ACCOUNT_DELETED": "A member deleted their account",
+    "RECOVERY_CODE_USED": "Signed in with a recovery code",
+    "REFRESH_TOKEN_GRACE": "Two tabs refreshed the session together",
+    "SUPPORT_ACCESS_ENDED": "Ended support access",
+    "SUPPORT_ACCESS_GRANTED": "Let SmartFarm360 support read",
+    "SUPPORT_VIEW": "Support opened a page",
+    "TENANT_DELETION_CANCELLED": "Cancelled the deletion",
+    "TENANT_DELETION_REQUESTED": "Asked for the farm business to be deleted",
+    "TENANT_EXPORT_DOWNLOADED": "Downloaded the full export",
+    "TENANT_EXPORT_REQUESTED": "Exported everything",
+    "TWO_STEP_DISABLED": "Turned off two-step sign-in",
+    "TWO_STEP_ENABLED": "Turned on two-step sign-in",
+    "TWO_STEP_FAILED": "Entered a wrong two-step code"
   },
   "platform": {
     "title": "Platform administration",
@@ -518,7 +553,99 @@
     "suspended": "Suspended",
     "suspend": "Suspend",
     "activate": "Activate",
-    "confirmSuspend": "Suspend {{name}}? Its members lose access until it is activated again."
+    "confirmSuspend": "Suspend {{name}}? Its members lose access until it is activated again.",
+    "subtitle": "Farm businesses and users by status and counts; their books stay private.",
+    "tab": {
+      "tenants": "Farm businesses",
+      "users": "Users",
+      "ops": "Operations",
+      "announcements": "Announcements",
+      "legal": "Terms and privacy",
+      "audit": "Platform log"
+    },
+    "search": "Search",
+    "searchTenantsHint": "Name, short name or owner's email",
+    "searchUsersHint": "Email or name",
+    "find": "Find",
+    "close": "Close",
+    "open": "Open",
+    "owners": "Owners",
+    "modulesOn": "Modules on",
+    "deletionOn": "Deletion on {{date}}",
+    "usage": "Usage",
+    "overridden": "raised by an administrator",
+    "limit": "Limit",
+    "newLimit": "New value",
+    "emptyRemoves": "empty: back to the plan",
+    "reason": "Reason",
+    "saveLimit": "Save limit",
+    "status": "Status",
+    "suspendReason": "Reason (shown to its members)",
+    "suspendedBecause": "Suspended: {{reason}}",
+    "supportGrants": "Support access",
+    "noGrants": "None granted.",
+    "history": "History",
+    "farms": "Farms",
+    "lastActivity": "last activity {{date}}",
+    "lockReason": "Why lock {{email}}?",
+    "noBusinesses": "no farm business",
+    "twoStepOn": "two-step on",
+    "unverified": "email not confirmed",
+    "administrator": "administrator",
+    "locked": "Locked",
+    "lock": "Lock",
+    "unlock": "Unlock",
+    "ok": "passed",
+    "failed": "FAILED",
+    "never": "never",
+    "version": "Version {{version}}",
+    "lastBackup": "Last backup",
+    "lastRestoreTest": "Last restore test",
+    "lastAlertTest": "Last test alert",
+    "lastLoadTest": "Last load test",
+    "alertEmailMissing": "No alert address is set (APP_OPS_ALERT_EMAIL).",
+    "sendTestAlert": "Send a test alert",
+    "testAlertSent": "Test alert sent. Check that it arrived.",
+    "messageEn": "Message in English",
+    "messageTa": "Message in Tamil",
+    "forHours": "For how many hours",
+    "readOnlyMaintenance": "Read-only maintenance: refuse every change meanwhile",
+    "confirmMaintenance": "Make SmartFarm360 read-only for everyone? Phones keep their records and send them later.",
+    "announce": "Announce",
+    "maintenance": "maintenance",
+    "ended": "ended",
+    "end": "End now",
+    "legalHelp": "Publish the texts written by the product owner and reviewed by a lawyer. Every user accepts a new version before going on.",
+    "document": "Document",
+    "terms": "Terms of service",
+    "privacyNotice": "Privacy notice",
+    "changes": "What changed (shown to users)",
+    "titleEn": "Title in English",
+    "titleTa": "Title in Tamil",
+    "bodyEn": "Text in English",
+    "bodyTa": "Text in Tamil",
+    "publish": "Publish a new version",
+    "confirmPublish": "Publish this version? Every user will be asked to accept it.",
+    "action": {
+      "PLATFORM_TENANT_SUSPENDED": "Suspended the farm business",
+      "PLATFORM_TENANT_ACTIVATED": "Reactivated the farm business",
+      "PLATFORM_LIMIT_SET": "Changed a limit",
+      "PLATFORM_USER_LOCKED": "Locked a user",
+      "PLATFORM_USER_UNLOCKED": "Unlocked a user",
+      "PLATFORM_CHECK_RECORDED": "Recorded a check",
+      "PLATFORM_TEST_ALERT": "Sent a test alert",
+      "PLATFORM_ANNOUNCEMENT_CREATED": "Made an announcement",
+      "PLATFORM_MAINTENANCE_SCHEDULED": "Scheduled read-only maintenance",
+      "PLATFORM_ANNOUNCEMENT_ENDED": "Ended an announcement",
+      "PLATFORM_LEGAL_PUBLISHED": "Published terms or privacy notice",
+      "SUPPORT_ACCESS_GRANTED": "Granted support access",
+      "SUPPORT_ACCESS_ENDED": "Ended support access",
+      "TENANT_EXPORT_READY": "Export ready",
+      "TENANT_DELETION_REQUESTED": "Asked for deletion",
+      "TENANT_DELETION_CANCELLED": "Cancelled the deletion",
+      "TENANT_DELETED": "Farm business deleted",
+      "ACCOUNT_DELETED": "Account deleted"
+    }
   },
   "errors": {
     "generic": "Something went wrong. Please try again.",
@@ -810,7 +937,39 @@
     "IDEMPOTENCY_IN_PROGRESS": "This record is still being saved. Try again in a moment.",
     "STALE_RECORD": "Someone else changed this since you opened it. Check their version first.",
     "CLIENT_UPGRADE_REQUIRED": "Please update the SmartFarm360 app to send your records.",
-    "SAVED_ON_PHONE": "Saved on this phone. It will be sent when there is signal."
+    "SAVED_ON_PHONE": "Saved on this phone. It will be sent when there is signal.",
+    "EMAIL_NOT_VERIFIED": "Verify your email address first. We sent you a link.",
+    "INVALID_VERIFICATION_TOKEN": "This verification link is invalid or has expired. Ask for a new one.",
+    "EMAIL_ALREADY_VERIFIED": "This email address is already verified.",
+    "PLAN_LIMIT_REACHED": "Your plan's limit is reached. Contact SmartFarm360 support to raise it.",
+    "TWO_STEP_ALREADY_ON": "Two-step sign-in is already on.",
+    "TWO_STEP_NOT_STARTED": "Start setting up two-step sign-in first.",
+    "INVALID_TWO_STEP_CODE": "That code is not right. Check the time on your phone and try again.",
+    "TWO_STEP_REQUIRED": "Turn on two-step sign-in, then sign in with it.",
+    "SECOND_STEP_EXPIRED": "Sign in again: the second step took too long.",
+    "UNKNOWN_LIMIT": "Unknown limit.",
+    "USER_NOT_FOUND": "User not found.",
+    "CANNOT_LOCK_SELF": "You cannot lock your own account.",
+    "UNKNOWN_CHECK": "Unknown check.",
+    "ALERT_EMAIL_MISSING": "Set the operators' alert email address first (APP_OPS_ALERT_EMAIL).",
+    "MESSAGE_REQUIRED": "Write the message in English and Tamil.",
+    "INVALID_PERIOD": "The end must be after the start.",
+    "ANNOUNCEMENT_NOT_FOUND": "Announcement not found or already ended.",
+    "MAINTENANCE": "SmartFarm360 is read-only for maintenance. Try again later.",
+    "UNKNOWN_DOCUMENT": "Unknown document.",
+    "LEGAL_TEXT_REQUIRED": "Give the title and text in English and Tamil.",
+    "PLATFORM_ADMIN_ACCOUNT": "A platform administrator's account is removed by another administrator.",
+    "SOLE_OWNER": "You are the only owner of a farm business. Make someone else an owner, or ask for the business to be deleted first.",
+    "NOT_A_PLATFORM_ADMIN": "That address is not a SmartFarm360 support administrator.",
+    "INVALID_SUPPORT_PERIOD": "Support access lasts from 1 to 72 hours.",
+    "SUPPORT_GRANT_NOT_FOUND": "Support access not found or already ended.",
+    "SUPPORT_READ_ONLY": "Support access is read-only.",
+    "TENANT_DELETION_PENDING": "This farm business is being deleted and is read-only. An owner can cancel the deletion.",
+    "EXPORT_NOT_FOUND": "Export not found.",
+    "EXPORT_NOT_READY": "This export is not ready or has expired.",
+    "CONFIRM_NAME_MISMATCH": "Type the farm business's name exactly to confirm.",
+    "DELETION_ALREADY_REQUESTED": "Deletion was already asked for.",
+    "DELETION_NOT_REQUESTED": "No deletion was asked for."
   },
   "mobileAuth": {
     "chooseTenant": "Choose a farm business",
@@ -2859,5 +3018,138 @@
       "step": "Enter kg and moisture as numbers.",
       "output": "Choose the item (or say what the waste is) and enter the quantity."
     }
+  },
+  "email": {
+    "footer": "SmartFarm360 · You get this email because of your SmartFarm360 account. If you did not expect it, you can ignore it.",
+    "passwordReset": {
+      "subject": "Reset your SmartFarm360 password",
+      "body": "Someone asked to reset the password of this account. To choose a new password, open this link within 30 minutes:\n{{url}}\n\nIf it was not you, ignore this email; your password stays the same."
+    },
+    "registrationAttempt": {
+      "subject": "Someone tried to register with your email",
+      "body": "Someone tried to create a SmartFarm360 account with this email address, which already has one. If it was you, sign in, or reset your password if you forgot it."
+    },
+    "invitation": {
+      "subject": "You are invited to {{tenant}} on SmartFarm360",
+      "body": "You have been invited to join {{tenant}}. To accept, sign in or create an account with this email address and open:\n{{url}}\n\nThe invitation is valid for 7 days."
+    },
+    "verifyEmail": {
+      "subject": "Confirm your email address",
+      "body": "Welcome to SmartFarm360. Please confirm this is your email address by opening this link within 48 hours:\n{{url}}"
+    },
+    "exportReady": {
+      "subject": "Your export of {{tenant}} is ready",
+      "body": "The export of {{tenant}} is ready. Download it from Settings, Your data, within 7 days; then it is removed."
+    },
+    "deletionScheduled": {
+      "subject": "{{tenant}} will be deleted on {{date}}",
+      "body": "An owner asked for {{tenant}} to be deleted. Until {{date}} it is read-only, and any owner can cancel the deletion or export the data from Settings. After that date all its records are deleted for good.\n\nKeeping the books for tax purposes is the owner's responsibility: export them before the deletion."
+    },
+    "deletionCancelled": {
+      "subject": "The deletion of {{tenant}} was cancelled",
+      "body": "An owner cancelled the deletion of {{tenant}}. It works as before."
+    },
+    "deletionDone": {
+      "subject": "{{tenant}} has been deleted",
+      "body": "As asked, {{tenant}} and all its records have been deleted from SmartFarm360. Copies in backups expire on their normal schedule, as the privacy notice explains."
+    },
+    "supportAccessGranted": {
+      "subject": "Support access to {{tenant}} is on",
+      "body": "SmartFarm360 support can now read {{tenant}} until {{until}} (UTC). They cannot change anything. Every page they open is listed in the activity log, and an owner can end the access from Settings, Support."
+    },
+    "adminSignIn": {
+      "subject": "New sign-in to your SmartFarm360 administrator account",
+      "body": "Your platform administrator account signed in at {{time}} (UTC). If it was not you, reset your password now and tell the other administrators."
+    },
+    "accountDeleted": {
+      "subject": "Your SmartFarm360 account was deleted",
+      "body": "Your SmartFarm360 account has been deleted, as you asked. Records you made for farm businesses stay in their books under a former-member label."
+    },
+    "opsAlert": {
+      "subject": "SmartFarm360 alert: {{alert}}",
+      "body": "{{alert}}\nTime: {{time}} (UTC)\nSee the incident checklist (docs/ops/incident.md)."
+    }
+  },
+  "account": {
+    "title": "Your account",
+    "email": "Email address",
+    "emailVerified": "Your email address is confirmed.",
+    "emailNotVerified": "Your email address is not confirmed yet. Open the link we sent you to create a farm business.",
+    "verificationSent": "We sent a new link. It works for 48 hours.",
+    "resendVerification": "Send the link again",
+    "verifyBanner": "Confirm your email address to create a farm business.",
+    "verifyBannerLink": "Send the link again",
+    "twoStep": "Two-step sign-in",
+    "twoStepHelp": "After your password, also enter a code from an authenticator app on your phone. Recommended for owners.",
+    "twoStepRequired": "Platform administrators must use two-step sign-in.",
+    "twoStepOn": "Two-step sign-in is on.",
+    "twoStepOnSignInAgain": "Two-step sign-in is on. Next time you sign in you will be asked for a code.",
+    "password": "Your password",
+    "setUp": "Set up",
+    "scanOrType": "Add SmartFarm360 to your authenticator app with the link below, or type the key.",
+    "openInApp": "Open in the authenticator app",
+    "secretKey": "Key",
+    "codeFromApp": "Code from the app",
+    "turnOn": "Turn on",
+    "recoveryCodesTitle": "Your recovery codes",
+    "recoveryCodesHelp": "Keep these somewhere safe. Each code signs you in once if you lose your phone. They are shown only now.",
+    "savedCodes": "I have saved them",
+    "newRecoveryCodes": "New recovery codes",
+    "privacy": "Privacy",
+    "marketing": "Send me news and offers from SmartFarm360 by email",
+    "consentHistory": "What you accepted",
+    "noConsents": "Nothing recorded yet.",
+    "consentKind": {
+      "TERMS": "Terms of service",
+      "PRIVACY": "Privacy notice",
+      "MARKETING": "News by email"
+    },
+    "accepted": "accepted",
+    "declined": "declined",
+    "downloadMyData": "Download my data",
+    "deleteAccount": "Delete your account",
+    "deleteAccountHelp": "Your name and email are removed and you can no longer sign in. Records you made for farm businesses stay in their books under a former-member label. If you are the only owner of a farm business, make someone else an owner or delete the business first.",
+    "deleteAccountConfirm": "Delete your account for good? This cannot be undone.",
+    "deleteAccountButton": "Delete my account"
+  },
+  "tenantOps": {
+    "deletionBanner": "This farm business will be deleted on {{date}}. Until then it is read-only.",
+    "plan": "Plan and limits",
+    "limit": {
+      "MEMBERS": "Members",
+      "FARMS": "Farms",
+      "EXPORTS_PER_DAY": "Full exports today"
+    },
+    "nearLimit": "near the limit",
+    "support": "Support access",
+    "supportHelp": "Let SmartFarm360 support read this farm business to help you. They cannot change anything, and every page they open is in the activity history.",
+    "supportUntil": "Support can read until {{date}}",
+    "endSupport": "End access now",
+    "supportGranted": "Support access is on.",
+    "supportHours": "For",
+    "hours": "{{count}} hours",
+    "supportReason": "What should they look at?",
+    "grantSupport": "Let support read",
+    "yourData": "Your data",
+    "exportHelp": "Download everything recorded for this farm business: a ZIP of spreadsheet (CSV) and JSON files. We email you when it is ready; it is kept 7 days.",
+    "exportAll": "Export everything",
+    "exportStarted": "The export has started. We will email you when it is ready.",
+    "exportStatus": {
+      "QUEUED": "waiting",
+      "RUNNING": "being prepared",
+      "READY": "ready",
+      "FAILED": "failed; try again",
+      "EXPIRED": "expired"
+    },
+    "download": "Download",
+    "availableUntil": "available until {{date}}",
+    "deleteBusiness": "Delete this farm business",
+    "deleteHelp": "Everything recorded here is deleted after 30 days. Until then the business is read-only and any owner can cancel. Keeping the books for tax is your responsibility: export them first.",
+    "typeName": "Type {{name}} to confirm",
+    "deleteButton": "Delete after 30 days",
+    "deleteConfirm": "Delete {{name}} after 30 days?",
+    "deletionPending": "Deletion on {{date}}, asked by {{email}}. It is read-only until then.",
+    "cancelDeletion": "Cancel the deletion",
+    "deletionCancelled": "The deletion is cancelled."
   }
 }

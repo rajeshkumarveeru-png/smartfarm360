@@ -14,13 +14,24 @@ import java.sql.Statement;
 /**
  * Starts one real, empty PostgreSQL server per test JVM (no Docker required).
  * Integration tests extend this class so Liquibase runs against a clean database.
+ * <p>
+ * The application connects as {@value #APP_ROLE}, an ordinary role that owns its database, as in production. A
+ * superuser would bypass Row-Level Security (ADR 0011), so every API test also runs against the policies.
  */
 public abstract class EmbeddedPostgresSupport {
+    public static final String APP_ROLE = "sf_app";
+    private static final String APP_DATABASE = "smartfarm";
     private static final EmbeddedPostgres POSTGRES = start();
 
     private static EmbeddedPostgres start() {
         try {
             EmbeddedPostgres postgres = EmbeddedPostgres.builder().start();
+            try (Connection c = postgres.getPostgresDatabase().getConnection(); Statement s = c.createStatement()) {
+                s.execute("create role " + APP_ROLE + " login password '" + APP_ROLE + "' nosuperuser");
+                s.execute("create database " + APP_DATABASE + " owner " + APP_ROLE);
+            } catch (SQLException e) {
+                throw new IllegalStateException("Could not create the application role", e);
+            }
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 try { postgres.close(); } catch (IOException ignored) { }
             }));
@@ -32,9 +43,9 @@ public abstract class EmbeddedPostgresSupport {
 
     @DynamicPropertySource
     static void datasource(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", () -> POSTGRES.getJdbcUrl("postgres", "postgres"));
-        registry.add("spring.datasource.username", () -> "postgres");
-        registry.add("spring.datasource.password", () -> "postgres");
+        registry.add("spring.datasource.url", () -> POSTGRES.getJdbcUrl(APP_ROLE, APP_DATABASE));
+        registry.add("spring.datasource.username", () -> APP_ROLE);
+        registry.add("spring.datasource.password", () -> APP_ROLE);
         registry.add("app.bootstrap-admin.enabled", () -> "false");
         registry.add("app.auth.jwt-secret", () -> "test-only-signing-secret-at-least-32-bytes!!");
     }

@@ -13,6 +13,10 @@ public interface SfRefreshTokenRepository extends JpaRepository<SfRefreshToken, 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<SfRefreshToken> findByTokenHash(String tokenHash);
 
+    /** True when the family was ended (sign-out, theft, password change): the rotation grace never reopens it. */
+    @Query("select count(t) > 0 from SfRefreshToken t where t.familyId = :familyId and t.revokedAt is not null and t.revokeReason <> 'ROTATED'")
+    boolean familyRevokedOtherThanRotation(UUID familyId);
+
     @Modifying
     @Query("update SfRefreshToken t set t.revokedAt = :now, t.revokeReason = :reason where t.familyId = :familyId and t.revokedAt is null")
     int revokeFamily(UUID familyId, String reason, Instant now);

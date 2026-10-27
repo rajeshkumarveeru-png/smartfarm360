@@ -38,12 +38,17 @@ public class AuthService {
     private final EmailSender emailSender;
     private final AuditService audit;
     private final Clock clock;
+    private final EmailVerificationService verification;
+    private final AccountFacts facts;
+    private final TwoStepService twoStep;
     private final String dummyHash;
 
     public AuthService(SfUserAccountRepository users, SfRefreshTokenRepository refreshTokens,
                        SfPasswordResetTokenRepository resetTokens, PasswordEncoder passwordEncoder,
                        AccessTokenService accessTokens, AuthProperties properties, RateLimiter rateLimiter,
-                       EmailSender emailSender, AuditService audit, Clock clock) {
+                       EmailSender emailSender, AuditService audit, Clock clock, EmailVerificationService verification, AccountFacts facts,
+                       TwoStepService twoStep) {
+        this.twoStep = twoStep;
         this.users = users;
         this.refreshTokens = refreshTokens;
         this.resetTokens = resetTokens;
@@ -54,11 +59,15 @@ public class AuthService {
         this.emailSender = emailSender;
         this.audit = audit;
         this.clock = clock;
+        this.verification = verification;
+        this.facts = facts;
         this.dummyHash = passwordEncoder.encode("timing-equalisation-only");
     }
 
     /** Tokens for a successful sign-in or refresh. {@code refreshToken} is the raw secret; the controller decides how it is delivered. */
-    public record Session(AccessTokenService.IssuedAccessToken accessToken, String refreshToken, UserResponse user) {}
+    public record Session(AccessTokenService.IssuedAccessToken accessToken, String refreshToken, UserResponse user, String secondStepChallenge) {
+        Session(AccessTokenService.IssuedAccessToken accessToken, String refreshToken, UserResponse user) { this(accessToken, refreshToken, user, null); }
+    }
 
     @Transactional
     public void register(RegisterRequest request, String clientIp) {
@@ -76,6 +85,7 @@ public class AuthService {
                     user.setPreferredLanguage(request.preferredLanguage() == null ? "en" : request.preferredLanguage());
                     user.setPasswordChangedAt(clock.instant());
                     users.save(user);
+                    verification.issue(user.getId(), user.getEmail(), user.getPreferredLanguage());
                 });
     }
 
@@ -108,12 +118,38 @@ public class AuthService {
         }
         user.setFailedLoginAttempts(0);
         user.setLockedUntil(null);
-        return newSession(user, UUID.randomUUID(), now);
+        if (twoStep.enabled(user.getId())) return new Session(null, null, null, accessTokens.issueChallenge(user));
+        return newSession(user, UUID.randomUUID(), now, false);
     }
+
+    /** The second sign-in step (O6): a code from the app or a recovery code, at most 10 tries in 15 minutes. */
+    @Transactional(noRollbackFor = ApiException.class)
+    public Session completeSecondStep(SecondStepRequest request, String clientIp) {
+        long userId = accessTokens.readChallenge(request.challenge())
+                .orElseThrow(() -> ApiException.unauthorized("SECOND_STEP_EXPIRED", "Sign in again: the second step took too long."));
+        rateLimiter.check("second-step:user:" + userId, 10, Duration.ofMinutes(15));
+        rateLimiter.check("second-step:ip:" + clientIp, 30, Duration.ofMinutes(15));
+        SfUserAccount user = users.findById(userId).filter(SfUserAccount::isActive).orElseThrow(AuthService::invalidCredentials);
+        if (!twoStep.verify(userId, request.code(), request.recoveryCode())) {
+            audit.record(null, userId, "TWO_STEP_FAILED", "USER", userId, Map.of());
+            throw ApiException.unauthorized("INVALID_TWO_STEP_CODE", "That code is not right. Check the time on your phone and try again.");
+        }
+        if (request.recoveryCode() != null && !request.recoveryCode().isBlank()) audit.record(null, userId, "RECOVERY_CODE_USED", "USER", userId, Map.of());
+        if (user.isPlatformAdmin()) {
+            String address = user.getEmail();
+            String language = user.getPreferredLanguage();
+            AfterCommit.run(() -> emailSender.sendNotice(address, language, EmailSender.Notice.ADMIN_SIGN_IN, Map.of("time", clock.instant().toString())));
+        }
+        return newSession(user, UUID.randomUUID(), clock.instant(), true);
+    }
+
+    /** Two tabs of one browser may refresh the same token together; within this time that is not treated as theft (O13). */
+    static final Duration ROTATION_GRACE = Duration.ofSeconds(30);
 
     /**
      * Rotates a refresh token. Presenting a token that was already rotated means it was copied: the whole token family
-     * is revoked, signing out every device that shares it.
+     * is revoked, signing out every device that shares it. Within {@link #ROTATION_GRACE} of its rotation the token gets
+     * another successor in the same family instead (another tab of the same browser refreshed at the same moment).
      */
     @Transactional(noRollbackFor = ApiException.class)
     public Session refresh(String rawToken) {
@@ -121,6 +157,13 @@ public class AuthService {
         Instant now = clock.instant();
         SfRefreshToken token = refreshTokens.findByTokenHash(SecretTokens.hash(rawToken)).orElseThrow(AuthService::invalidRefreshToken);
         if (token.getRevokedAt() != null) {
+            if (SfRefreshToken.ROTATED.equals(token.getRevokeReason()) && !token.getRevokedAt().plus(ROTATION_GRACE).isBefore(now)
+                    && token.getExpiresAt().isAfter(now) && !refreshTokens.familyRevokedOtherThanRotation(token.getFamilyId())) {
+                SfUserAccount user = users.findById(token.getUserId()).filter(SfUserAccount::isActive).orElseThrow(AuthService::invalidRefreshToken);
+                IssuedRefresh sibling = issueRefresh(user.getId(), token.getFamilyId(), now, token.isMfa());
+                audit.record(null, user.getId(), "REFRESH_TOKEN_GRACE", "USER", user.getId(), Map.of());
+                return new Session(accessTokens.issue(user, token.isMfa()), sibling.raw(), toResponse(user));
+            }
             if (SfRefreshToken.ROTATED.equals(token.getRevokeReason())) {
                 refreshTokens.revokeFamily(token.getFamilyId(), SfRefreshToken.REUSE_DETECTED, now);
                 audit.record(null, token.getUserId(), "REFRESH_TOKEN_REUSE_DETECTED", "USER", token.getUserId(), Map.of());
@@ -131,9 +174,9 @@ public class AuthService {
         SfUserAccount user = users.findById(token.getUserId()).filter(SfUserAccount::isActive).orElseThrow(AuthService::invalidRefreshToken);
 
         token.revoke(SfRefreshToken.ROTATED, now);
-        IssuedRefresh next = issueRefresh(user.getId(), token.getFamilyId(), now);
+        IssuedRefresh next = issueRefresh(user.getId(), token.getFamilyId(), now, token.isMfa());
         token.setReplacedById(next.entity().getId());
-        return new Session(accessTokens.issue(user), next.raw(), toResponse(user));
+        return new Session(accessTokens.issue(user, token.isMfa()), next.raw(), toResponse(user));
     }
 
     @Transactional
@@ -211,14 +254,14 @@ public class AuthService {
         refreshTokens.revokeAllForUser(user.getId(), SfRefreshToken.PASSWORD_CHANGED, now);
     }
 
-    private Session newSession(SfUserAccount user, UUID familyId, Instant now) {
-        IssuedRefresh refresh = issueRefresh(user.getId(), familyId, now);
-        return new Session(accessTokens.issue(user), refresh.raw(), toResponse(user));
+    Session newSession(SfUserAccount user, UUID familyId, Instant now, boolean mfa) {
+        IssuedRefresh refresh = issueRefresh(user.getId(), familyId, now, mfa);
+        return new Session(accessTokens.issue(user, mfa), refresh.raw(), toResponse(user));
     }
 
     private record IssuedRefresh(String raw, SfRefreshToken entity) {}
 
-    private IssuedRefresh issueRefresh(Long userId, UUID familyId, Instant now) {
+    private IssuedRefresh issueRefresh(Long userId, UUID familyId, Instant now, boolean mfa) {
         String raw = SecretTokens.generate();
         SfRefreshToken refresh = new SfRefreshToken();
         refresh.setUserId(userId);
@@ -226,6 +269,7 @@ public class AuthService {
         refresh.setTokenHash(SecretTokens.hash(raw));
         refresh.setIssuedAt(now);
         refresh.setExpiresAt(now.plus(properties.refreshTokenTtl()));
+        refresh.setMfa(mfa);
         return new IssuedRefresh(raw, refreshTokens.save(refresh));
     }
 
@@ -234,8 +278,9 @@ public class AuthService {
                 .orElseThrow(() -> ApiException.unauthorized("UNAUTHENTICATED", "Sign in is required."));
     }
 
-    static UserResponse toResponse(SfUserAccount u) {
-        return new UserResponse(u.getId(), u.getEmail(), u.getDisplayName(), u.getPreferredLanguage(), u.isPlatformAdmin());
+    UserResponse toResponse(SfUserAccount u) {
+        return new UserResponse(u.getId(), u.getEmail(), u.getDisplayName(), u.getPreferredLanguage(), u.isPlatformAdmin(),
+                u.getEmailVerifiedAt() != null, facts.twoStepEnabled(u.getId()), facts.pendingConsents(u.getId()));
     }
 
     private static String normalize(String email) { return email.trim().toLowerCase(Locale.ROOT); }

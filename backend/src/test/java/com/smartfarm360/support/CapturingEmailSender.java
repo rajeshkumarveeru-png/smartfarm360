@@ -3,6 +3,7 @@ package com.smartfarm360.support;
 import com.smartfarm360.platform.mail.EmailSender;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /** Records emails instead of sending them, so tests can follow reset and invitation links. */
@@ -14,6 +15,7 @@ public class CapturingEmailSender implements EmailSender {
     @Override public void sendPasswordReset(String to, String resetUrl, String language) { sent.add(new Sent("RESET", to, resetUrl)); }
     @Override public void sendRegistrationAttempt(String to, String language) { sent.add(new Sent("REGISTRATION_ATTEMPT", to, null)); }
     @Override public void sendInvitation(String to, String tenantName, String acceptUrl, String language) { sent.add(new Sent("INVITATION", to, acceptUrl)); }
+    @Override public void sendNotice(String to, String language, Notice notice, Map<String, String> params) { sent.add(new Sent(notice.name(), to, params.get("url"))); }
 
     public List<Sent> to(String email) { return sent.stream().filter(s -> s.to().equalsIgnoreCase(email)).toList(); }
 

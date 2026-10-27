@@ -23,7 +23,12 @@ public class AuthController {
     private final AuthService auth;
     private final AuthProperties properties;
 
-    public AuthController(AuthService auth, AuthProperties properties) {
+    private final EmailVerificationService verification;
+    private final TwoStepService twoStep;
+
+    public AuthController(AuthService auth, AuthProperties properties, EmailVerificationService verification, TwoStepService twoStep) {
+        this.verification = verification;
+        this.twoStep = twoStep;
         this.auth = auth;
         this.properties = properties;
     }
@@ -41,6 +46,28 @@ public class AuthController {
         AuthService.Session session = auth.login(request, http.getRemoteAddr());
         return respond(session, "BODY".equals(request.refreshTokenDelivery()));
     }
+
+    @PostMapping("/login/second-step")
+    public ResponseEntity<TokenResponse> secondStep(@Valid @RequestBody SecondStepRequest request, HttpServletRequest http) {
+        return respond(auth.completeSecondStep(request, http.getRemoteAddr()), "BODY".equals(request.refreshTokenDelivery()));
+    }
+
+    /** Starts two-step sign-in: the secret and the link for an authenticator app (O6). */
+    @PostMapping("/me/two-step/setup")
+    public TwoStepService.Setup twoStepSetup(CurrentUser user, @Valid @RequestBody PasswordConfirm request) { return twoStep.setup(user, request.password()); }
+
+    /** Confirms it with a code; the recovery codes are shown once. */
+    @PostMapping("/me/two-step/enable")
+    public TwoStepService.RecoveryCodes twoStepEnable(CurrentUser user, @Valid @RequestBody TwoStepCode request) { return twoStep.enable(user, request.code()); }
+
+    @PostMapping("/me/two-step/recovery-codes")
+    public TwoStepService.RecoveryCodes twoStepRecoveryCodes(CurrentUser user, @Valid @RequestBody PasswordConfirm request) {
+        return twoStep.regenerate(user, request.password());
+    }
+
+    @PostMapping("/me/two-step/disable")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void twoStepDisable(CurrentUser user, @Valid @RequestBody TwoStepOff request) { twoStep.disable(user, request.password(), request.code()); }
 
     /**
      * Mobile sends {@code {"refreshToken": "..."}}. The web app relies on the HttpOnly cookie and must send the
@@ -83,6 +110,18 @@ public class AuthController {
         auth.confirmPasswordReset(request);
     }
 
+    @PostMapping("/verify-email")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void verifyEmail(@Valid @RequestBody VerifyEmailRequest request) { verification.verify(request.token()); }
+
+    /** Sends a new verification link (at most 3 an hour). */
+    @PostMapping("/me/verification")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public AcceptedResponse resendVerification(CurrentUser user) {
+        verification.resend(user);
+        return AcceptedResponse.ACCEPTED;
+    }
+
     @GetMapping("/me")
     public UserResponse me(CurrentUser user) { return auth.me(user); }
 
@@ -103,6 +142,10 @@ public class AuthController {
     }
 
     private ResponseEntity<TokenResponse> respond(AuthService.Session session, boolean refreshInBody) {
+        if (session.secondStepChallenge() != null) {
+            return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "no-store")
+                    .body(new TokenResponse(null, null, 0, null, null, session.secondStepChallenge()));
+        }
         TokenResponse body = new TokenResponse(session.accessToken().value(), "Bearer", session.accessToken().expiresInSeconds(),
                 refreshInBody ? session.refreshToken() : null, session.user());
         ResponseEntity.BodyBuilder builder = ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "no-store");

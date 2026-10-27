@@ -1,6 +1,6 @@
 # SaaS operations and production readiness design (Phase 14)
 
-- Status: **Draft for product-owner review** (2026-10-22). No Phase 14 code is written until this is approved.
+- Status: **Approved** (2026-10-22, O1–O15 as recommended) and **built** in Phase 14. Implementation notes are in section 18.
 - Builds on:
   - the platform after Phase 13:
     - a platform administrator can list farm businesses and suspend or reactivate them;
@@ -484,3 +484,43 @@ reports, several application instances, iOS, and offline photos. Each stays in t
 
 **Not testable inside this repository** (recorded in PROGRESS when done on the real host): the managed database's
 point-in-time recovery, the uptime check, real email delivery, the load tests on staging, and the Play Store release.
+
+## 18. Implementation notes (2026-10-22)
+
+O1–O15 were approved as recommended. The decisions are recorded in
+[ADR 0011](../adr/0011-row-level-security.md) (RLS), [ADR 0012](../adr/0012-hosting-and-operations.md)
+(hosting, backups, monitoring, settings) and [ADR 0013](../adr/0013-owners-data-export-and-deletion.md) (export and
+deletion), with amendments to ADR 0002 and ADR 0003. Where the build differs from the sections above:
+
+- **Row-Level Security without a second role (O13).** The policies are *forced* on the owner role the application uses.
+  That gives the same protection as a separate non-owner role, with simpler migrations.
+  - Production refuses a superuser login instead of refusing a schema owner.
+  - The scope is set on every borrowed connection: the business inside its own requests, `all` elsewhere.
+  - The test suite now connects as an ordinary owner role, so every API test runs under the policies.
+- **RLS and query plans.** With the policies on, the dashboard performance test went from 560–640 ms to 1.1–1.7 s. The
+  cause was not the filter itself, which costs the same in either scope. The policy's conditions led PostgreSQL to pick
+  generic plans for prepared report queries with optional filters, and the income statement took a second instead of
+  100 ms.
+  - Each connection now uses custom plans (`plan_cache_mode = force_custom_plan`, set with the tenant scope).
+  - The dashboard works out the dues once per request.
+  - Result: 470–490 ms.
+  - The policy reads the session's business once per query (`sf_rls_tenant()` in a scalar subquery). Changeset 056
+    was corrected for this before its first run.
+- **The refresh grace gives a second successor, not the first (O13).** Only the token's hash is stored, so the
+  successor already issued cannot be handed back. Within 30 seconds, the second tab gets its own successor in the same
+  family, and both tabs stay signed in. A family that was signed out or revoked is never reopened.
+- **Platform support sees viewer permissions** of the business, read-only. Each request opened is recorded as
+  `SUPPORT_VIEW` with its path. The design's "plus reports" is covered: viewers can read the reports.
+- **Deleting a business needed one change to the append-only guards** (changeset 057). They allow DELETE only in a
+  transaction where the deletion job set `app.tenant_deletion = 'on'`.
+- **Export files are on the server's disk** (`APP_EXPORT_DIR`), because attachment storage (ADR 0009) is not built yet.
+  A second instance would need shared storage for them.
+- **Storage limits** are listed in the plan (`STORAGE_MB`), but nothing counts storage until attachment storage exists.
+- **Legal documents are published from the console in both languages at once.** Nothing is asked of users until the
+  first version is published.
+- **The section 14 example** is covered by the API tests for support access, export and deletion. The hosting,
+  certificate, real email and incident parts happen on the real host.
+- **Not built here:**
+  - a staging seed job for the load tests (the scripts expect seeded load-test accounts);
+  - Play Store listings;
+  - the monitoring tool's alert rules themselves (written in `docs/ops/deployment.md`, configured on the host).

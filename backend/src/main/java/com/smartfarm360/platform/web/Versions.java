@@ -33,6 +33,7 @@ public final class Versions {
     /** Refuses a save based on another version; {@code base} null means the caller does not check (older clients). */
     public static void requireCurrent(String base, String current) {
         if (base != null && !base.equals(current)) {
+            io.micrometer.core.instrument.Metrics.counter("sf.sync.stale_refusals").increment();
             throw ApiException.conflict("STALE_RECORD", "Someone else changed this since you opened it. Check their version first.");
         }
     }

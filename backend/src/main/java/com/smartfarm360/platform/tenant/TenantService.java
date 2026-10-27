@@ -29,10 +29,15 @@ public class TenantService {
     private final SfUserAccountRepository users;
     private final TenantAccessService access;
     private final AuditService audit;
+    private final com.smartfarm360.platform.auth.EmailVerificationService verification;
+    private final com.smartfarm360.platform.plan.PlanLimits limits;
 
     public TenantService(SfTenantRepository tenants, SfTenantSettingsRepository settings, SfTenantModuleRepository modules,
                          SfTenantMembershipRepository memberships, SfRoleRepository roles, SfUserAccountRepository users,
-                         TenantAccessService access, AuditService audit) {
+                         TenantAccessService access, AuditService audit, com.smartfarm360.platform.auth.EmailVerificationService verification,
+                         com.smartfarm360.platform.plan.PlanLimits limits) {
+        this.verification = verification;
+        this.limits = limits;
         this.tenants = tenants;
         this.settings = settings;
         this.modules = modules;
@@ -46,6 +51,8 @@ public class TenantService {
     /** Creates a farm business; the creator becomes its owner. */
     @Transactional
     public TenantSummary create(CurrentUser user, CreateTenantRequest request) {
+        verification.requireVerified(user.id());
+        limits.requireTenantSlot(user.id());
         Set<FarmModule> requested = request.modules() == null || request.modules().isEmpty()
                 ? EnumSet.of(FarmModule.CROP, FarmModule.DAIRY, FarmModule.WORKFORCE, FarmModule.ASSETS) : EnumSet.copyOf(request.modules());
         requested.forEach(TenantService::requireAvailable);
@@ -177,7 +184,7 @@ public class TenantService {
                 ctx.roleCodes().stream().sorted().toList(),
                 ctx.permissions().stream().map(Enum::name).sorted().toList(),
                 ctx.enabledModules().stream().map(Enum::name).sorted().toList(),
-                t.getCreatedAt());
+                t.getCreatedAt(), t.getSuspendedReason(), t.getDeletionScheduledFor());
     }
 
     private String uniqueSlug(String name) {

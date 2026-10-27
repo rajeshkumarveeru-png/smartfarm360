@@ -28,3 +28,17 @@ request. The mobile client expects a bearer token. A bootstrap admin `admin`/`ad
 
 - HTTP Basic and the `sessionStorage` credential are removed in Phase 2.
 - Logout revokes the refresh token family server-side.
+
+## Amendments (Phase 14, 2026-10-22)
+
+- **Rotation grace.** A rotated refresh token presented again within 30 seconds of its rotation, from a family that
+  was not ended, gets another successor in the same family. This is another tab of the same browser refreshing at the
+  same moment. Only the token's hash is stored, so the first successor cannot be handed back. Reuse after 30 seconds
+  still revokes the family. (SaaS operations design, O13.)
+- **Two-step sign-in.** It uses an authenticator app (TOTP) and ten single-use recovery codes. It is required for
+  platform administrators, who reach the console only with a session that passed it, and optional for everyone else.
+  - The password step returns a 5-minute challenge, never an access token.
+  - Secrets are encrypted with `APP_MFA_ENCRYPTION_KEY`.
+  - A refreshed session keeps its second step. (O6.)
+- **Email verification.** New accounts verify their address before creating a farm business. Accepting an invitation
+  sent to the address also verifies it. (O5.)

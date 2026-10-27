@@ -32,3 +32,9 @@ service re-implements its own membership check with hard-coded role lists.
 
 - Tenant switching is a client-side choice of `{tenantId}`, validated on every request; no tenant state on the server.
 - Caches and reports must key on tenant id; background jobs must carry an explicit `TenantContext`.
+
+## Amendment (Phase 14, 2026-10-22)
+
+Point 4 is carried out by [ADR 0011](0011-row-level-security.md). It forces Row-Level Security on the owner role
+instead of adding a non-owner role. Platform support reads a business only under an owner's time-limited, read-only
+grant, recorded in the business's audit log (O7).

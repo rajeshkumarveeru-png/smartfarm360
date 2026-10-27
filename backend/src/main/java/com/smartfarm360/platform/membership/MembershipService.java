@@ -41,10 +41,15 @@ public class MembershipService {
     private final AuditService audit;
     private final AuthProperties properties;
     private final Clock clock;
+    private final com.smartfarm360.platform.auth.EmailVerificationService verification;
+    private final com.smartfarm360.platform.plan.PlanLimits limits;
 
     public MembershipService(SfTenantMembershipRepository memberships, SfInvitationRepository invitations, SfRoleRepository roles,
                              SfUserAccountRepository users, SfTenantRepository tenants, EmailSender emailSender,
-                             AuditService audit, AuthProperties properties, Clock clock) {
+                             AuditService audit, AuthProperties properties, Clock clock,
+                             com.smartfarm360.platform.auth.EmailVerificationService verification, com.smartfarm360.platform.plan.PlanLimits limits) {
+        this.verification = verification;
+        this.limits = limits;
         this.memberships = memberships;
         this.invitations = invitations;
         this.roles = roles;
@@ -107,6 +112,7 @@ public class MembershipService {
                 .flatMap(u -> memberships.findByTenantIdAndUserId(ctx.tenantId(), u.getId()))
                 .filter(SfTenantMembership::isActive)
                 .ifPresent(m -> { throw ApiException.conflict("ALREADY_MEMBER", "This person is already a member."); });
+        limits.requireMemberSlot(ctx.tenantId());
 
         Instant now = clock.instant();
         invitations.findOpenForEmail(ctx.tenantId(), email).forEach(i -> i.setRevokedAt(now));
@@ -160,11 +166,14 @@ public class MembershipService {
             return m;
         });
         if (membership.isActive()) throw ApiException.conflict("ALREADY_MEMBER", "You are already a member.");
+        limits.requireMemberSlot(tenant.getId());
         membership.setActive(true);
         membership.getRoles().clear();
         membership.getRoles().addAll(invitation.getRoles());
         memberships.saveAndFlush(membership);
 
+        // The invitation reached this address, so the address is verified (O5)
+        verification.markVerified(account.getId());
         invitation.setAcceptedAt(now);
         invitation.setAcceptedByUserId(account.getId());
         audit.record(tenant.getId(), account.getId(), "INVITATION_ACCEPTED", "INVITATION", invitation.getId(),

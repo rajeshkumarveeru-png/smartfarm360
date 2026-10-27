@@ -48,6 +48,7 @@ public class BootstrapAdminInitializer {
             });
             if (!user.isActive()) throw new IllegalStateException("The bootstrap admin account exists but is inactive");
             user.setPlatformRole(SfUserAccount.PLATFORM_ADMIN);
+            if (user.getEmailVerifiedAt() == null) user.setEmailVerifiedAt(Instant.now());
             users.save(user);
             log.info("Bootstrap platform administrator ensured for {}", email.charAt(0) + "***" + email.substring(email.indexOf('@')));
         });

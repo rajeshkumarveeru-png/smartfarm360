@@ -54,7 +54,7 @@ public class AuditService {
         long total = jdbc.sql("select count(*) from sf_audit_history where tenant_id = :t").param("t", tenantId)
                 .query(Long.class).single();
         List<AuditEntry> items = jdbc.sql("""
-                        select a.id, a.actor_user_id, u.email, a.action, a.entity_type, a.entity_id, a.details::text, a.occurred_at
+                        select a.id, a.actor_user_id, case when u.anonymised_at is not null then u.display_name else u.email end, a.action, a.entity_type, a.entity_id, a.details::text, a.occurred_at
                         from sf_audit_history a left join sf_users u on u.id = a.actor_user_id
                         where a.tenant_id = :t order by a.occurred_at desc, a.id desc limit :limit offset :offset""")
                 .param("t", tenantId).param("limit", size).param("offset", (long) page * size)

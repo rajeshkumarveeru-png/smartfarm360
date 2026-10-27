@@ -55,6 +55,7 @@ public class IdempotencyInterceptor implements HandlerInterceptor {
             response.setStatus(s.status());
             if (s.contentType() != null) response.setContentType(s.contentType());
             response.setHeader("Idempotent-Replayed", "true");
+            io.micrometer.core.instrument.Metrics.counter("sf.sync.replays").increment();
             if (s.body() != null) response.getOutputStream().write(s.body().getBytes(StandardCharsets.UTF_8));
             return false;
         }

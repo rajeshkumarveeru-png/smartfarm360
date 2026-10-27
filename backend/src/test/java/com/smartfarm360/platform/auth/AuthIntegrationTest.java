@@ -72,12 +72,35 @@ class AuthIntegrationTest extends ApiIntegrationTest {
         String r2 = body(post("/api/v1/auth/refresh", null, Map.of("refreshToken", r1)).andExpect(status().isOk())).get("refreshToken").asText();
         assertThat(r2).isNotEqualTo(r1);
 
+        // More than 30 seconds after its rotation, a reused token is treated as stolen (O13)
+        jdbc.update("update sf_refresh_tokens set revoked_at = revoked_at - interval '31 seconds' where user_id = ? and revoke_reason = 'ROTATED'", user.id());
         post("/api/v1/auth/refresh", null, Map.of("refreshToken", r1)).andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("INVALID_REFRESH_TOKEN"));
         // r2 was never used, but it belongs to the compromised family.
         post("/api/v1/auth/refresh", null, Map.of("refreshToken", r2)).andExpect(status().isUnauthorized());
         assertThat(jdbc.queryForObject("select count(*) from sf_refresh_tokens where user_id = ? and revoke_reason = 'REUSE_DETECTED'",
                 Integer.class, user.id())).isPositive();
+    }
+
+    @Test
+    void twoTabsRefreshingTogetherStaySignedInButALoggedOutFamilyStaysEnded() throws Exception {
+        User user = newUser("two-tabs");
+        String r1 = body(post("/api/v1/auth/login", null, Map.of("email", user.email(), "password", PASSWORD, "refreshTokenDelivery", "BODY")))
+                .get("refreshToken").asText();
+        String tabA = body(post("/api/v1/auth/refresh", null, Map.of("refreshToken", r1)).andExpect(status().isOk())).get("refreshToken").asText();
+        // The second tab sends the same token a moment later: it gets its own successor, and nothing is revoked
+        String tabB = body(post("/api/v1/auth/refresh", null, Map.of("refreshToken", r1)).andExpect(status().isOk())).get("refreshToken").asText();
+        assertThat(tabB).isNotEqualTo(tabA);
+        post("/api/v1/auth/refresh", null, Map.of("refreshToken", tabA)).andExpect(status().isOk());
+        post("/api/v1/auth/refresh", null, Map.of("refreshToken", tabB)).andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("select count(*) from sf_refresh_tokens where user_id = ? and revoke_reason = 'REUSE_DETECTED'",
+                Integer.class, user.id())).isZero();
+        // After sign-out the grace never reopens the family
+        String r3 = body(post("/api/v1/auth/login", null, Map.of("email", user.email(), "password", PASSWORD, "refreshTokenDelivery", "BODY")))
+                .get("refreshToken").asText();
+        String r4 = body(post("/api/v1/auth/refresh", null, Map.of("refreshToken", r3)).andExpect(status().isOk())).get("refreshToken").asText();
+        post("/api/v1/auth/logout", null, Map.of("refreshToken", r4)).andExpect(status().isNoContent());
+        post("/api/v1/auth/refresh", null, Map.of("refreshToken", r3)).andExpect(status().isUnauthorized());
     }
 
     @Test

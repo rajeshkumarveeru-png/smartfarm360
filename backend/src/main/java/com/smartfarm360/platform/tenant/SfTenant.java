@@ -17,6 +17,9 @@ public class SfTenant {
     @Column(nullable = false) private boolean active = true;
     /** Placeholder for future plans; every tenant is FREE and nothing is gated on it yet. */
     @Column(name = "plan_code", nullable = false, length = 30) private String planCode = "FREE";
+    /** Written by the platform console and the deletion request (JDBC); read-only here. */
+    @Column(name = "suspended_reason", insertable = false, updatable = false) private String suspendedReason;
+    @Column(name = "deletion_scheduled_for", insertable = false, updatable = false) private Instant deletionScheduledFor;
     @Column(name = "created_at", nullable = false) private Instant createdAt = Instant.now();
     @Column(name = "updated_at", nullable = false) private Instant updatedAt = Instant.now();
 

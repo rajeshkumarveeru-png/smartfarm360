@@ -2,13 +2,13 @@
 
 ## Current state
 
-- **Phase:** 13 (mobile offline) built on branch `feature/phase-13-mobile-offline` (based on
-  `feature/phase-12-processing`). Its browser check and a real-phone check are still to do. The farming modules
-  (Phases 8–12) are complete. Phase 14 (SaaS operations and production readiness) started on
-  `feature/phase-14-saas-ops`: the [SaaS operations design](platform/saas-operations.md) is awaiting review; no
-  Phase 14 code yet. Nothing is pushed yet.
-- **Production readiness:** not ready. Authentication, roles, tenant isolation, audit, the finance core and stock with
-  movements are in place and tested, but no email provider is configured and hosting/backups are undecided.
+- **Phase:** 14 (SaaS operations and production readiness) built on branch `feature/phase-14-saas-ops` (based on
+  `feature/phase-13-mobile-offline`). All planned phases are built. Nothing is pushed yet.
+- **Production readiness:** not ready yet. The application side is in place and tested: production settings checks,
+  RLS, two-step sign-in, support access, limits, export and deletion, consent, SMTP email, backup and restore scripts,
+  and runbooks. What is left needs the real host: choose the provider, deploy staging and production from `deploy/`,
+  configure email and alerts, run the restore check and load tests, and publish the legal texts. That is the
+  production-readiness review of the Phase 14 design, section 12.
 
 ## Decisions
 
@@ -23,15 +23,15 @@
 | Test database | Embedded PostgreSQL (no Docker available) | ADR 0007 |
 | Attachment storage | Storage interface; local disk default, S3 later | ADR 0009 |
 | Offline records | Client ids with a server idempotency store; day-record versions as value hashes | ADR 0010 |
-| **Hosting / deployment target** | **Open** — proposed in the Phase 14 design (O1: Indian region, managed PostgreSQL; provider chosen by the product owner) | [SaaS operations](platform/saas-operations.md) |
-| **Desktop (Electron) scope** | **Open** — the Phase 14 design proposes freezing it (O15) | [SaaS operations](platform/saas-operations.md) |
+| **Hosting / deployment target** | Approved shape (O1): Indian region, one server, managed PostgreSQL 18. **The provider is still open** (product owner) | [SaaS operations](platform/saas-operations.md) |
+| Desktop (Electron) scope | Frozen: not built or released (O15) | [SaaS operations](platform/saas-operations.md) |
 | **Tamil terminology reviewer** | **Open** — required before the first release | ADR 0008 |
 | Finance posting rules, D1–D12 | Approved as recommended (2026-10-20) | [posting rules](finance/posting-rules.md) |
 | Stock movement design, E1–E12 | Approved as recommended (2026-10-20) | [stock movements](inventory/stock-movements.md) |
 | Crop management design, F1–F12 | Approved as recommended (2026-10-20) | [crop management](crops/crop-management.md) |
 | **Workforce and assets design, G1–G15** | **Awaiting review** (draft 2026-10-20) | [workforce and assets](workforce/workforce-and-assets.md) |
 | **Stock inputs by field supervisors** | **Open** — today only roles with `INVENTORY_WRITE` (owner, farm admin, farm manager, accountant) can record stock used on a crop; field supervisors and workers record notes-only work and harvests. Should field supervisors get stock-use permission? | crop design §15 |
-| **Email provider** | **Open** — Phase 2 ships the `EmailSender` interface with a logging stub, as instructed. Reset and invitation emails are not delivered until a provider is chosen; the Phase 14 design proposes SMTP to a provider chosen with the host (O5) | ADR 0003 |
+| **Email provider** | **Open** — Phase 2 ships the `EmailSender` interface with a logging stub, as instructed. The SMTP sender is built (O5); **the provider is chosen with the host** | ADR 0012 |
 
 ## Phase 1 — Baseline and hygiene (2026-10-19)
 
@@ -1354,17 +1354,181 @@ Not verified:
 - A real phone: SQLite, NetInfo, the app going to the background, and a signal lost in the middle of a send.
 - GitHub Actions (nothing has been pushed).
 
+## Phase 14 — SaaS operations and production readiness (2026-10-27)
+
+Commits on `feature/phase-14-saas-ops` (based on `feature/phase-13-mobile-offline`):
+
+- `3db7e9d`: design.
+- A build commit with the backend, web, mobile, deployment files, runbooks and docs.
+
+### Features completed
+
+- **Approved design.** [SaaS operations](platform/saas-operations.md) is implemented with O1–O15 as recommended.
+  Implementation notes are in section 18.
+  - ADRs: [0011](adr/0011-row-level-security.md) Row-Level Security, [0012](adr/0012-hosting-and-operations.md) hosting
+    and operations, [0013](adr/0013-owners-data-export-and-deletion.md) export and deletion.
+  - ADR 0002 and ADR 0003 are amended.
+- **Production profile (O2).** `SPRING_PROFILES_ACTIVE=prod` refuses to start with unsafe settings, one line per
+  problem. It gives JSON logs, metrics and probes on a private port (8091), the built web app served from the same
+  address, and security headers (CSP, HSTS, no framing).
+- **Deployment (O1, O2).**
+  - `deploy/` holds the image, the Compose file with Caddy, and the settings template.
+  - The CI image job builds and scans the image.
+  - Runbooks in `docs/ops/`: deployment, release, incident, restore, secrets.
+- **Backups (O3).** `deploy/backup.sh` (nightly, encrypted, off-region) and `deploy/restore-check.sh` (monthly). Both
+  record their result on the console.
+- **Email (O5).**
+  - An SMTP sender, with English and Tamil texts from the shared catalogs and three retries.
+  - Email verification: new accounts verify before creating a farm business; accepting an invitation verifies too;
+    existing accounts are treated as verified.
+- **Platform console (O6).**
+  - Farm businesses: search, detail and usage; suspension with a reason shown to members; limit overrides.
+  - Users: lock and unlock.
+  - Operations checks and a test alert.
+  - Announcements and read-only maintenance.
+  - Terms and privacy publishing, and the platform audit log.
+  - Two-step sign-in (authenticator app, recovery codes): required for the console, optional for everyone.
+- **Support access (O7):** owner-granted, read-only, at most 72 hours, every page recorded in the business's history.
+- **Plans and limits (O8):** `FREE` with members 25, farms 20, farm businesses per user 3, and exports 3 a day. A notice
+  appears at 80%, and only new additions are refused (`PLAN_LIMIT_REACHED`).
+- **Owners' data (O9–O11):**
+  - the whole-business export (CSV and JSON with a README, kept 7 days);
+  - deletion after 30 days' grace (read-only meanwhile, cancellable), then a final delete keeping only a deletion
+    record;
+  - account deletion with a former-member label.
+- **Privacy and consent (O12):** versioned terms and privacy notice in both languages, accepted before going on, with a
+  consent history, a marketing opt-in (off by default) and a copy of one's personal data.
+- **Security (O13):**
+  - Row-Level Security forced on all 81 tenant tables;
+  - the 30-second refresh grace, which fixes the two-tab sign-out defect;
+  - rate limits in PostgreSQL.
+- **Load tests and checklists (O14):** k6 scripts in `deploy/load/` with the section 12 targets, and the release,
+  incident and restore checklists.
+- **Releases (O15):** Android through Play testing tracks (`docs/ops/release.md`); Electron frozen.
+- **Web:** *Your account* (email, two-step, privacy, deletion), the consent page, the verify-email page, the second
+  sign-in step, the settings sections (plan, support, data, deletion), announcement banners and the new console.
+- **Phone:** the second sign-in step, accepting new terms, and announcement lines.
+
+### Database migrations
+
+`016-saas-operations.yaml` contains four changesets:
+
+- `054-saas-operations-schema`:
+  - plans and limits, and limit overrides;
+  - suspension and deletion columns on `sf_tenants`;
+  - support grants, the platform audit log and tenant exports;
+  - two-step secrets and recovery codes, and the `mfa` flag on refresh tokens;
+  - legal documents and consents;
+  - email verification;
+  - rate-limit counters, announcements and operations checks.
+
+  Existing users are marked verified.
+- `055-saas-operations-seed`: the `FREE` plan and its limits, and a foreign key from `sf_tenants.plan_code`.
+- `056-row-level-security`: `sf_rls_allows()`, and the forced policy on every table with a `tenant_id`.
+- `057-guards-allow-tenant-deletion`: the append-only and read-only guards allow DELETE only inside a farm business's
+  deletion.
+
+They were applied to the local database on 2026-10-27 at startup of the new jar, after a `pg_dump` backup
+(`smartfarm360-before-phase14.backup`, 90 tables). No business data was changed; existing users were marked verified.
+
+### APIs added
+
+| Area | Endpoints |
+|---|---|
+| Auth | `POST /auth/login/second-step`, `POST /auth/verify-email`, `POST /auth/me/verification`, `POST /auth/me/two-step/{setup,enable,disable,recovery-codes}` |
+| Account | `GET /me/consents`, `POST /me/consents`, `PUT /me/marketing`, `GET /me/data`, `POST /me/deletion` |
+| Public | `GET /legal/current`, `GET /announcements` |
+| Farm business | `GET /tenants/{t}/usage`; `GET`, `POST /support-grants` and `POST /support-grants/{id}/end`; `GET`, `POST /exports` and `GET /exports/{id}/download`; `GET`, `POST`, `DELETE /deletion` |
+| Platform | `GET /platform/tenants?q=`, `GET /platform/tenants/{id}`, `PATCH /platform/tenants/{id}` (with a reason), `PUT /platform/tenants/{id}/limits/{code}`, `GET` and `PATCH /platform/users`, `GET /platform/ops`, `POST /platform/ops/checks`, `POST /platform/ops/test-alert`, `GET /platform/audit`, `GET`, `POST /platform/announcements` and `POST /platform/announcements/{id}/end`, `GET`, `POST /platform/legal-documents` |
+
+Changed:
+
+- The login response carries `secondStepChallenge` when two-step sign-in is on.
+- `UserResponse` adds `emailVerified`, `twoStepEnabled` and `pendingConsents`.
+- `TenantSummary` adds `suspendedReason` and `deletionScheduledFor`.
+
+### Tests and evidence
+
+| Command | Result |
+|---|---|
+| `backend: gradlew test bootJar` | Passed: **787 tests, 0 failures** (41 new); the dashboard test answers in 483 ms (budget 1,000 ms) |
+| `frontend: npm run lint`, `npm test`, `npm run build` | Passed: **83 tests** (5 new); the bundle is still over 500 kB |
+| `mobile: npx tsc --noEmit`, `npm test`, `npx expo install --check` | Passed: **75 tests** (1 new); dependencies up to date |
+| `bash -n deploy/backup.sh deploy/restore-check.sh` | Syntax OK |
+| Migration on the local database | Applied (054–057) on 2026-10-27; no errors in the log; 81 tables under the policy; health 200; security headers present |
+| `deploy/restore-check.sh` | **Not run**: it creates a scratch database, and the local user cannot create databases; the superuser password was not used |
+| `docker build -f deploy/Dockerfile` | **Not run**: no Docker on this machine (ADR 0007); CI builds it once pushed |
+| k6 load tests | **Not run**: they need staging |
+| Manual browser check | **Not done** (sign-in needs the owner's password) |
+
+The new backend tests are:
+
+- **`SaasOperationsTest`** (12):
+  - email verification and invitation verification;
+  - two-step sign-in: codes, recovery codes, replay refused, the challenge not a session, the refreshed session keeps
+    the step;
+  - the console needs the second step and records changes;
+  - support access: none without a grant; with one, read-only, viewer permissions only, closed to other businesses,
+    recorded, ended and expired;
+  - limits and overrides, and the 3-business limit;
+  - read-only maintenance;
+  - export: contents, no secrets, no other business, the journal balances in the export, the daily limit;
+  - deletion: owner only, name check, 30 days read-only, cancel, every row of that business removed, others untouched,
+    the deletion record;
+  - account deletion: the sole-owner refusal, the label, the books intact;
+  - consent versions;
+  - rate limits surviving a restart;
+  - RLS hiding and refusing other businesses' rows inside a business's scope.
+- **`RowLevelSecurityCoverageTest`:** every tenant table has the forced policy.
+- **`ProductionSettingsTest`:** each unsafe production setting is refused and named.
+- **`EmailTemplatesTest`:** every email in both languages, with its parameters filled.
+- **`TotpTest`:** the RFC 6238 vectors, the time window, base32, and the encryption round trip.
+- **`AuthIntegrationTest`**, one new test: two tabs refreshing together stay signed in; a signed-out family stays
+  ended.
+
+**Row-Level Security and the dashboard.** With the policies on, the dashboard test first took 1.1–1.7 s, against its
+1-second budget. The policy filter itself was not the cause: it costs the same in either scope. The cause was generic
+plans for prepared report queries with optional filters (about a second for the income statement). The fix:
+
+- each connection uses custom plans, set with the tenant scope;
+- the dashboard works out the dues once per request;
+- the policy reads the session's business once per query.
+
+Changeset 056 was corrected for this before its first run. The dashboard now takes 467–491 ms, faster than before RLS.
+The budget was not changed.
+
+The whole suite now runs as an ordinary database role, under the RLS policies, including the 552 cross-tenant cases.
+
+Existing tests changed with the approved design:
+
+- **New accounts verify their email address** in the test helper `newUser`, as a real user would before creating a
+  farm business (O5).
+- **The refresh-reuse test** ages the rotation past the 30-second grace, so it still proves that reuse revokes the
+  family (O13).
+- **The platform administrator tests** sign in with the second step (O6), and the suspension test gives a reason
+  after checking that a suspension without one is refused.
+
+Nothing was removed from these tests.
+
+Not verified:
+
+- The production image and the Compose set-up, real email, point-in-time recovery, the monitoring alerts and the load
+  tests. These need the chosen host and staging.
+- The browser check, and a real phone.
+- GitHub Actions (nothing has been pushed).
+
 ## Known gaps and defects
 
 Security and platform:
-- **Two open tabs can sign each other out.** On 2026-10-21 two tabs refreshed the same token within a second; the server
-  treated the second refresh as a stolen token (`REUSE_DETECTED`) and revoked the whole session. A fix (a short grace
-  window or reliable cross-tab coordination, with tests) is proposed as a separate task.
-- **No email provider:** reset and invitation emails are not delivered (invitation links can be shared by hand;
-  password reset needs a provider before production).
-- Rate limits are in memory per instance; a shared store is needed before running more than one instance.
-- Row-Level Security not yet added (ADR 0002, planned after the finance core).
-- No account deletion or tenant data export yet (Phase 14). Mobile has no registration or password reset (use web).
+- **Fixed in Phase 14:** two open tabs signing each other out (the 30-second refresh grace), rate limits in memory (now
+  in PostgreSQL), Row-Level Security (ADR 0011), and account deletion and tenant export (O9–O11).
+- **No email provider chosen yet:** the SMTP sender is built, but until `SPRING_MAIL_HOST` is set emails are only logged
+  (production refuses to start without it).
+- **Nothing is hosted yet:** the image, Compose set-up, backups, restore test, alerts and load tests are written but not run
+  on a real host (Phase 14, not verified).
+- Export files are on the server's disk; a second instance needs shared storage first (ADR 0009). The web app loads Google
+  Fonts (allowed by the CSP); self-hosting them would keep visitors' addresses from Google.
+- Mobile has no registration or password reset, and no account deletion (use the web).
 - Tamil strings are unreviewed (`shared/i18n/ta.json` → `_meta.reviewStatus`).
 
 Finance and stock:

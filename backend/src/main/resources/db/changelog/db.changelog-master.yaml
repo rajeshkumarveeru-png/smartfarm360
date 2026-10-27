@@ -29,3 +29,5 @@ databaseChangeLog:
       file: db/changelog/014-processing.yaml
   - include:
       file: db/changelog/015-offline.yaml
+  - include:
+      file: db/changelog/016-saas-operations.yaml

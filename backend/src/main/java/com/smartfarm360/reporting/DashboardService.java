@@ -82,13 +82,15 @@ public class DashboardService {
     public Dashboard dashboard(TenantContext ctx, LocalDate asOf) {
         List<TileError> errors = new ArrayList<>();
         boolean finance = ctx.has(Permission.FINANCE_READ);
-        Money money = finance ? tile("money", errors, () -> money(ctx, asOf)) : null;
+        // The money tile and the overdue-sales item read the same dues: work them out once per request
+        Supplier<ReportService.Dues> dues = once(() -> reports.dues(ctx, asOf));
+        Money money = finance ? tile("money", errors, () -> money(ctx, asOf, dues.get())) : null;
         Trend trend = finance ? tile("trend", errors, () -> trend(ctx, asOf)) : null;
         List<CropTile> cropTiles = ctx.has(Permission.CROP_READ) && module(ctx, FarmModule.CROP)
                 ? tile("crops", errors, () -> crops(ctx, finance)) : null;
         List<Attention> attention = new ArrayList<>();
         if (finance) {
-            add(attention, tile("overdueSales", errors, () -> overdueSales(ctx, asOf)));
+            add(attention, tile("overdueSales", errors, () -> overdueSales(dues.get())));
             add(attention, tile("billsDueSoon", errors, () -> {
                 LedgerReportService.DueSoon d = ledger.billsDueSoon(ctx, asOf, BILLS_DUE_DAYS);
                 return d.count() == 0 ? null : new Attention("BILLS_DUE_SOON", d.count(), d.amount(), null);
@@ -198,6 +200,16 @@ public class DashboardService {
         return new Dashboard(asOf, true, money, trend, cropTiles, attention, errors);
     }
 
+    /** A value worked out on first use and kept for this request; a failure is not kept, so the next tile tries again. */
+    private static <T> Supplier<T> once(Supplier<T> load) {
+        Object[] value = new Object[1];
+        return () -> {
+            if (value[0] == null) value[0] = load.get();
+            @SuppressWarnings("unchecked") T t = (T) value[0];
+            return t;
+        };
+    }
+
     private static boolean module(TenantContext ctx, FarmModule m) { return ctx.enabledModules().contains(m); }
 
     private static void add(List<Attention> list, Attention a) { if (a != null) list.add(a); }
@@ -215,8 +227,7 @@ public class DashboardService {
         return null;
     }
 
-    private Money money(TenantContext ctx, LocalDate asOf) {
-        ReportService.Dues dues = reports.dues(ctx, asOf);
+    private Money money(TenantContext ctx, LocalDate asOf, ReportService.Dues dues) {
         ReportService.Summary s = reports.summary(ctx, asOf, dues);
         ReportService.Balances b = reports.balances(ctx, asOf, dues);
         return new Money(s.fiscalYearFrom(), s.cashTotal(), b.accounts(), s.receivableTotal(), s.overdueReceivables(), s.payableTotal(), b.loanTotal(),
@@ -254,8 +265,8 @@ public class DashboardService {
         return tiles;
     }
 
-    private Attention overdueSales(TenantContext ctx, LocalDate asOf) {
-        List<ReportService.PartyDues> late = reports.dues(ctx, asOf).receivables().stream()
+    private Attention overdueSales(ReportService.Dues dues) {
+        List<ReportService.PartyDues> late = dues.receivables().stream()
                 .filter(d -> d.days31to60().add(d.days61to90()).add(d.over90()).signum() > 0).toList();
         if (late.isEmpty()) return null;
         BigDecimal amount = late.stream().map(d -> d.days31to60().add(d.days61to90()).add(d.over90())).reduce(ZERO, BigDecimal::add);

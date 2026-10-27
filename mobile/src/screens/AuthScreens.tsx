@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { ApiError, isApiConfigured } from '../services/api';
+import { ApiError, isApiConfigured, apiRequest } from '../services/api';
 import type { TenantSummary } from '../auth/session';
 import { Language, tr } from '../i18n/translations';
 
@@ -22,24 +22,64 @@ function LanguageButton({ language, onChange }: { language: Language; onChange: 
   );
 }
 
-export function LoginScreen({ language, onLanguage, onSubmit }: {
-  language: Language; onLanguage: (l: Language) => void; onSubmit: (email: string, password: string) => Promise<void>;
+/** {@code onSubmit} resolves with a challenge when two-step sign-in is on; the screen then asks for the code (O6). */
+export function LoginScreen({ language, onLanguage, onSubmit, onSecondStep }: {
+  language: Language; onLanguage: (l: Language) => void; onSubmit: (email: string, password: string) => Promise<string | null>;
+  onSecondStep: (challenge: string, code: string, recoveryCode: boolean) => Promise<void>;
 }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [challenge, setChallenge] = useState<string | null>(null);
+  const [code, setCode] = useState('');
+  const [recovery, setRecovery] = useState(false);
 
   async function submit() {
     if (!email.trim() || !password) { setError(tr(language, 'common.required')); return; }
     setBusy(true); setError('');
     try {
-      await onSubmit(email.trim(), password);
+      const next = await onSubmit(email.trim(), password);
+      if (next) setChallenge(next);
     } catch (e) {
       setError(errorText(language, e));
     } finally {
       setBusy(false);
     }
+  }
+
+  async function submitCode() {
+    if (!challenge || !code.trim()) { setError(tr(language, 'common.required')); return; }
+    setBusy(true); setError('');
+    try {
+      await onSecondStep(challenge, code, recovery);
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'SECOND_STEP_EXPIRED') { setChallenge(null); setCode(''); }
+      setError(errorText(language, e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (challenge) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+          <Text style={styles.title}>{tr(language, 'auth.secondStepTitle')}</Text>
+          <Text style={styles.note}>{tr(language, recovery ? 'auth.recoveryHelp' : 'auth.secondStepHelp')}</Text>
+          <Text style={styles.label}>{tr(language, recovery ? 'auth.recoveryCode' : 'auth.appCode')}</Text>
+          <TextInput accessibilityLabel={tr(language, recovery ? 'auth.recoveryCode' : 'auth.appCode')} value={code} onChangeText={setCode}
+                     keyboardType={recovery ? 'default' : 'number-pad'} autoComplete="one-time-code" maxLength={recovery ? 20 : 6} style={styles.input} />
+          {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
+          <Pressable accessibilityRole="button" disabled={busy} onPress={() => void submitCode()} style={[styles.button, busy && styles.disabled]}>
+            {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{tr(language, 'auth.verifyCode')}</Text>}
+          </Pressable>
+          <Pressable accessibilityRole="button" onPress={() => { setRecovery(r => !r); setCode(''); setError(''); }} style={[styles.button, styles.outline]}>
+            <Text style={[styles.buttonText, styles.outlineText]}>{tr(language, recovery ? 'auth.useAppCode' : 'auth.useRecoveryCode')}</Text>
+          </Pressable>
+        </ScrollView>
+      </SafeAreaView>
+    );
   }
 
   return (
@@ -55,6 +95,53 @@ export function LoginScreen({ language, onLanguage, onSubmit }: {
         {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
         <Pressable accessibilityRole="button" disabled={busy || !isApiConfigured} onPress={() => void submit()} style={[styles.button, (busy || !isApiConfigured) && styles.disabled]}>
           {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{tr(language, 'auth.signIn')}</Text>}
+        </Pressable>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+type LegalDocument = { kind: string; version: number; title: string; body: string; changes: string | null };
+
+/** New terms or a new privacy notice: read and accept before going on (O12). */
+export function ConsentScreen({ language, pending, onAccepted, onSignOut }: {
+  language: Language; pending: string[]; onAccepted: () => Promise<void>; onSignOut: () => void;
+}) {
+  const [docs, setDocs] = useState<LegalDocument[]>([]);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    apiRequest<LegalDocument[]>(`/api/v1/legal/current?language=${language}`).then(setDocs).catch(e => setError(errorText(language, e)));
+  }, [language]);
+  async function accept() {
+    setBusy(true); setError('');
+    try {
+      await apiRequest('/api/v1/me/consents', { method: 'POST', body: { documents: pending, client: 'MOBILE' } });
+      await onAccepted();
+    } catch (e) {
+      setError(errorText(language, e));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <SafeAreaView style={styles.safe}>
+      <ScrollView contentContainerStyle={styles.body}>
+        <Text style={styles.title}>{tr(language, 'auth.consentTitle')}</Text>
+        <Text style={styles.note}>{tr(language, 'auth.consentIntro')}</Text>
+        {docs.filter(d => pending.includes(`${d.kind}:${d.version}`)).map(d => (
+          <View key={d.kind} style={styles.tenant}>
+            <Text style={styles.tenantName}>{d.title}</Text>
+            {d.changes ? <Text style={styles.note}>{tr(language, 'auth.whatChanged', { changes: d.changes })}</Text> : null}
+            <Text style={styles.note}>{d.body}</Text>
+          </View>
+        ))}
+        {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
+        <Pressable accessibilityRole="button" disabled={busy} onPress={() => void accept()} style={[styles.button, busy && styles.disabled]}>
+          <Text style={styles.buttonText}>{tr(language, 'auth.consentAccept')}</Text>
+        </Pressable>
+        <Pressable accessibilityRole="button" onPress={onSignOut} style={[styles.button, styles.outline]}>
+          <Text style={[styles.buttonText, styles.outlineText]}>{tr(language, 'auth.signOut')}</Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>

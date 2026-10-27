@@ -19,8 +19,10 @@ public final class TenantDtos {
     public record UpdateTenantRequest(@Size(min = 1, max = 140) String name, @Pattern(regexp = "en|ta") String preferredLanguage) {}
 
     /** A tenant as seen by one of its members, including what that member may do. */
+    /** {@code suspendedReason}: why the platform suspended it; {@code deletionScheduledFor}: when it will be deleted (O10). */
     public record TenantSummary(long id, String name, String slug, String preferredLanguage, boolean active,
-                                List<String> roles, List<String> permissions, List<String> enabledModules, Instant createdAt) {}
+                                List<String> roles, List<String> permissions, List<String> enabledModules, Instant createdAt,
+                                String suspendedReason, Instant deletionScheduledFor) {}
 
     public record SettingsResponse(String timezone, String currencyCode, String areaUnit, String weightUnit, String volumeUnit) {}
 

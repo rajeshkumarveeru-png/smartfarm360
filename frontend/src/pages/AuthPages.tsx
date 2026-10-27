@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { api } from '../api/client';
+import { api, ApiError } from '../api/client';
+import type { LegalDocument } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import { AuthCard, ErrorBanner } from '../components/common';
 import { describeError } from '../lib/errors';
@@ -20,25 +21,63 @@ function useFragmentToken(): string {
 
 export function LoginPage() {
   const { t } = useTranslation();
-  const { login, sessionExpired } = useAuth();
+  const { login, completeSecondStep, sessionExpired } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [challenge, setChallenge] = useState<string | null>(null);
+  const [code, setCode] = useState('');
+  const [useRecovery, setUseRecovery] = useState(false);
+  const done = () => navigate(sessionStorage.getItem(PENDING_INVITE) ? '/accept-invitation' : '/', { replace: true });
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!email.trim() || !password) { setError(t('common.required')); return; }
     setBusy(true); setError('');
     try {
-      await login(email.trim(), password);
-      navigate(sessionStorage.getItem(PENDING_INVITE) ? '/accept-invitation' : '/', { replace: true });
+      const next = await login(email.trim(), password);
+      if (next) setChallenge(next); else done();
     } catch (err) {
       setError(describeError(err));
     } finally {
       setBusy(false);
     }
+  }
+
+  async function submitCode(e: React.FormEvent) {
+    e.preventDefault();
+    if (!challenge || !code.trim()) { setError(t('common.required')); return; }
+    setBusy(true); setError('');
+    try {
+      await completeSecondStep(challenge, code, useRecovery);
+      done();
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'SECOND_STEP_EXPIRED') { setChallenge(null); setCode(''); }
+      setError(describeError(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (challenge) {
+    return (
+      <AuthCard title={t('common.appName')} subtitle={t('auth.secondStepTitle')}>
+        <form onSubmit={submitCode} noValidate>
+          <p className="hint">{useRecovery ? t('auth.recoveryHelp') : t('auth.secondStepHelp')}</p>
+          <label>{useRecovery ? t('auth.recoveryCode') : t('auth.appCode')}
+            <input inputMode={useRecovery ? 'text' : 'numeric'} autoComplete="one-time-code" maxLength={useRecovery ? 20 : 6} value={code}
+                   onChange={e => setCode(e.target.value)} autoFocus /></label>
+          <ErrorBanner message={error} />
+          <button className="primary" disabled={busy}>{busy ? t('common.loading') : t('auth.verifyCode')}</button>
+        </form>
+        <button type="button" className="text-link" onClick={() => { setUseRecovery(r => !r); setCode(''); setError(''); }}>
+          {useRecovery ? t('auth.useAppCode') : t('auth.useRecoveryCode')}
+        </button>
+        <button type="button" className="secondary" onClick={() => { setChallenge(null); setCode(''); setError(''); }}>{t('common.back')}</button>
+      </AuthCard>
+    );
   }
 
   return (
@@ -205,6 +244,74 @@ export function AcceptInvitationPage() {
           <Link className="secondary" to="/register">{t('auth.register')}</Link>
         </>
       )}
+    </AuthCard>
+  );
+}
+
+/** Opens the link from the verification email (`#token=...`), then goes on to the app (O5). */
+export function VerifyEmailPage() {
+  const { t } = useTranslation();
+  const { status, reloadUser } = useAuth();
+  const token = useFragmentToken();
+  const [state, setState] = useState<'working' | 'done' | 'failed'>('working');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!token) { setState('failed'); setError(t('errors.INVALID_VERIFICATION_TOKEN')); return; }
+    api('/api/v1/auth/verify-email', { method: 'POST', body: { token } })
+      .then(async () => { setState('done'); if (status === 'signedIn') await reloadUser().catch(() => undefined); })
+      .catch(err => { setState('failed'); setError(describeError(err)); });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- run once for the token in the link
+  }, [token]);
+
+  return (
+    <AuthCard title={t('auth.verifyTitle')} subtitle={t('auth.verifyIntro')}>
+      {state === 'working' && <div className="info-banner" role="status">{t('common.loading')}</div>}
+      {state === 'done' && <div className="info-banner" role="status">{t('auth.verifyDone')}</div>}
+      <ErrorBanner message={error} />
+      <Link className="primary" to="/">{t('auth.continue')}</Link>
+    </AuthCard>
+  );
+}
+
+/** Shown before anything else when new terms or a new privacy notice were published (O12). */
+export function ConsentPage() {
+  const { t } = useTranslation();
+  const { user, reloadUser, logout } = useAuth();
+  const [docs, setDocs] = useState<LegalDocument[]>([]);
+  const [agreed, setAgreed] = useState(false);
+  const [error, setError] = useState('');
+  const pending = user?.pendingConsents ?? [];
+
+  useEffect(() => {
+    api<LegalDocument[]>(`/api/v1/legal/current?language=${user?.preferredLanguage ?? 'en'}`).then(setDocs).catch(err => setError(describeError(err)));
+  }, [user?.preferredLanguage]);
+
+  async function accept() {
+    if (!agreed) { setError(t('auth.consentRequired')); return; }
+    setError('');
+    try {
+      await api('/api/v1/me/consents', { method: 'POST', body: { documents: pending, client: 'WEB' } });
+      await reloadUser();
+    } catch (err) {
+      setError(describeError(err));
+    }
+  }
+
+  const shown = docs.filter(d => pending.includes(`${d.kind}:${d.version}`));
+  return (
+    <AuthCard title={t('auth.consentTitle')} subtitle={t('auth.consentIntro')}>
+      {shown.map(d => (
+        <article className="legal-document" key={d.kind}>
+          <h3>{d.title}</h3>
+          {d.changes && <p className="hint">{t('auth.whatChanged', { changes: d.changes })}</p>}
+          <div className="legal-text">{d.body}</div>
+        </article>
+      ))}
+      <label className="check"><input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} />{t('auth.consentAgree')}</label>
+      <ErrorBanner message={error} />
+      <button className="primary" onClick={() => void accept()}>{t('auth.consentAccept')}</button>
+      <button type="button" className="secondary" onClick={() => void logout()}>{t('auth.signOut')}</button>
     </AuthCard>
   );
 }

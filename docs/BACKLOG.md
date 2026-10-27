@@ -77,10 +77,15 @@ Approved design: [mobile offline](mobile/mobile-offline.md) (N1–N15); [ADR 001
 - Stock records, set-up work and party records offline; photos (N15, with attachment storage).
 - A browser check of the web stale-record handling, and a real-phone check of offline mode.
 
-## Phase 14 — SaaS operations and production readiness
+## Phase 14 — SaaS operations and production readiness (built 2026-10-27)
 
-Design for review: [SaaS operations](platform/saas-operations.md) (O1–O15).
+Approved design: [SaaS operations](platform/saas-operations.md) (O1–O15); ADRs 0011–0013. To do on the real host before the
+first paying farm business (the production-readiness review, design section 12):
 
+- Choose the provider, create staging and production from `deploy/`, configure the alerts, publish the legal texts.
+- Build the image in CI, run the restore check, the k6 load tests on staging and a real-email check; record each result.
+- Android release through Play testing tracks.
 
-- Platform admin console, tenant status, usage limits, support tools, tenant export and deletion, privacy/consent.
-- Hosting and deployment, backups with a tested restore, monitoring, incident and release checklists, load tests.
+Left for later: billing and payments; SMS and push notifications; recurring expenses (H14); emailed and scheduled
+reports; several application instances (needs shared storage for exports, ADR 0009); iOS; a staging seed job for the
+load tests; self-hosted web fonts (today Google Fonts, allowed by the CSP).
