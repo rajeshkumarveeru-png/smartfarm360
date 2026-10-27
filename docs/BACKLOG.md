@@ -89,3 +89,8 @@ first paying farm business (the production-readiness review, design section 12):
 Left for later: billing and payments; SMS and push notifications; recurring expenses (H14); emailed and scheduled
 reports; several application instances (needs shared storage for exports, ADR 0009); iOS; a staging seed job for the
 load tests; self-hosted web fonts (today Google Fonts, allowed by the CSP).
+
+## Phase 15 — Billing and payments (design draft 2026-10-27)
+
+Draft design: [billing](platform/billing.md) (P1–P15), awaiting review. Needs from the product owner: plan prices,
+the legal entity's GSTIN and address, and the payment gateway account.

@@ -2,8 +2,9 @@
 
 ## Current state
 
-- **Phase:** 14 (SaaS operations and production readiness) built on branch `feature/phase-14-saas-ops` (based on
-  `feature/phase-13-mobile-offline`). All planned phases are built. Nothing is pushed yet.
+- **Phase:** 15 (billing and payments), design draft on branch `feature/phase-15-billing` (based on
+  `feature/phase-14-saas-ops`): [billing](platform/billing.md), P1–P15 awaiting review. Phases 1–14 are built.
+  Nothing is pushed yet.
 - **Production readiness:** not ready yet. The application side is in place and tested: production settings checks,
   RLS, two-step sign-in, support access, limits, export and deletion, consent, SMTP email, backup and restore scripts,
   and runbooks. What is left needs the real host: choose the provider, deploy staging and production from `deploy/`,
@@ -24,6 +25,7 @@
 | Attachment storage | Storage interface; local disk default, S3 later | ADR 0009 |
 | Offline records | Client ids with a server idempotency store; day-record versions as value hashes | ADR 0010 |
 | **Hosting / deployment target** | Approved shape (O1): Indian region, one server, managed PostgreSQL 18. **The provider is still open** (product owner) | [SaaS operations](platform/saas-operations.md) |
+| **Billing and payments design, P1–P15** | **Awaiting review** (draft 2026-10-27); prices and GST details from the product owner | [billing](platform/billing.md) |
 | Desktop (Electron) scope | Frozen: not built or released (O15) | [SaaS operations](platform/saas-operations.md) |
 | **Tamil terminology reviewer** | **Open** — required before the first release | ADR 0008 |
 | Finance posting rules, D1–D12 | Approved as recommended (2026-10-20) | [posting rules](finance/posting-rules.md) |
