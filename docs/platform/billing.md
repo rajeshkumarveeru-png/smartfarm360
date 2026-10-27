@@ -1,13 +1,13 @@
 # Billing and payments design (Phase 15)
 
-- Status: **Draft for review** (2026-10-27).
+- Status: **Approved** (2026-10-27, P1–P15 as recommended) and **built** in Phase 15. Implementation notes are in section 17.
 - Builds on:
   - Phase 14 (SaaS operations): every farm business is on the `FREE` plan, plans are lists of limits
     (`sf_plans`, `sf_plan_limits`), a platform administrator can override a limit with a reason, limits only refuse new
     additions, SMTP email with English and Tamil templates, the platform console and `PlatformAudit`;
   - ADR 0002 (tenancy), ADR 0004 (accounting model), ADR 0011 (Row-Level Security) and ADR 0012 (hosting).
-- Decisions marked **P1–P15** need an answer. Each has a recommendation. **P4**, **P6** and **P9** will get ADRs once
-  approved.
+- Decisions **P1–P15** were approved as recommended. ADRs: [0014](../adr/0014-payment-gateway.md) (P4),
+  [0015](../adr/0015-gst-invoices.md) (P6, P7), [0016](../adr/0016-plans-trial-and-grace.md) (P1–P3, P8–P11); amendments to ADR 0011 and ADR 0013.
 - Prices and the legal entity's GST details are not decided here. The product owner sets them; this phase builds
   where they live and how they are charged. Every amount below is an example.
 - SmartBill360 is a separate product and repository. Nothing here uses or changes it.
@@ -188,7 +188,7 @@ Murugan's farm business in Erode (Tamil Nadu) was created on 1 November 2026. Pr
 
 1. 1 November: a 30-day GROWER trial starts. Murugan adds 6 members and 4 farms.
 2. 24 November: a trial reminder email and banner.
-3. 28 November: Murugan subscribes to GROWER yearly (₹4,990) with GSTIN 33ABCDE1234F1Z5. UPI AutoPay is authorised;
+3. 28 November: Murugan subscribes to GROWER yearly (₹4,990) with GSTIN 33ABCDE1234F1Z7. UPI AutoPay is authorised;
    the webhook activates the plan.
 4. Invoice `SF/2026-27/000041`: ₹4,990.00 + CGST 9% ₹449.10 + SGST 9% ₹449.10 = **₹5,888.20** (the seller is also in
    Tamil Nadu). He presses *Record in my books*; a supplier bill appears in his finance module.
@@ -253,3 +253,34 @@ and referral codes, usage-based charges (for example SMS), Play billing in the p
 - Migration `017-billing.yaml`, ADRs for P4, P6 and P9, and an amendment to ADR 0013.
 - Tests for every path in section 12; the gates run and recorded in PROGRESS. The end-to-end run in gateway test mode
   needs staging and the gateway account, so it is recorded as not run until those exist.
+
+## 17. Implementation notes (2026-10-27)
+
+Built as designed, with these choices and narrowings:
+
+- **Where things live.** `platform.billing` holds the plans and prices (`PlanCatalog`), the state machine and jobs
+  (`SubscriptionService`), the webhook (`WebhookService`), invoices and credit notes (`InvoiceService`, `InvoicePdf`),
+  GST rules (`Gst`), refunds and prices (`BillingService`) and the reconciliation. *Record in my books* lives in
+  `finance` (`SubscriptionBookingService`), because the platform may not depend on business modules.
+- **The farm business's `plan_code` is the effective plan.** `PlanLimits` did not change; the subscription writes the
+  effective plan whenever it changes (ADR 0016).
+- **Migration `017-billing.yaml`** (changesets 058 and 059). Changeset 058 was corrected before its first run: the
+  trigger function needed its own SQL block, because splitting statements broke its body.
+- **Billing documents keep `customer_tenant_id` without a foreign key**, with their own RLS policy, so the deletion
+  keeps them for 8 years (ADRs 0011, 0013 and 0015 amended or added).
+- **The amount charged is the price plus GST for the customer's state**, so a gateway plan is created for each amount
+  the first time it is needed. Invoices are built from the captured total, so they always add up to it.
+- **Narrowings:**
+  - Only an upgrade to a higher plan for the same period is pro-rated (a payment link). Switching between monthly and
+    yearly waits for the renewal, like a downgrade.
+  - A comp charges nothing, so it issues no invoice (section 9 said it would show as a 100% discount). It is in the
+    subscription events and both audit logs.
+  - The invoice PDF is in English only. The PDF library cannot shape Tamil text, so there is no Tamil summary page;
+    the invoice is shown in Tamil in the app and the emails are in both languages.
+  - *Record in my books* creates one bill line for the invoice total, GST included, with the GST in the note. The
+    finance module has no input-tax account yet.
+  - The reconciliation lists a payment the gateway has and we do not. A platform administrator applies it by having
+    the gateway resend the webhook; replay in the console is for events we stored that failed.
+  - The fake gateway's checkout opens the return page and nothing more. Locally, a plan becomes paid only through a
+    signed webhook (as in the tests).
+- **Not run yet:** the end-to-end run on Razorpay test mode (it needs staging and the account), and a browser check.

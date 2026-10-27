@@ -90,7 +90,16 @@ Left for later: billing and payments; SMS and push notifications; recurring expe
 reports; several application instances (needs shared storage for exports, ADR 0009); iOS; a staging seed job for the
 load tests; self-hosted web fonts (today Google Fonts, allowed by the CSP).
 
-## Phase 15 — Billing and payments (design draft 2026-10-27)
+## Phase 15 — Billing and payments (built 2026-10-27)
 
-Draft design: [billing](platform/billing.md) (P1–P15), awaiting review. Needs from the product owner: plan prices,
-the legal entity's GSTIN and address, and the payment gateway account.
+Approved design: [billing](platform/billing.md) (P1–P15); ADRs 0014–0016. Before charging the first farm business:
+
+- The product owner sets the real prices (the seeded ones are examples), the legal entity's GSTIN and address, and
+  opens the Razorpay account; the privacy notice says invoices keep billing details for 8 years.
+- On staging: the webhook, then one subscription end to end in Razorpay test mode (checkout, renewal, failed renewal,
+  refund); record the result.
+
+Left for later: foreign customers and export invoices (LUT); e-invoicing (IRN) above the threshold; per-module or
+per-seat pricing; coupons and referrals; usage-based charges; pro-rated switches between monthly and yearly; a Tamil
+page in the invoice PDF (needs a PDF library with Tamil shaping); input-tax (GST) accounts in the farm's own books, so
+*Record in my books* can split the GST; Play billing in the phone app.

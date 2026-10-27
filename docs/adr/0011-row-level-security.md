@@ -38,3 +38,14 @@
     On 50,000 journal lines that turned the income statement from 100 ms into about a second.
   - With custom plans the dashboard answers in 470–490 ms, against 560–640 ms before RLS.
   - The dashboard also works out the dues once per request instead of twice.
+
+## Amendment (2026-10-27, billing design)
+
+- The platform's billing documents (`sf_payments`, `sf_invoices`, `sf_invoice_lines`, `sf_credit_notes`) are the
+  seller's records, kept 8 years after a farm business is deleted. They have `customer_tenant_id` instead of
+  `tenant_id`, so neither the deletion nor `RowLevelSecurityCoverageTest` treats them as tenant tables.
+- They get their own forced policy, `sf_customer_isolation`:
+  `(SELECT sf_rls_tenant()) IS NULL OR customer_tenant_id = (SELECT sf_rls_tenant())`. Inside a farm business's request
+  only its own documents exist; the webhook, the jobs and the console run in the `all` scope.
+- The subscription tables (`sf_subscriptions`, `sf_subscription_events`, `sf_billing_profiles`) are ordinary tenant
+  tables with the standard policy.

@@ -1,5 +1,6 @@
 package com.smartfarm360.platform.ops;
 
+import com.smartfarm360.platform.billing.Gst;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -28,6 +29,17 @@ public final class ProductionSettings {
         if (value(property, "app.ops.alert-email").isBlank()) out.add("APP_OPS_ALERT_EMAIL must be set: operational alerts need an address (O4)");
         if (!validKey(value(property, "app.mfa.encryption-key"))) out.add("APP_MFA_ENCRYPTION_KEY must be 32 random bytes, base64-encoded");
         if ("true".equalsIgnoreCase(value(property, "app.bootstrap-admin.enabled"))) out.add("APP_BOOTSTRAP_ADMIN_ENABLED must be false once the first administrator exists");
+        String gateway = value(property, "app.billing.gateway");
+        if (!"razorpay".equalsIgnoreCase(gateway)) out.add("APP_BILLING_GATEWAY must be razorpay in the prod profile (the fake gateway moves no money)");
+        if (value(property, "app.billing.razorpay.key-id").isBlank() || value(property, "app.billing.razorpay.key-secret").isBlank()) {
+            out.add("APP_BILLING_RAZORPAY_KEY_ID and APP_BILLING_RAZORPAY_KEY_SECRET must be set (billing design, P4)");
+        }
+        if (value(property, "app.billing.razorpay.key-id").startsWith("rzp_test_")) out.add("APP_BILLING_RAZORPAY_KEY_ID must be a live key in the prod profile, not a test key");
+        if (value(property, "app.billing.webhook-secret").length() < 16) out.add("APP_BILLING_WEBHOOK_SECRET must be set (at least 16 characters)");
+        if (!Gst.validGstin(value(property, "app.billing.seller.gstin").toUpperCase())) out.add("APP_BILLING_SELLER_GSTIN must be the platform entity's valid GSTIN (billing design, P6)");
+        if (value(property, "app.billing.seller.name").isBlank() || value(property, "app.billing.seller.address").isBlank()) {
+            out.add("APP_BILLING_SELLER_NAME and APP_BILLING_SELLER_ADDRESS must be set: they are printed on every invoice");
+        }
         if (databaseSuperuser) out.add("The database user must not be a superuser: superusers bypass Row-Level Security (ADR 0011)");
         return out;
     }

@@ -3,7 +3,8 @@ export type Permission =
   | 'FARM_READ' | 'FARM_WRITE' | 'CROP_READ' | 'CROP_WRITE' | 'CROP_ACTIVITY_WRITE'
   | 'FINANCE_READ' | 'FINANCE_WRITE' | 'FINANCE_REVERSE' | 'FINANCE_MANAGE' | 'INVENTORY_READ' | 'INVENTORY_WRITE'
   | 'WORKFORCE_READ' | 'WORKFORCE_WRITE' | 'PAYROLL_MANAGE' | 'ASSETS_READ' | 'ASSETS_WRITE'
-  | 'LIVESTOCK_READ' | 'LIVESTOCK_WRITE' | 'AQUACULTURE_READ' | 'AQUACULTURE_WRITE' | 'ORGANIC_READ' | 'ORGANIC_WRITE' | 'PROCESSING_READ' | 'PROCESSING_WRITE';
+  | 'LIVESTOCK_READ' | 'LIVESTOCK_WRITE' | 'AQUACULTURE_READ' | 'AQUACULTURE_WRITE' | 'ORGANIC_READ' | 'ORGANIC_WRITE' | 'PROCESSING_READ' | 'PROCESSING_WRITE'
+  | 'BILLING_VIEW' | 'BILLING_MANAGE';
 
 export type ModuleCode = 'CROP' | 'DAIRY' | 'POULTRY' | 'GOAT_SHEEP' | 'AQUACULTURE' | 'ORGANIC' | 'PROCESSING' | 'WORKFORCE' | 'ASSETS';
 
@@ -54,3 +55,60 @@ export type SupportGrant = { id: number; grantedByEmail: string; grantedToEmail:
 export type TenantExport = { id: number; status: 'QUEUED' | 'RUNNING' | 'READY' | 'FAILED' | 'EXPIRED'; sizeBytes: number | null; requestedAt: string;
   readyAt: string | null; expiresAt: string | null; requestedByEmail: string };
 export type DeletionState = { pending: boolean; requestedAt: string | null; scheduledFor: string | null; requestedByEmail: string | null };
+
+// ---- Billing and payments (billing design, Phase 15) ----------------------------------------------------------------
+
+export type BillingPeriod = 'MONTHLY' | 'YEARLY';
+export type SubscriptionState = 'NONE' | 'TRIAL' | 'ACTIVE' | 'PAST_DUE' | 'LAPSED' | 'CANCELLED' | 'ENDED';
+
+export interface PlanPrice { amount: number; validFrom: string }
+
+export interface BillingPlan {
+  code: string; name: string; paid: boolean; sortOrder: number;
+  limits: { code: string; value: number | null }[];
+  prices: { period: BillingPeriod; current: PlanPrice | null; next: PlanPrice | null }[];
+}
+
+export interface BillingOverview {
+  state: SubscriptionState; planCode: string; period: BillingPeriod | null; effectivePlanCode: string;
+  trialEndsAt: string | null; paidUntil: string | null; graceEndsAt: string | null;
+  pendingPlanCode: string | null; pendingPeriod: BillingPeriod | null; compPlanCode: string | null; compUntil: string | null;
+  checkoutStarted: boolean; upgradeStarted: boolean; profileComplete: boolean;
+  banner: 'TRIAL_ENDING' | 'PAST_DUE' | 'LAPSED' | null; plans: BillingPlan[];
+}
+
+export interface CheckoutResult { checkoutUrl: string | null; overview: BillingOverview }
+
+export interface BillingProfile {
+  legalName: string; addressLine1: string; addressLine2: string | null; city: string; pincode: string; stateCode: string;
+  gstin: string | null; email: string; updatedAt?: string;
+}
+
+export interface CreditNote { id: number; number: string; noteDate: string; reason: string; taxableAmount: number; cgst: number; sgst: number; igst: number; total: number }
+
+export interface BillingInvoice {
+  id: number; number: string; invoiceDate: string; description: string; planCode: string; period: BillingPeriod;
+  periodStart: string; periodEnd: string; taxableAmount: number; cgst: number; sgst: number; igst: number; total: number;
+  refundedAmount: number; buyerGstin: string | null; bookedDocumentId: number | null; creditNotes: CreditNote[];
+}
+
+export interface ConsoleSubscription {
+  tenantId: number; tenantName: string; state: SubscriptionState; planCode: string; period: BillingPeriod | null; effectivePlanCode: string;
+  trialEndsAt: string | null; paidUntil: string | null; graceEndsAt: string | null; compPlanCode: string | null; compUntil: string | null; compReason: string | null;
+}
+
+export interface ConsolePayment {
+  id: number; tenantId: number; businessName: string; kind: 'RENEWAL' | 'UPGRADE'; amount: number; refundedAmount: number; method: string | null;
+  capturedAt: string; invoiceId: number | null; invoiceNumber: string | null;
+}
+
+export interface GatewayEventRow { id: number; eventId: string; eventType: string; tenantId: number | null; receivedAt: string; outcome: string; error: string | null }
+
+export interface ReconciliationRun {
+  id: number; ranAt: string; ok: boolean; error: string | null;
+  differences: { kind: string; gatewayId: string; tenantId: number | null; detail: string }[];
+}
+
+export interface BillingSummary { subscriptions: Record<string, number>; unappliedEvents: GatewayEventRow[]; lastReconciliation: ReconciliationRun | null }
+
+export interface PriceRow { planCode: string; period: BillingPeriod; amount: number; validFrom: string }

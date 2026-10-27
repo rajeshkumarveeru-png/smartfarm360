@@ -31,12 +31,15 @@ public class TenantService {
     private final AuditService audit;
     private final com.smartfarm360.platform.auth.EmailVerificationService verification;
     private final com.smartfarm360.platform.plan.PlanLimits limits;
+    private final com.smartfarm360.platform.billing.SubscriptionService subscriptions;
 
     public TenantService(SfTenantRepository tenants, SfTenantSettingsRepository settings, SfTenantModuleRepository modules,
                          SfTenantMembershipRepository memberships, SfRoleRepository roles, SfUserAccountRepository users,
                          TenantAccessService access, AuditService audit, com.smartfarm360.platform.auth.EmailVerificationService verification,
-                         com.smartfarm360.platform.plan.PlanLimits limits) {
+                         com.smartfarm360.platform.plan.PlanLimits limits,
+                         com.smartfarm360.platform.billing.SubscriptionService subscriptions) {
         this.verification = verification;
+        this.subscriptions = subscriptions;
         this.limits = limits;
         this.tenants = tenants;
         this.settings = settings;
@@ -71,6 +74,8 @@ public class TenantService {
         membership.getRoles().addAll(roles.findByTenantIdIsNullAndCodeIn(List.of(RoleCode.TENANT_OWNER.name())));
         memberships.saveAndFlush(membership);
         modules.flush();
+        // A new farm business starts the trial, once per user (billing design, P3)
+        tenant.setPlanCode(subscriptions.startTrial(tenant.getId(), user.id()));
 
         audit.record(tenant.getId(), user.id(), "TENANT_CREATED", "TENANT", tenant.getId(),
                 Map.of("name", tenant.getName(), "modules", requested.stream().map(Enum::name).sorted().toList()));

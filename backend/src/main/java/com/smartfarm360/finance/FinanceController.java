@@ -34,9 +34,12 @@ public class FinanceController {
     private final LedgerReportService ledger;
     private final FinanceExports exports;
     private final ExportService export;
+    private final SubscriptionBookingService subscriptionBooking;
 
     public FinanceController(DocumentService documents, MasterDataService master, ReportService reports, FinanceSettingsService settings,
-                             AllocationService allocations, LedgerReportService ledger, FinanceExports exports, ExportService export) {
+                             AllocationService allocations, LedgerReportService ledger, FinanceExports exports, ExportService export,
+                             SubscriptionBookingService subscriptionBooking) {
+        this.subscriptionBooking = subscriptionBooking;
         this.ledger = ledger;
         this.exports = exports;
         this.export = export;
@@ -129,6 +132,16 @@ public class FinanceController {
     @GetMapping("/documents/{documentId}")
     @RequiresPermission(Permission.FINANCE_READ)
     public Document document(TenantContext ctx, @PathVariable long documentId) { return documents.document(ctx, documentId); }
+
+    public record BookingRequest(Long financialAccountId) {}
+
+    /** Records a paid SmartFarm360 invoice as a supplier bill in these books, when an owner asks (billing design, P13). */
+    @PostMapping("/subscription-invoices/{invoiceId}/book")
+    @RequiresPermission(Permission.FINANCE_WRITE)
+    @ResponseStatus(HttpStatus.CREATED)
+    public Document bookSubscriptionInvoice(TenantContext ctx, @PathVariable long invoiceId, @RequestBody(required = false) BookingRequest r) {
+        return subscriptionBooking.book(ctx, invoiceId, r == null ? null : r.financialAccountId());
+    }
 
     @PostMapping("/bills")
     @RequiresPermission(Permission.FINANCE_WRITE)

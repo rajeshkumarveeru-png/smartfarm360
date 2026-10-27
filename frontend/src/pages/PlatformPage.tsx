@@ -5,9 +5,10 @@ import { ErrorBanner, Loading } from '../components/common';
 import { currentLanguage, useNs } from '../i18n';
 import { describeError } from '../lib/errors';
 import { formatDate, formatNumber } from '../lib/format';
+import PlatformBillingTab from './PlatformBillingTab';
 
-type Tab = 'tenants' | 'users' | 'ops' | 'announcements' | 'legal' | 'audit';
-const TABS: Tab[] = ['tenants', 'users', 'ops', 'announcements', 'legal', 'audit'];
+type Tab = 'tenants' | 'users' | 'billing' | 'ops' | 'announcements' | 'legal' | 'audit';
+const TABS: Tab[] = ['tenants', 'users', 'billing', 'ops', 'announcements', 'legal', 'audit'];
 
 /**
  * The platform console (SaaS operations design, section 6): farm businesses and users by counts and status, operations
@@ -24,6 +25,7 @@ export default function PlatformPage() {
       </div>
       {tab === 'tenants' && <TenantsTab />}
       {tab === 'users' && <UsersTab />}
+      {tab === 'billing' && <PlatformBillingTab />}
       {tab === 'ops' && <OpsTab />}
       {tab === 'announcements' && <AnnouncementsTab />}
       {tab === 'legal' && <LegalTab />}

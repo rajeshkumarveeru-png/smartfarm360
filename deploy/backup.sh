@@ -28,7 +28,8 @@ record() {
 }
 trap 'record false "backup failed at line $LINENO"' ERR
 
-pg_dump --format=custom --no-owner --no-privileges --file="$dump"
+# --enable-row-security: tables have forced RLS (ADR 0011); with no app.tenant_id set the policy shows every row
+pg_dump --format=custom --no-owner --no-privileges --enable-row-security --file="$dump"
 # A dump that cannot be listed is not a backup
 pg_restore --list "$dump" > /dev/null
 tables=$(pg_restore --list "$dump" | grep -c "TABLE DATA" || true)

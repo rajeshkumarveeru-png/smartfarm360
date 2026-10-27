@@ -9,6 +9,7 @@ import { Loading } from './components/common';
 import { visibleNav } from './lib/nav';
 import { AcceptInvitationPage, ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage, ConsentPage, VerifyEmailPage } from './pages/AuthPages';
 import AuditPage from './pages/AuditPage';
+import { BillingReturnPage } from './pages/BillingPanel';
 import ComparisonPage from './crop/ComparisonPage';
 import CropLayout from './crop/CropLayout';
 import CyclePage from './crop/CyclePage';
@@ -127,6 +128,7 @@ function App() {
       <Route element={<RequireAuth />}>
         <Route path="/" element={<Home />} />
         <Route path="/onboarding" element={<OnboardingPage />} />
+        <Route path="/billing/return" element={<BillingReturnPage />} />
         <Route element={<Layout />}>
           <Route path="/t/:tenantId" element={<TenantRoute />}>
             <Route index element={<Navigate to="dashboard" replace />} />

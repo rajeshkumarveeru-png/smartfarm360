@@ -21,7 +21,7 @@ class EmailTemplatesTest {
         List<String> keys = new ArrayList<>(List.of("passwordReset", "registrationAttempt", "invitation"));
         for (EmailSender.Notice n : EmailSender.Notice.values()) keys.add(n.key);
         Map<String, String> params = Map.of("url", "https://app.example/x#token=abc", "tenant", "Lakshmi Farms", "date", "2026-12-22",
-                "until", "2026-10-23T10:00:00Z", "time", "2026-10-22T06:10:00Z", "alert", "Site down");
+                "until", "2026-10-23T10:00:00Z", "time", "2026-10-22T06:10:00Z", "alert", "Site down", "days", "7", "number", "SF/2026-27/000041", "amount", "5888.20", "plan", "Grower");
         SmtpEmailSender sender = new SmtpEmailSender(new JavaMailSenderImpl(), labels, "SmartFarm360 <no-reply@example.com>");
         for (String key : keys) {
             SimpleMailMessage en = sender.message("a@example.com", "en", key, params);

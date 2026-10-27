@@ -7,8 +7,9 @@ import { currentLanguage } from '../i18n';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthContext';
 import { useCurrentTenant } from '../auth/useCurrentTenant';
-import { visibleNav } from '../lib/nav';
+import { can, visibleNav } from '../lib/nav';
 import { LanguageToggle } from './common';
+import { BillingBanner } from '../pages/BillingPanel';
 
 /** Announcements and maintenance notices from the platform, in the user's language (O8). */
 export function AnnouncementBanner() {
@@ -71,6 +72,7 @@ export default function Layout() {
         {user && user.emailVerified === false && (
           <div className="info-banner" role="status">{t('account.verifyBanner')} <Link to="/account">{t('account.verifyBannerLink')}</Link></div>
         )}
+        {tenant && tenant.active && <BillingBanner tenantId={tenant.id} canManage={can(tenant, 'BILLING_MANAGE')} />}
         {tenant && !tenant.active && (
           <div className="error-banner" role="alert">{t('tenant.suspended')}{tenant.suspendedReason ? ` ${t('tenant.suspendedReason', { reason: tenant.suspendedReason })}` : ''}</div>
         )}

@@ -61,7 +61,8 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
                 "040-workforce-assets-schema",
                 "041-workforce-assets-seed", "042-report-indexes", "043-livestock-schema", "044-livestock-seed",
                 "045-poultry-goats-schema", "046-poultry-goats-seed", "047-aquaculture-schema", "048-aquaculture-seed", "049-organic-schema", "050-organic-seed", "051-processing-schema", "052-processing-seed", "053-idempotent-requests",
-                "054-saas-operations-schema", "055-saas-operations-seed", "056-row-level-security", "057-guards-allow-tenant-deletion");
+                "054-saas-operations-schema", "055-saas-operations-seed", "056-row-level-security", "057-guards-allow-tenant-deletion",
+                "058-billing-schema", "059-billing-seed");
     }
 
     @Test
@@ -92,7 +93,9 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
                 "sf_processing_outputs", "sf_idempotent_requests",
                 "sf_plans", "sf_plan_limits", "sf_tenant_limit_overrides", "sf_support_grants", "sf_platform_audit", "sf_tenant_exports",
                 "sf_user_mfa", "sf_user_recovery_codes", "sf_legal_documents", "sf_consents", "sf_email_verification_tokens",
-                "sf_rate_limit_counters", "sf_announcements", "sf_ops_checks");
+                "sf_rate_limit_counters", "sf_announcements", "sf_ops_checks",
+                "sf_plan_prices", "sf_tax_rates", "sf_subscriptions", "sf_subscription_events", "sf_billing_profiles", "sf_trials_used", "sf_gateway_plans",
+                "sf_gateway_events", "sf_payments", "sf_document_counters", "sf_invoices", "sf_invoice_lines", "sf_credit_notes", "sf_billing_reconciliations");
     }
 
     @Test
@@ -462,6 +465,31 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
     }
 
     /** Applies {@code count} changesets (all when null) to the given database. */
+    @Test
+    void upgradingKeepsEveryExistingBusinessOnItsLimitsAndGivesNewOnesTheSmallerFreePlan() throws Exception {
+        DataSource legacy = newDatabase("legacy_bill_" + UUID.randomUUID().toString().replace("-", ""));
+        JdbcTemplate db = new JdbcTemplate(legacy);
+        runChangelog(legacy, 33); // everything before Phase 15 (changesets 025-057)
+        long tenant = db.queryForObject("insert into sf_tenants(name, slug) values ('Old farm', 'old-farm-bill') returning id", Long.class);
+
+        runChangelog(legacy, null);
+
+        // P2: existing farm businesses move to FREE_LEGACY with the limits FREE had; FREE is smaller from now on
+        assertThat(db.queryForObject("select plan_code from sf_tenants where id = ?", String.class, tenant)).isEqualTo("FREE_LEGACY");
+        String limit = "select limit_value from sf_plan_limits where plan_code = ? and limit_code = ?";
+        assertThat(db.queryForObject(limit, Integer.class, "FREE_LEGACY", "MEMBERS")).isEqualTo(25);
+        assertThat(db.queryForObject(limit, Integer.class, "FREE_LEGACY", "FARMS")).isEqualTo(20);
+        assertThat(db.queryForObject(limit, Integer.class, "FREE", "MEMBERS")).isEqualTo(5);
+        assertThat(db.queryForObject(limit, Integer.class, "FREE", "FARMS")).isEqualTo(3);
+        assertThat(db.queryForObject("select count(*) from sf_plan_limits where plan_code = 'ESTATE' and limit_code = 'FARMS'", Integer.class)).isZero();
+        assertThat(db.queryForObject("select count(*) from sf_subscriptions", Integer.class)).isZero();
+        assertThat(db.queryForList("select r.code from sf_role_permissions rp join sf_roles r on r.id = rp.role_id where r.tenant_id is null " +
+                "and rp.permission_code = 'BILLING_VIEW'", String.class)).containsExactlyInAnyOrder("TENANT_OWNER", "ACCOUNTANT");
+        // Billing documents carry their own policy; the tenant tables the standard one
+        assertThat(db.queryForList("select tablename from pg_policies where policyname = 'sf_customer_isolation'", String.class))
+                .containsExactlyInAnyOrder("sf_payments", "sf_invoices", "sf_invoice_lines", "sf_credit_notes");
+    }
+
     private static void runChangelog(DataSource target, Integer count) throws Exception {
         try (Connection connection = target.getConnection()) {
             Database database = DatabaseFactory.getInstance().findCorrectDatabaseImplementation(new JdbcConnection(connection));

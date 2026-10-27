@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import BillingPanel from './BillingPanel';
 import TenantOperations from './TenantOperations';
 import { api } from '../api/client';
 import type { ModuleStatus, Settings, TenantDetail } from '../api/types';
@@ -138,6 +139,7 @@ export default function SettingsPage() {
         ))}
       </div>
 
+      <BillingPanel />
       <TenantOperations />
 
       <h3>{t('profile')}</h3>

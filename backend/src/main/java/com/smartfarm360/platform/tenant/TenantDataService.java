@@ -67,9 +67,12 @@ public class TenantDataService {
     private final Clock clock;
     private final Path dir;
     private final ThreadPoolTaskExecutor workers;
+    private final com.smartfarm360.platform.billing.SubscriptionService subscriptions;
 
     public TenantDataService(JdbcClient jdbc, JdbcTemplate template, javax.sql.DataSource dataSource, AuditService audit, PlatformAudit platformAudit,
-                             PlanLimits limits, EmailSender email, ObjectMapper json, Clock clock, @Value("${app.export.dir}") String dir) {
+                             PlanLimits limits, EmailSender email, ObjectMapper json, Clock clock, @Value("${app.export.dir}") String dir,
+                             com.smartfarm360.platform.billing.SubscriptionService subscriptions) {
+        this.subscriptions = subscriptions;
         this.jdbc = jdbc;
         this.template = template;
         // A JDBC transaction manager, because the deletion orders itself with savepoints (the JPA one has none)
@@ -276,6 +279,8 @@ public class TenantDataService {
                         where id = :t and deletion_requested_at is null""")
                 .param("now", Timestamp.from(now)).param("u", ctx.userId()).param("when", Timestamp.from(now.plus(GRACE))).param("t", ctx.tenantId()).update();
         if (n == 0) throw ApiException.conflict("DELETION_ALREADY_REQUESTED", "Deletion was already asked for.");
+        // The subscription ends at once; cancelling the deletion does not restore it (billing design, P11)
+        subscriptions.endForDeletion(ctx.tenantId(), ctx.userId());
         audit.record(ctx.tenantId(), ctx.userId(), "TENANT_DELETION_REQUESTED", "TENANT", ctx.tenantId(), Map.of());
         platformAudit.record(ctx.userId(), "TENANT_DELETION_REQUESTED", "TENANT", ctx.tenantId(), Map.of("name", name));
         notifyOwners(ctx.tenantId(), EmailSender.Notice.DELETION_SCHEDULED, Map.of("tenant", name, "date", LocalDate.ofInstant(now.plus(GRACE), ZoneOffset.UTC).toString()));

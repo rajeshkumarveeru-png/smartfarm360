@@ -54,7 +54,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST,
                         "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout",
                         "/api/v1/auth/password-reset/request", "/api/v1/auth/password-reset/confirm", "/api/v1/auth/login/second-step",
-                        "/api/v1/auth/verify-email").permitAll()
+                        "/api/v1/auth/verify-email", "/api/v1/billing/webhooks/*").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/legal/current", "/api/v1/announcements").permitAll()
                 // The built web app (served from the same address in production): its files and its page routes
                 .requestMatchers(r -> "GET".equals(r.getMethod()) && !r.getRequestURI().startsWith("/api/")

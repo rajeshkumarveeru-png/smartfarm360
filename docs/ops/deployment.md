@@ -36,6 +36,13 @@ The reference set-up is provider-neutral. The product owner chooses the provider
 6. Install the backup cron job (`deploy/backup.sh`, nightly) and the restore check (`deploy/restore-check.sh --latest`,
    on the 1st of each month). Then run both once by hand.
 7. Publish the terms and privacy notice (*Terms and privacy* tab) with the texts from the product owner.
+8. Billing (billing design, Phase 15):
+   - in the Razorpay dashboard, add a webhook to `https://<domain>/api/v1/billing/webhooks/razorpay` with the events
+     `subscription.*`, `payment.failed` and `payment_link.paid`, and the secret in `APP_BILLING_WEBHOOK_SECRET`;
+   - staging uses Razorpay test keys; production refuses them;
+   - set the real prices in the console (*Billing*, *Prices*); the seeded prices are examples;
+   - on staging, run one subscription end to end in test mode (checkout, renewal, failed renewal, refund) and record the
+     result in PROGRESS.
 
 ## Alerts (O4)
 

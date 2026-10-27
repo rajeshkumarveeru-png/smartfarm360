@@ -15,7 +15,7 @@ public class SfTenant {
     @Column(nullable = false, unique = true, length = 100) private String slug;
     @Column(name = "preferred_language", nullable = false, length = 5) private String preferredLanguage = "en";
     @Column(nullable = false) private boolean active = true;
-    /** Placeholder for future plans; every tenant is FREE and nothing is gated on it yet. */
+    /** The effective plan, kept by the subscription (billing design); PlanLimits reads it. */
     @Column(name = "plan_code", nullable = false, length = 30) private String planCode = "FREE";
     /** Written by the platform console and the deletion request (JDBC); read-only here. */
     @Column(name = "suspended_reason", insertable = false, updatable = false) private String suspendedReason;

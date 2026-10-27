@@ -544,7 +544,23 @@
     "TENANT_EXPORT_REQUESTED": "Exported everything",
     "TWO_STEP_DISABLED": "Turned off two-step sign-in",
     "TWO_STEP_ENABLED": "Turned on two-step sign-in",
-    "TWO_STEP_FAILED": "Entered a wrong two-step code"
+    "TWO_STEP_FAILED": "Entered a wrong two-step code",
+    "BILLING_STATE_CHANGED": "Plan state changed",
+    "BILLING_CHECKOUT_STARTED": "Payment for a plan started",
+    "BILLING_UPGRADE_STARTED": "Plan upgrade started",
+    "BILLING_CHANGE_SCHEDULED": "Plan change scheduled for renewal",
+    "BILLING_UPGRADED": "Plan upgraded",
+    "BILLING_COMP_GIVEN": "Plan given free by SmartFarm360",
+    "BILLING_COMP_ENDED": "Free plan ended",
+    "BILLING_PRICE_APPLIED": "New price set for renewals",
+    "BILLING_TRIAL_EXTENDED": "Trial extended",
+    "BILLING_GRACE_EXTENDED": "Payment grace extended",
+    "BILLING_PROFILE_SAVED": "Billing details saved",
+    "BILLING_REFUNDED": "Payment refunded",
+    "BILLING_SUBSCRIBED": "Plan subscribed",
+    "BILLING_INVOICE_RESENT": "Invoice email sent again",
+    "BILLING_PRICE_SET": "Price announced",
+    "BILLING_EVENT_REPLAYED": "Gateway event applied again"
   },
   "platform": {
     "title": "Platform administration",
@@ -561,7 +577,8 @@
       "ops": "Operations",
       "announcements": "Announcements",
       "legal": "Terms and privacy",
-      "audit": "Platform log"
+      "audit": "Platform log",
+      "billing": "Billing"
     },
     "search": "Search",
     "searchTenantsHint": "Name, short name or owner's email",
@@ -645,6 +662,46 @@
       "TENANT_DELETION_CANCELLED": "Cancelled the deletion",
       "TENANT_DELETED": "Farm business deleted",
       "ACCOUNT_DELETED": "Account deleted"
+    },
+    "billing": {
+      "refunded": "The refund is made and its credit note issued.",
+      "saved": "Saved.",
+      "reconciliation": "Reconciliation with the payment gateway",
+      "reconciled": "The reconciliation ran.",
+      "reconcileNow": "Run it now",
+      "difference": {
+        "PAYMENT_NOT_RECORDED": "Payment not recorded",
+        "STATE_DIFFERS": "Subscription state differs"
+      },
+      "unapplied": "Gateway events that did not apply",
+      "noUnapplied": "None.",
+      "replay": "Apply again",
+      "replayed": "The event was applied again.",
+      "action": {
+        "trial": "Extend the trial",
+        "grace": "Extend the grace",
+        "comp": "Give a plan free",
+        "endComp": "End the free plan",
+        "refund": "Refund"
+      },
+      "days": "Days",
+      "plan": "Plan",
+      "until": "Until",
+      "amount": "Amount with GST",
+      "apply": "Apply",
+      "subscriptions": "Subscriptions",
+      "allStates": "All",
+      "paidUntil": "paid until {{date}}",
+      "payments": "Payments",
+      "resend": "Send the invoice again",
+      "resent": "The invoice email was sent again.",
+      "prices": "Prices",
+      "from": "from {{date}}",
+      "period": "Period",
+      "amountBeforeGst": "Price before GST",
+      "setPrice": "Announce the price",
+      "priceSet": "The price is announced and subscribers were emailed.",
+      "priceHelp": "A new price applies at least 30 days from today, to renewals from that date. Subscribers are emailed now."
     }
   },
   "errors": {
@@ -969,7 +1026,33 @@
     "EXPORT_NOT_READY": "This export is not ready or has expired.",
     "CONFIRM_NAME_MISMATCH": "Type the farm business's name exactly to confirm.",
     "DELETION_ALREADY_REQUESTED": "Deletion was already asked for.",
-    "DELETION_NOT_REQUESTED": "No deletion was asked for."
+    "DELETION_NOT_REQUESTED": "No deletion was asked for.",
+    "BILLING_PROFILE_INCOMPLETE": "Fill in the billing details first.",
+    "UNKNOWN_PLAN": "Unknown plan.",
+    "UNKNOWN_PERIOD": "Choose monthly or yearly.",
+    "PLAN_NOT_FOR_SALE": "Choose a paid plan.",
+    "SUBSCRIPTION_EXISTS": "This farm business already has a plan. Change it instead.",
+    "SUBSCRIPTION_NOT_ACTIVE": "There is no paid, active plan to change or cancel.",
+    "PLAN_UNCHANGED": "This is already the plan.",
+    "NO_SUBSCRIPTION": "This farm business has no subscription.",
+    "GATEWAY_UNAVAILABLE": "The payment gateway could not be reached. Try again later.",
+    "WEBHOOK_SIGNATURE_INVALID": "The signature does not match.",
+    "WEBHOOK_UNREADABLE": "The event could not be read.",
+    "INVOICE_NOT_FOUND": "Invoice not found.",
+    "INVOICE_ALREADY_BOOKED": "This invoice is already in your books.",
+    "UNKNOWN_STATE": "Choose the state of the billing address.",
+    "INVALID_GSTIN": "This GSTIN is not valid. Check it, or leave it empty.",
+    "GSTIN_STATE_MISMATCH": "The GSTIN belongs to another state.",
+    "PAYMENT_NOT_FOUND": "Payment not found.",
+    "REFUND_TOO_LARGE": "The refund must be more than zero and at most what is left of the payment.",
+    "PRICE_NOTICE_TOO_SHORT": "A new price applies at least 30 days from today.",
+    "PRICE_EXISTS": "This plan already has a price from that date.",
+    "NOT_IN_TRIAL": "This farm business is not in its trial.",
+    "NOT_PAST_DUE": "This farm business has no unpaid renewal.",
+    "DATE_IN_PAST": "Choose a date from today.",
+    "NO_COMP": "This farm business has no free plan to end.",
+    "EVENT_NOT_FOUND": "Event not found.",
+    "EVENT_ALREADY_APPLIED": "This event was already applied."
   },
   "mobileAuth": {
     "chooseTenant": "Choose a farm business",
@@ -1305,7 +1388,8 @@
     "BREEDING_ANIMALS": "Breeding and milch animals",
     "BUILDINGS": "Sheds, wells and buildings",
     "YOUNG_STOCK": "Chicks and young stock",
-    "FISH_SEED": "Fish and shrimp seed"
+    "FISH_SEED": "Fish and shrimp seed",
+    "SOFTWARE": "Software and subscriptions"
   },
   "stock": {
     "title": "Stock",
@@ -3068,6 +3152,38 @@
     "opsAlert": {
       "subject": "SmartFarm360 alert: {{alert}}",
       "body": "{{alert}}\nTime: {{time}} (UTC)\nSee the incident checklist (docs/ops/incident.md)."
+    },
+    "trialEnding": {
+      "subject": "Your SmartFarm360 trial for {{tenant}} ends in {{days}} day(s)",
+      "body": "The Grower trial of {{tenant}} ends on {{date}}. To keep its limits, choose a plan in Settings, Plan and billing:\n{{url}}\n\nIf you do nothing, the free plan applies. Nothing you recorded is hidden or deleted."
+    },
+    "trialEnded": {
+      "subject": "The trial of {{tenant}} has ended",
+      "body": "The trial of {{tenant}} has ended and the free plan applies. Everything you recorded is still there. To get more members and farms, choose a plan:\n{{url}}"
+    },
+    "paymentReceived": {
+      "subject": "Payment received: invoice {{number}}",
+      "body": "Thank you. We received {{amount}} (GST included) for {{tenant}}. Tax invoice {{number}} is in Settings, Plan and billing, where owners and accountants can download it:\n{{url}}"
+    },
+    "renewalFailed": {
+      "subject": "The renewal payment for {{tenant}} failed",
+      "body": "We could not collect the renewal for {{tenant}}. The payment gateway will try again. To keep the plan, pay or update the payment method by {{date}}:\n{{url}}\n\nAfter that date the free plan applies; nothing is hidden or deleted."
+    },
+    "graceEnding": {
+      "subject": "Pay by {{date}} to keep the plan of {{tenant}}",
+      "body": "The renewal for {{tenant}} is still unpaid. On {{date}} the free plan applies. Pay here:\n{{url}}"
+    },
+    "planLapsed": {
+      "subject": "The plan of {{tenant}} has lapsed",
+      "body": "The renewal for {{tenant}} was not paid, so the free plan's limits now apply. Nothing you recorded is hidden or deleted. Paying brings the plan back from that day:\n{{url}}"
+    },
+    "priceChange": {
+      "subject": "The price of the {{plan}} plan changes on {{date}}",
+      "body": "From {{date}}, the {{plan}} plan of {{tenant}} costs {{amount}} before GST. Renewals from that date charge the new price. You can change or cancel the plan before then:\n{{url}}"
+    },
+    "refundIssued": {
+      "subject": "Refund of {{amount}} for {{tenant}}",
+      "body": "We refunded {{amount}} to the payment method used. Credit note {{number}} is in Settings, Plan and billing. The bank may take a few days to show it.\n{{url}}"
     }
   },
   "account": {
@@ -3151,5 +3267,128 @@
     "deletionPending": "Deletion on {{date}}, asked by {{email}}. It is read-only until then.",
     "cancelDeletion": "Cancel the deletion",
     "deletionCancelled": "The deletion is cancelled."
+  },
+  "billing": {
+    "title": "Plan and billing",
+    "plan": {
+      "FREE": "Free",
+      "FREE_LEGACY": "Free (early farm businesses)",
+      "GROWER": "Grower",
+      "ESTATE": "Estate"
+    },
+    "state": {
+      "NONE": "No paid plan",
+      "TRIAL": "Trial",
+      "ACTIVE": "Paid",
+      "PAST_DUE": "Payment due",
+      "LAPSED": "Lapsed",
+      "CANCELLED": "Cancelled",
+      "ENDED": "Ended"
+    },
+    "stateField": "State",
+    "period": {
+      "MONTHLY": "Monthly",
+      "YEARLY": "Yearly"
+    },
+    "periodLabel": "Billing period",
+    "trialUntil": "Trial until {{date}}",
+    "renewsOn": "Renews on {{date}} ({{period}})",
+    "endsOn": "Paid until {{date}}; it does not renew",
+    "graceUntil": "Pay by {{date}} to keep the plan",
+    "pendingChange": "Changes to {{plan}} ({{period}}) on {{date}}",
+    "compUntil": "{{plan}} given free by SmartFarm360 until {{date}}",
+    "checkoutWaiting": "A payment was started. The plan changes when the payment gateway confirms it.",
+    "upgradeWaiting": "An upgrade is waiting for its payment.",
+    "neverLocked": "If a plan ends, nothing you recorded is hidden or locked: only adding more than the free plan allows is refused.",
+    "limit": {
+      "MEMBERS": "Members",
+      "FARMS": "Farms",
+      "EXPORTS_PER_DAY": "Full exports a day",
+      "STORAGE_MB": "Storage (MB)"
+    },
+    "unlimited": "no limit",
+    "perMonth": "{{amount}} a month",
+    "perYear": "{{amount}} a year",
+    "plusGst": "plus 18% GST",
+    "priceFrom": "{{amount}} from {{date}}",
+    "free": "No charge",
+    "current": "Your plan",
+    "choose": "Choose and pay",
+    "switchTo": "Switch to this plan",
+    "changeScheduled": "The change is saved. A higher plan starts once paid; a lower plan or another period starts at the next renewal.",
+    "profileFirst": "Fill in the billing details below before choosing a plan.",
+    "payOnGateway": "You pay on the payment gateway's secure page by UPI, card or net banking. SmartFarm360 never sees your card or bank details.",
+    "cancel": "Cancel the plan",
+    "cancelConfirm": "Cancel the plan? It stays until the end of the paid period, then the free plan applies.",
+    "cancelled": "The plan is cancelled. It stays until the end of the paid period.",
+    "details": "Billing details",
+    "legalName": "Legal name",
+    "gstin": "GSTIN",
+    "gstinOptional": "Optional, to claim input tax credit",
+    "addressLine1": "Address",
+    "addressLine2": "Address, second line",
+    "city": "Town or city",
+    "pincode": "PIN code",
+    "invoiceEmail": "Email for invoices",
+    "saveDetails": "Save the billing details",
+    "profileSaved": "The billing details are saved. Invoices issued before keep the details they had.",
+    "invoices": "Invoices",
+    "noInvoices": "No invoices yet.",
+    "gstIncluded": "includes GST {{amount}}",
+    "refunded": "{{amount}} refunded",
+    "creditNote": "Credit note {{number}}: {{amount}}",
+    "pdf": "Download PDF",
+    "paidFrom": "Paid from (for your books)",
+    "notPaidYet": "Record as unpaid",
+    "book": "Record in my books",
+    "booked": "The invoice is recorded as a bill from SmartFarm360 in your books.",
+    "inBooks": "In your books",
+    "banner": {
+      "TRIAL_ENDING": "Your trial ends on {{date}}. Choose a plan to keep its limits.",
+      "PAST_DUE": "The renewal payment failed. Pay by {{date}} to keep your plan.",
+      "LAPSED": "Your plan lapsed and the free plan's limits apply. Nothing is hidden; pay to get your plan back."
+    },
+    "bannerLink": "Plan and billing",
+    "returned": "Thank you. Your plan changes as soon as the payment gateway confirms the payment, usually within a minute.",
+    "backToApp": "Back to SmartFarm360",
+    "managedOnWeb": "The plan is managed on the SmartFarm360 website, in Settings.",
+    "gstState": {
+      "10": "Bihar",
+      "11": "Sikkim",
+      "12": "Arunachal Pradesh",
+      "13": "Nagaland",
+      "14": "Manipur",
+      "15": "Mizoram",
+      "16": "Tripura",
+      "17": "Meghalaya",
+      "18": "Assam",
+      "19": "West Bengal",
+      "20": "Jharkhand",
+      "21": "Odisha",
+      "22": "Chhattisgarh",
+      "23": "Madhya Pradesh",
+      "24": "Gujarat",
+      "26": "Dadra and Nagar Haveli and Daman and Diu",
+      "27": "Maharashtra",
+      "29": "Karnataka",
+      "30": "Goa",
+      "31": "Lakshadweep",
+      "32": "Kerala",
+      "33": "Tamil Nadu",
+      "34": "Puducherry",
+      "35": "Andaman and Nicobar Islands",
+      "36": "Telangana",
+      "37": "Andhra Pradesh",
+      "38": "Ladakh",
+      "01": "Jammu and Kashmir",
+      "02": "Himachal Pradesh",
+      "03": "Punjab",
+      "04": "Chandigarh",
+      "05": "Uttarakhand",
+      "06": "Haryana",
+      "07": "Delhi",
+      "08": "Rajasthan",
+      "09": "Uttar Pradesh"
+    }
   }
 }

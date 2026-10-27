@@ -35,7 +35,7 @@ Record every command you ran and its result in `docs/PROGRESS.md` at the end of 
 
 - Backend package root `com.smartfarm360`; tables use the `sf_` prefix.
 - Modular monolith, one package per module (ADR 0001): `platform` (auth, tenant, membership, rbac, security, audit,
-  web, admin, mail), `farm`, `crop`, `finance`, `inventory` (stock), `costing`, `operations` (field work that moves stock and money),
+  web, admin, mail, billing), `farm`, `crop`, `finance`, `inventory` (stock), `costing`, `operations` (field work that moves stock and money),
   `workforce` (workers, attendance, pay runs), `assets` (register, depreciation, maintenance), `livestock` (herd, milk,
   health, breeding, poultry batches, goat and sheep herds; only reporting depends on it), `aquaculture` (ponds, culture
   cycles, water quality, harvests; only reporting depends on it), `organic` (compost and manure batches; only reporting
@@ -55,6 +55,10 @@ Record every command you ran and its result in `docs/PROGRESS.md` at the end of 
 - The platform console (`/api/v1/platform`) shows counts and status, never books; every change goes to `PlatformAudit`.
   Plan limits go through `PlanLimits`. The `prod` profile refuses unsafe settings (`ProductionSettings`); new
   production settings get a rule there. Operations runbooks are in `docs/ops/`.
+- Billing (ADRs 0014–0016): plans change only through signed gateway webhooks (`WebhookService`), never from the browser.
+  A farm business's `plan_code` is the subscription's effective plan; billing never hides or locks records, it only lowers
+  limits. Invoices and credit notes are immutable, gapless per financial year, and use `customer_tenant_id` so they outlive
+  a deleted business. Never store card, UPI or bank details. Money for invoices goes through `Gst`.
 - Errors: throw `ApiException` with a stable `code`, and add that code to `errors.*` in both catalogs.
 - Every tenant-data change that matters to owners is recorded with `AuditService` (no secrets in details).
 - Controllers stay thin; business rules live in services; typed request/response records with Bean Validation.

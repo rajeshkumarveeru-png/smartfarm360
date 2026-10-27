@@ -26,7 +26,8 @@ public class MaintenanceFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return READS.contains(request.getMethod()) || !path.startsWith("/api/") || path.startsWith("/api/v1/platform/") || path.startsWith("/api/v1/auth/");
+        return READS.contains(request.getMethod()) || !path.startsWith("/api/") || path.startsWith("/api/v1/platform/") || path.startsWith("/api/v1/auth/")
+                || path.startsWith("/api/v1/billing/webhooks/");
     }
 
     @Override

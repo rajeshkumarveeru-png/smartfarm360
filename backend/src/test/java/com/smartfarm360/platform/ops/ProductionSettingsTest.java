@@ -23,6 +23,13 @@ class ProductionSettingsTest {
         p.put("app.ops.alert-email", "ops@example.com");
         p.put("app.mfa.encryption-key", Base64.getEncoder().encodeToString(new byte[32]));
         p.put("app.bootstrap-admin.enabled", "false");
+        p.put("app.billing.gateway", "razorpay");
+        p.put("app.billing.razorpay.key-id", "rzp_live_0123456789");
+        p.put("app.billing.razorpay.key-secret", "a-live-key-secret");
+        p.put("app.billing.webhook-secret", "a-webhook-secret-of-16+");
+        p.put("app.billing.seller.gstin", "33AABCS1234A1Z8");
+        p.put("app.billing.seller.name", "SmartFarm360 Private Limited");
+        p.put("app.billing.seller.address", "1 Main Road, Coimbatore 641001");
         return p;
     }
 
@@ -48,7 +55,13 @@ class ProductionSettingsTest {
                 new Case("app.ops.alert-email", "", "APP_OPS_ALERT_EMAIL"),
                 new Case("app.mfa.encryption-key", "not-base64!", "APP_MFA_ENCRYPTION_KEY"),
                 new Case("app.mfa.encryption-key", Base64.getEncoder().encodeToString(new byte[16]), "APP_MFA_ENCRYPTION_KEY"),
-                new Case("app.bootstrap-admin.enabled", "true", "APP_BOOTSTRAP_ADMIN_ENABLED"));
+                new Case("app.bootstrap-admin.enabled", "true", "APP_BOOTSTRAP_ADMIN_ENABLED"),
+                new Case("app.billing.gateway", "fake", "APP_BILLING_GATEWAY"),
+                new Case("app.billing.razorpay.key-secret", "", "APP_BILLING_RAZORPAY_KEY_SECRET"),
+                new Case("app.billing.razorpay.key-id", "rzp_test_0123456789", "live key"),
+                new Case("app.billing.webhook-secret", "short", "APP_BILLING_WEBHOOK_SECRET"),
+                new Case("app.billing.seller.gstin", "33AABCS1234A1Z9", "APP_BILLING_SELLER_GSTIN"),
+                new Case("app.billing.seller.address", "", "APP_BILLING_SELLER_ADDRESS"));
         for (Case c : cases) {
             Map<String, String> p = safe();
             p.put(c.key(), c.value());

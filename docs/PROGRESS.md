@@ -2,14 +2,14 @@
 
 ## Current state
 
-- **Phase:** 15 (billing and payments), design draft on branch `feature/phase-15-billing` (based on
-  `feature/phase-14-saas-ops`): [billing](platform/billing.md), P1–P15 awaiting review. Phases 1–14 are built.
-  Nothing is pushed yet.
+- **Phase:** 15 (billing and payments) built on branch `feature/phase-15-billing` (based on
+  `feature/phase-14-saas-ops`). Nothing is pushed yet.
 - **Production readiness:** not ready yet. The application side is in place and tested: production settings checks,
   RLS, two-step sign-in, support access, limits, export and deletion, consent, SMTP email, backup and restore scripts,
   and runbooks. What is left needs the real host: choose the provider, deploy staging and production from `deploy/`,
   configure email and alerts, run the restore check and load tests, and publish the legal texts. That is the
-  production-readiness review of the Phase 14 design, section 12.
+  production-readiness review of the Phase 14 design, section 12. Before charging anyone, billing also needs the real
+  prices, the legal entity's GST details, the Razorpay account and one end-to-end run in its test mode on staging.
 
 ## Decisions
 
@@ -25,7 +25,7 @@
 | Attachment storage | Storage interface; local disk default, S3 later | ADR 0009 |
 | Offline records | Client ids with a server idempotency store; day-record versions as value hashes | ADR 0010 |
 | **Hosting / deployment target** | Approved shape (O1): Indian region, one server, managed PostgreSQL 18. **The provider is still open** (product owner) | [SaaS operations](platform/saas-operations.md) |
-| **Billing and payments design, P1–P15** | **Awaiting review** (draft 2026-10-27); prices and GST details from the product owner | [billing](platform/billing.md) |
+| Billing and payments design, P1–P15 | Approved as recommended (2026-10-27); **prices, GST details and the Razorpay account are open** (product owner) | [billing](platform/billing.md), ADRs 0014–0016 |
 | Desktop (Electron) scope | Frozen: not built or released (O15) | [SaaS operations](platform/saas-operations.md) |
 | **Tamil terminology reviewer** | **Open** — required before the first release | ADR 0008 |
 | Finance posting rules, D1–D12 | Approved as recommended (2026-10-20) | [posting rules](finance/posting-rules.md) |
@@ -1519,11 +1519,123 @@ Not verified:
 - The browser check, and a real phone.
 - GitHub Actions (nothing has been pushed).
 
+## Phase 15 — Billing and payments (2026-10-27)
+
+Approved design: [billing](platform/billing.md), P1–P15 as recommended (2026-10-27). New ADRs:
+[0014](adr/0014-payment-gateway.md) (gateway and webhooks), [0015](adr/0015-gst-invoices.md) (GST invoices) and
+[0016](adr/0016-plans-trial-and-grace.md) (plans, trial and grace). ADRs 0011 and 0013 are amended. The design's
+implementation notes are in its section 17.
+
+### Features completed
+
+- **Plans (P1, P2).** FREE (5 members, 3 farms, for new businesses), GROWER and ESTATE, with monthly and yearly
+  prices as data. Every existing farm business moved to FREE_LEGACY, with the limits it had.
+- **Trial (P3).** A new farm business gets 30 days of GROWER, once per user, with reminders 7 days and 1 day before
+  the end. Then FREE applies, and nothing recorded is hidden.
+- **Checkout (P4, P5).** An owner fills in the billing details (legal name, Indian address, optional GSTIN checked with
+  its check digit), picks a plan and period, and pays on the gateway's hosted page. Only a signed webhook activates the
+  plan.
+- **Webhooks.** The signature is checked first and each event is stored once. Events apply in order, and old state
+  changes are ignored. A failed event is kept for a replay.
+- **GST invoices (P6, P7).** CGST and SGST, or IGST, by place of supply, SAC 998314. Numbers are gapless per financial
+  year (`SF/2026-27/000041`). An invoice adds up to exactly what was paid. It cannot be changed, and it is kept 8 years
+  after a business is deleted. PDF download; credit notes for refunds. No IRN yet.
+- **Renewals and grace (P8, P9).** A failed renewal gives 14 days' grace, with emails and a banner, then the business
+  falls back to its free plan's limits. Paying later reactivates the plan. There is no suspension for non-payment.
+- **Changes (P10, P11).** An upgrade for the same period is charged pro rata through a payment link. A downgrade or a
+  change of period waits for the renewal. Cancelling keeps the plan until the end of the paid period. Asking for
+  deletion ends the subscription at once.
+- **Console Billing tab (P12).** Subscriptions by state, extending a trial or grace, comps, refunds with credit notes,
+  re-sending invoices, prices with 30 days' notice (emailed to subscribers), events that did not apply with replay, and
+  the nightly reconciliation (alerts only, never changes anything).
+- **Record in my books (P13).** On request, a posted supplier bill from SmartFarm360 under the new system category
+  *Software and subscriptions*, paid from a chosen account, once per invoice.
+- **Phone (P14).** The plan and the banner, with a line saying the plan is managed on the web. There is no purchase in
+  the app.
+- **Emails** in English and Tamil: trial ending and ended, payment received, renewal failed, grace ending, plan lapsed,
+  price change, refund.
+- **Production settings** refuse the fake gateway, Razorpay test keys, a missing webhook secret and a missing or
+  invalid seller GSTIN.
+
+### Database migrations
+
+`017-billing.yaml`:
+
+- **058** schema: plan prices, tax rates, subscriptions and their events, billing details, trials used, gateway plans,
+  gateway events, payments, document counters, invoices and lines, credit notes, reconciliation runs. It also adds RLS:
+  the standard policy on the tenant tables, and `sf_customer_isolation` on the billing documents. A trigger keeps
+  issued documents immutable.
+- **059** seed: the plans and their limits; existing businesses to FREE_LEGACY; example prices; GST rates;
+  `BILLING_VIEW` (owner, accountant) and `BILLING_MANAGE` (owner); the *Software and subscriptions* category.
+
+Changeset 058 was corrected before its first run: the trigger function needed its own SQL block. The migrations were
+applied to the local database on 2026-10-27, after a `pg_dump` backup (`smartfarm360-before-phase15.backup`, 104
+tables).
+
+### APIs added
+
+| Area | Endpoints (under `/api/v1`) |
+|---|---|
+| Farm business | `GET /tenants/{t}/billing`; `GET`, `PUT /billing/profile`; `POST /billing/checkout`, `/billing/change`, `/billing/cancel`; `GET /billing/invoices`, `/billing/invoices/{id}/pdf`, `/billing/invoices/{id}/credit-notes/{cn}/pdf`; `POST /tenants/{t}/finance/subscription-invoices/{id}/book` |
+| Public | `POST /billing/webhooks/{gateway}` (signed) |
+| Platform | `GET /platform/billing`, `/subscriptions`, `/payments`, `/invoices`, `/prices`, `/reconciliation`; `POST /payments/{id}/refund`, `/invoices/{id}/resend`, `/tenants/{id}/trial`, `/tenants/{id}/grace`, `/tenants/{id}/comp/end`, `/prices`, `/reconciliation`, `/events/{id}/replay`; `PUT /tenants/{id}/comp` |
+
+### Tests and evidence
+
+| Command | Result |
+|---|---|
+| `backend: gradlew test bootJar` | Passed: **826 tests, 0 failures** (39 new, counting the cross-tenant cases the new endpoints add); the dashboard test answers in 365 ms (budget 1,000 ms) |
+| `frontend: npm run lint`, `npm test`, `npm run build` | Passed: **88 tests** (5 new); the bundle is still over 500 kB |
+| `mobile: npx tsc --noEmit`, `npm test`, `npx expo install --check` | Passed: **76 tests** (1 new); dependencies up to date |
+| `pg_dump --enable-row-security` (local backup) | 104 tables; without the flag `pg_dump` refuses tables under forced RLS, so `deploy/backup.sh` was fixed |
+| Migration on the local database | Applied (058–059) on 2026-10-27; no errors in the log; the 3 existing businesses are on FREE_LEGACY; 88 tables under a policy; health 200; an unsigned webhook is refused (400) |
+| Razorpay test mode end to end | **Not run**: it needs staging and the account |
+| Manual browser check | **Not done** (sign-in needs the owner's password) |
+
+The new backend tests are:
+
+- **`BillingTest`** (12):
+  - the trial once per user, its reminders and its end, with nothing hidden;
+  - checkout only for owners, the billing details and GSTIN checks, nothing paid before the webhook, and the gateway
+    being down;
+  - a signed charge activating the plan and issuing the GST invoice once; a bad signature, an unknown subscription and
+    repeated deliveries; immutable invoices; the PDF;
+  - IGST for another state;
+  - a failed renewal, 14 days' grace, reminders, the lapse to FREE with every record kept, and paying again;
+  - the pro-rata upgrade by payment link, and a downgrade waiting for the renewal;
+  - cancelling to the end of the period; re-subscribing stops the earlier gateway subscription; deletion ends the plan
+    at once and keeps the invoices after the final delete; no second trial;
+  - the console: refunds with credit notes and their limits, comps, trial and grace extensions with reasons, prices
+    with 30 days' notice;
+  - the reconciliation, and a failed event replayed;
+  - *Record in my books*, once, with the books balanced;
+  - isolation from other farm businesses in the API and in the database;
+  - gapless invoice numbers under 8 concurrent payments, with a rolled-back issue taking no number.
+- **`GstTest`** (6): the GSTIN check digit, CGST and SGST or IGST with rounding, invoices built from a paid total,
+  credit-note shares, financial years, and the effective plan.
+- **`LiquibaseMigrationIntegrationTest`**, one new test: existing businesses keep their limits on FREE_LEGACY, the
+  billing permissions, and the billing documents' policy.
+- The automatic cross-tenant test covers every new tenant endpoint.
+
+Existing tests changed with the approved design:
+
+- `ProductionSettingsTest` and `EmailTemplatesTest` gained the billing settings and the new email parameters.
+- The migration test lists changesets 058–059 and the new tables.
+
+Nothing was removed from these tests.
+
+Not verified: the real gateway, the browser check, a real phone, and GitHub Actions (nothing has been pushed).
+
 ## Known gaps and defects
 
 Security and platform:
 - **Fixed in Phase 14:** two open tabs signing each other out (the 30-second refresh grace), rate limits in memory (now
   in PostgreSQL), Row-Level Security (ADR 0011), and account deletion and tenant export (O9–O11).
+- **Fixed in Phase 15:** `deploy/backup.sh` would have failed every night under the forced RLS policies, because
+  `pg_dump` refuses such tables unless it is given `--enable-row-security`. It was found while backing up the local
+  database; with no tenant scope set the policy shows every row, so the dump is complete.
+- **Billing has not met the real gateway:** Razorpay is called only through its documented API; the end-to-end run in
+  test mode needs staging and the account.
 - **No email provider chosen yet:** the SMTP sender is built, but until `SPRING_MAIL_HOST` is set emails are only logged
   (production refuses to start without it).
 - **Nothing is hosted yet:** the image, Compose set-up, backups, restore test, alerts and load tests are written but not run

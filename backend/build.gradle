@@ -31,6 +31,8 @@ dependencies {
     implementation 'org.liquibase:liquibase-core'
     // XLSX report exports (dashboard and reports design, H7); streaming writer only
     implementation 'org.apache.poi:poi-ooxml:5.4.1'
+    // GST tax invoice and credit note PDFs (billing design, P6)
+    implementation 'com.github.librepdf:openpdf:2.0.3'
     runtimeOnly 'org.postgresql:postgresql'
     compileOnly 'org.projectlombok:lombok:1.18.38'
     annotationProcessor 'org.projectlombok:lombok:1.18.38'

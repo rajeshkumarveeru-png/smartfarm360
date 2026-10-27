@@ -48,6 +48,11 @@ public abstract class EmbeddedPostgresSupport {
         registry.add("spring.datasource.password", () -> APP_ROLE);
         registry.add("app.bootstrap-admin.enabled", () -> "false");
         registry.add("app.auth.jwt-secret", () -> "test-only-signing-secret-at-least-32-bytes!!");
+        // The platform entity printed on test invoices (Tamil Nadu) and the fake gateway's webhook secret (billing design)
+        registry.add("app.billing.seller.name", () -> "SmartFarm360 Test Private Limited");
+        registry.add("app.billing.seller.gstin", () -> "33AABCS1234A1Z8");
+        registry.add("app.billing.seller.address", () -> "1 Test Street, Coimbatore, Tamil Nadu 641001");
+        registry.add("app.billing.webhook-secret", () -> "test-webhook-secret-0123456789");
     }
 
     /** Creates a separate, empty database on the same server (for migration scenarios that must not share state). */

@@ -35,3 +35,12 @@
 - A new tenant table is exported and deleted with no change here, as long as it has a `tenant_id`.
 - Keeping books for tax purposes is the owner's responsibility. The deletion request says so and offers the export.
 - The append-only guarantee of ADR 0004 and ADR 0005 has exactly one exception: the deletion of a whole farm business.
+
+## Amendment (2026-10-27, billing design, P6 and P11)
+
+- Asking for a farm business's deletion ends its subscription at once, and the gateway is told to stop charging.
+  Cancelling the deletion does not restore the subscription.
+- The final deletion removes the subscription, its events and the billing details with the other tenant tables. The
+  business's payments, invoices and credit notes stay for 8 years, as GST law requires (ADR 0015). They hold the buyer's
+  name, address, GSTIN and invoice email as printed; the privacy notice must say so.
+- `sf_trials_used` stays too, so deleting and recreating a business does not start another trial.

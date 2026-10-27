@@ -28,7 +28,15 @@ public interface EmailSender {
         SUPPORT_ACCESS_GRANTED("supportAccessGranted"),
         ADMIN_SIGN_IN("adminSignIn"),
         ACCOUNT_DELETED("accountDeleted"),
-        OPS_ALERT("opsAlert");
+        OPS_ALERT("opsAlert"),
+        TRIAL_ENDING("trialEnding"),
+        TRIAL_ENDED("trialEnded"),
+        PAYMENT_RECEIVED("paymentReceived"),
+        RENEWAL_FAILED("renewalFailed"),
+        GRACE_ENDING("graceEnding"),
+        PLAN_LAPSED("planLapsed"),
+        PRICE_CHANGE("priceChange"),
+        REFUND_ISSUED("refundIssued");
 
         public final String key;
 
