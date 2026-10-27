@@ -69,4 +69,29 @@ class ProductionSettingsTest {
         }
         assertThat(problems(safe(), true)).singleElement().asString().contains("superuser").contains("Row-Level Security");
     }
+
+    @Test
+    void stagingTakesOnlyTestPaymentsOnAStagingAddress() {
+        Map<String, String> p = safe();
+        p.put("app.environment", "staging");
+        p.put("app.auth.public-web-url", "https://staging.smartfarm360.example");
+        p.put("app.billing.razorpay.key-id", "rzp_test_0123456789");
+        assertThat(problems(p, false)).isEmpty();
+
+        Map<String, String> live = new HashMap<>(p);
+        live.put("app.billing.razorpay.key-id", "rzp_live_0123456789");
+        assertThat(problems(live, false)).singleElement().asString().contains("test key").contains("staging");
+
+        Map<String, String> productionAddress = new HashMap<>(p);
+        productionAddress.put("app.auth.public-web-url", "https://app.smartfarm360.example");
+        assertThat(problems(productionAddress, false)).singleElement().asString().contains("APP_PUBLIC_WEB_URL").contains("staging");
+
+        Map<String, String> other = new HashMap<>(p);
+        other.put("app.environment", "demo");
+        assertThat(problems(other, false)).singleElement().asString().contains("APP_ENVIRONMENT");
+
+        Map<String, String> production = new HashMap<>(p);
+        production.put("app.environment", "production");
+        assertThat(problems(production, false)).singleElement().asString().contains("live key");
+    }
 }

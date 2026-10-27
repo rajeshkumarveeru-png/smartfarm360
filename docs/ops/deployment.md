@@ -1,6 +1,8 @@
 # Deployment (SaaS operations design, sections 3–5)
 
 The reference set-up is provider-neutral. The product owner chooses the provider (O1); this page does not name one.
+Start with staging: [staging.md](staging.md) lists what is ready, what only the product owner can do, and the checks to
+pass before production.
 
 ## What to create (once per environment: staging, then production)
 
@@ -16,7 +18,8 @@ The reference set-up is provider-neutral. The product owner chooses the provider
 
 ## First start
 
-1. On the server, check out the release tag and fill in the settings:
+1. On the server, check out the release tag and fill in the settings. The image comes from the registry: a `v*` tag
+   publishes `ghcr.io/<owner>/smartfarm360:<version>` (`.github/workflows/release.yml`).
    - copy `deploy/env.example` to `deploy/.env` and fill it in (`chmod 600`);
    - generate the secrets with `openssl rand`, as the comments say.
 2. For the very first start only:

@@ -2,8 +2,9 @@
 
 ## Current state
 
-- **Phase:** 15 (billing and payments) built on branch `feature/phase-15-billing` (based on
-  `feature/phase-14-saas-ops`). Nothing is pushed yet.
+- **Phase:** 15 (billing and payments) built, plus staging readiness (rehearsed locally in production mode), on
+  branch `feature/staging-readiness` (based on `feature/phase-15-billing`). Nothing is pushed yet. Next: staging, as in
+  [docs/ops/staging.md](ops/staging.md).
 - **Production readiness:** not ready yet. The application side is in place and tested: production settings checks,
   RLS, two-step sign-in, support access, limits, export and deletion, consent, SMTP email, backup and restore scripts,
   and runbooks. What is left needs the real host: choose the provider, deploy staging and production from `deploy/`,
@@ -1626,6 +1627,49 @@ Nothing was removed from these tests.
 
 Not verified: the real gateway, the browser check, a real phone, and GitHub Actions (nothing has been pushed).
 
+## Staging readiness (2026-10-28)
+
+Getting staging ready without a host. Docker is not installed on this machine, so the image itself was not built.
+Instead the built jar was started locally with the `prod` profile in staging mode (ports 8082 and 8092, random
+secrets for the run, the local database, the built web app). That rehearsal found three defects, now fixed.
+
+### Found and fixed
+
+- **The home page was blank in production.** `/` answered 404: Spring's resource handler never sees an empty path,
+  so the web app was served only on deep links. `SpaConfig` now forwards `/` to `index.html`. The file lookup became a
+  testable `resolve` method, which also refuses `..`.
+- **The monitoring agent could not read metrics.** `/actuator/prometheus` on the management port answered 401, because
+  the security chain required sign-in there too. `SecurityConfig` now permits `GET /actuator/**` only on
+  `management.server.port`, which the compose file binds to `127.0.0.1`. The public port still answers 401 and Caddy
+  still answers 404.
+- **Staging could not start with Razorpay test keys.** The `prod` profile refused them, while the deployment page said
+  staging uses them. The new `APP_ENVIRONMENT` setting takes `production` (the default) or `staging`:
+  - staging requires a test key (`rzp_test_`) and a public address whose host name contains `staging`, so production
+    cannot be switched to test payments by this setting alone;
+  - production still refuses test keys;
+  - any other value is refused.
+
+### Added
+
+- `.github/workflows/release.yml`: a `v*` tag builds, scans (Trivy, critical findings that have a fix) and publishes
+  `ghcr.io/<owner>/smartfarm360:<version>`. Before this, CI built the image but published it nowhere.
+- `docs/ops/staging.md`: what is ready, the steps only the product owner can take, how to start staging, and the
+  checks before production. Linked from `deployment.md`.
+- `deploy/env.example`: `APP_ENVIRONMENT`; the image tag example is now `0.15.0`.
+
+### Tests and evidence
+
+| Command | Result |
+|---|---|
+| `backend: gradlew test bootJar` | Passed: **831 tests, 0 failures** (5 new: `ProductionSettingsTest` staging case, `SpaConfigTest` 2, `WebAppServingTest` 2) |
+| Rehearsal: jar with `prod` and `APP_ENVIRONMENT=staging` | Started in 16 s with JSON logs and no errors. Unsafe settings check passed. `/`, `/t/x/settings` and the hashed bundle answer 200; a missing asset 404; `/api/v1/announcements` 200; unsigned webhook 400; `/actuator/prometheus` 401 on the public port and 200 on the management port; readiness 200; `/v3/api-docs` serves only the web app (springdoc is off) |
+| `docker build`, the release workflow, Caddy | **Not run**: no Docker here, and nothing is pushed |
+
+Frontend and mobile are unchanged since Phase 15 (88 and 76 tests), so they were not re-run.
+
+Not done (needs the product owner): the provider and the staging resources, DNS, the email provider, the Razorpay test
+account and seller details, pushing `main` and the first tag, and then the checks in `docs/ops/staging.md`.
+
 ## Known gaps and defects
 
 Security and platform:
@@ -1634,6 +1678,8 @@ Security and platform:
 - **Fixed in Phase 15:** `deploy/backup.sh` would have failed every night under the forced RLS policies, because
   `pg_dump` refuses such tables unless it is given `--enable-row-security`. It was found while backing up the local
   database; with no tenant scope set the policy shows every row, so the dump is complete.
+- **Fixed in staging readiness:** in production the root address answered 404, metrics on the management port
+  answered 401, and staging could not start with Razorpay test keys (found by running the jar in production mode).
 - **Billing has not met the real gateway:** Razorpay is called only through its documented API; the end-to-end run in
   test mode needs staging and the account.
 - **No email provider chosen yet:** the SMTP sender is built, but until `SPRING_MAIL_HOST` is set emails are only logged

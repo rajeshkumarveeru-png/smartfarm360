@@ -6,10 +6,11 @@ import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.lang.NonNull;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
+import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.resource.PathResourceResolver;
 
-import java.io.IOException;
+import java.io.File;
 
 /**
  * Serves the built web app from {@code app.web.static-dir} at the same address as the API (SaaS operations design, O2).
@@ -23,18 +24,32 @@ public class SpaConfig implements WebMvcConfigurer {
     public SpaConfig(@Value("${app.web.static-dir:}") String dir) { this.dir = dir == null ? "" : dir.trim(); }
 
     @Override
+    public void addViewControllers(@NonNull ViewControllerRegistry registry) {
+        // The resource handler never sees an empty path, so the root is forwarded to the app explicitly
+        if (!dir.isEmpty()) registry.addViewController("/").setViewName("forward:/index.html");
+    }
+
+    @Override
     public void addResourceHandlers(@NonNull ResourceHandlerRegistry registry) {
         if (dir.isEmpty()) return;
         String root = dir.endsWith("/") ? dir : dir + "/";
         registry.addResourceHandler("/**").addResourceLocations("file:" + root).resourceChain(true)
                 .addResolver(new PathResourceResolver() {
                     @Override
-                    protected Resource getResource(@NonNull String path, @NonNull Resource location) throws IOException {
-                        if (path.startsWith("api/") || path.startsWith("actuator")) return null;
-                        Resource file = location.createRelative(path);
-                        if (file.exists() && file.isReadable()) return file;
-                        return path.contains(".") ? null : new FileSystemResource(root + "index.html");
+                    protected Resource getResource(@NonNull String path, @NonNull Resource location) {
+                        return resolve(root, path);
                     }
                 });
+    }
+
+    /**
+     * The file for a request path, {@code index.html} for an app route (including the root, which is a directory), or
+     * null for the API, the actuator and a missing file such as an old asset.
+     */
+    static Resource resolve(String root, String path) {
+        if (path.startsWith("api/") || path.startsWith("actuator") || path.contains("..")) return null;
+        File file = new File(root, path);
+        if (!path.isEmpty() && file.isFile() && file.canRead()) return new FileSystemResource(file);
+        return path.contains(".") ? null : new FileSystemResource(root + "index.html");
     }
 }

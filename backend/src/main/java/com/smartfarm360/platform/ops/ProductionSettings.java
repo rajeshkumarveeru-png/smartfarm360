@@ -1,6 +1,7 @@
 package com.smartfarm360.platform.ops;
 
 import com.smartfarm360.platform.billing.Gst;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -34,7 +35,19 @@ public final class ProductionSettings {
         if (value(property, "app.billing.razorpay.key-id").isBlank() || value(property, "app.billing.razorpay.key-secret").isBlank()) {
             out.add("APP_BILLING_RAZORPAY_KEY_ID and APP_BILLING_RAZORPAY_KEY_SECRET must be set (billing design, P4)");
         }
-        if (value(property, "app.billing.razorpay.key-id").startsWith("rzp_test_")) out.add("APP_BILLING_RAZORPAY_KEY_ID must be a live key in the prod profile, not a test key");
+        String environment = value(property, "app.environment");
+        boolean testKey = value(property, "app.billing.razorpay.key-id").startsWith("rzp_test_");
+        if (environment.isEmpty() || "production".equalsIgnoreCase(environment)) {
+            if (testKey) out.add("APP_BILLING_RAZORPAY_KEY_ID must be a live key in the prod profile, not a test key");
+        } else if ("staging".equalsIgnoreCase(environment)) {
+            // Staging takes test payments only, and must not pass for production by its address
+            if (!testKey) out.add("APP_BILLING_RAZORPAY_KEY_ID must be a Razorpay test key (rzp_test_) when APP_ENVIRONMENT is staging");
+            if (!host(value(property, "app.auth.public-web-url")).contains("staging")) {
+                out.add("APP_PUBLIC_WEB_URL must be a staging address (its host name contains \"staging\") when APP_ENVIRONMENT is staging");
+            }
+        } else {
+            out.add("APP_ENVIRONMENT must be production or staging");
+        }
         if (value(property, "app.billing.webhook-secret").length() < 16) out.add("APP_BILLING_WEBHOOK_SECRET must be set (at least 16 characters)");
         if (!Gst.validGstin(value(property, "app.billing.seller.gstin").toUpperCase())) out.add("APP_BILLING_SELLER_GSTIN must be the platform entity's valid GSTIN (billing design, P6)");
         if (value(property, "app.billing.seller.name").isBlank() || value(property, "app.billing.seller.address").isBlank()) {
@@ -49,6 +62,15 @@ public final class ProductionSettings {
             return !base64.isBlank() && Base64.getDecoder().decode(base64.trim()).length == 32;
         } catch (IllegalArgumentException e) {
             return false;
+        }
+    }
+
+    private static String host(String url) {
+        try {
+            String host = URI.create(url).getHost();
+            return host == null ? "" : host.toLowerCase();
+        } catch (IllegalArgumentException e) {
+            return "";
         }
     }
 

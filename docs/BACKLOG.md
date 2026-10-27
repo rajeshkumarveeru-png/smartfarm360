@@ -103,3 +103,12 @@ Left for later: foreign customers and export invoices (LUT); e-invoicing (IRN) a
 per-seat pricing; coupons and referrals; usage-based charges; pro-rated switches between monthly and yearly; a Tamil
 page in the invoice PDF (needs a PDF library with Tamil shaping); input-tax (GST) accounts in the farm's own books, so
 *Record in my books* can split the GST; Play billing in the phone app.
+
+## Staging readiness (2026-10-28)
+
+Rehearsed locally in production mode; see [staging](ops/staging.md). Waiting for the product owner:
+
+- choose the provider and create the staging resources (database, server, backup bucket), DNS and the email provider;
+- a Razorpay test account and the seller's name, address and GSTIN;
+- push `main` and tag `v0.15.0`, so the release workflow publishes the image;
+- then the checks in [staging](ops/staging.md), and production the same way.

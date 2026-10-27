@@ -40,7 +40,8 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, AccessTokenAuthenticationConverter converter,
-                                            ProblemAuthenticationHandlers handlers) throws Exception {
+                                            ProblemAuthenticationHandlers handlers,
+                                            @Value("${management.server.port:-1}") int managementPort) throws Exception {
         http.csrf(csrf -> csrf.disable()) // no cookie-authenticated endpoints except refresh/logout, which need REFRESH_HEADER
             .cors(Customizer.withDefaults())
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -60,6 +61,9 @@ public class SecurityConfig {
                 .requestMatchers(r -> "GET".equals(r.getMethod()) && !r.getRequestURI().startsWith("/api/")
                         && !r.getRequestURI().startsWith("/actuator") && !r.getRequestURI().startsWith("/v3/")).permitAll()
                 .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
+                // Metrics for the monitoring agent, only on the separate management port bound to the server itself (O4)
+                .requestMatchers(r -> managementPort > 0 && r.getLocalPort() == managementPort
+                        && "GET".equals(r.getMethod()) && r.getRequestURI().startsWith("/actuator/")).permitAll()
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/error").permitAll()
                 .requestMatchers("/api/v1/platform/**").hasRole("PLATFORM_ADMIN")
                 .anyRequest().authenticated())
