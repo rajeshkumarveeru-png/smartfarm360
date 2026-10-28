@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useParams } from 'react-router-dom';
 import './i18n';
 import './styles.css';
+import './theme.css';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import Layout from './components/Layout';
 import { Loading } from './components/common';

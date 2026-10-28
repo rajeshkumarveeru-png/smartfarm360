@@ -32,3 +32,17 @@ export const today = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
+
+/** Short rupee amounts for chart axes and summaries (₹1.2L, ₹45K); full amounts stay in the tables. */
+export function formatMoneyCompact(value: number | string | null | undefined, lang: Lang): string {
+  const n = Number(value ?? 0);
+  return new Intl.NumberFormat(locale(lang), { style: 'currency', currency: 'INR', notation: 'compact', maximumFractionDigits: 1 })
+    .format(Number.isFinite(n) ? n : 0);
+}
+
+/** A month (YYYY-MM) as a short name, with the year when asked ("Jan 2026"). */
+export function formatMonth(value: string, lang: Lang, withYear = false): string {
+  const date = new Date(`${value}-01T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat(locale(lang), withYear ? { month: 'short', year: 'numeric' } : { month: 'short' }).format(date);
+}

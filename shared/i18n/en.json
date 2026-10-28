@@ -2265,7 +2265,10 @@
       "HARVEST_OVERDUE": "{{count}} pond crops are past their planned harvest",
       "ORGANIC_OVERDUE": "{{count}} compost batches are past their ready date",
       "PROCESSING_OVERDUE": "{{count}} processing batches are past their expected end"
-    }
+    },
+    "noTrend": "No income or costs are recorded in these 12 months yet. Record a sale or an expense to see the trend.",
+    "attentionCount": "{{count}} items need attention",
+    "allClearHelp": "Dues, stock, workers and assets are all in order."
   },
   "livestock": {
     "report": {

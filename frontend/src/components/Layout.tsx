@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LogOut, ShieldCheck, Sprout, UserRound } from 'lucide-react';
+import { ChartColumn, Factory, Fish, HardHat, LayoutDashboard, Leaf, LogOut, Map as MapIcon, Milk, Package, ScrollText, Settings, ShieldCheck, Sprout,
+  Tractor, UserRound, UsersRound, Wallet, type LucideIcon } from 'lucide-react';
 import { api } from '../api/client';
 import type { Announcement } from '../api/types';
 import { currentLanguage } from '../i18n';
@@ -18,6 +19,12 @@ export function AnnouncementBanner() {
   useEffect(() => { api<Announcement[]>('/api/v1/announcements').then(setItems).catch(() => setItems([])); }, []);
   return <>{items.map(a => <div key={a.id} className={a.maintenance ? 'error-banner' : 'info-banner'} role="status">{lang === 'ta' ? a.messageTa : a.messageEn}</div>)}</>;
 }
+
+/** An icon for each section of the menu (presentation only; the sections and their permissions come from NAV_ITEMS). */
+const NAV_ICONS: Record<string, LucideIcon> = {
+  dashboard: LayoutDashboard, farms: MapIcon, crops: Sprout, livestock: Milk, aquaculture: Fish, organic: Leaf, processing: Factory, finance: Wallet,
+  stock: Package, workforce: HardHat, assets: Tractor, reports: ChartColumn, members: UsersRound, audit: ScrollText, settings: Settings,
+};
 
 export default function Layout() {
   const { t } = useTranslation();
@@ -44,11 +51,14 @@ export default function Layout() {
           </select>
         </label>
         <nav aria-label={t('nav.menu')}>
-          {tenant && items.map(item => (
-            <NavLink key={item.key} to={`/t/${tenant.id}/${item.path}`} className={({ isActive }) => `side-link${isActive ? ' active' : ''}`}>
-              {t(`nav.${item.key}`)}
-            </NavLink>
-          ))}
+          {tenant && items.map(item => {
+            const Icon = NAV_ICONS[item.key] ?? LayoutDashboard;
+            return (
+              <NavLink key={item.key} to={`/t/${tenant.id}/${item.path}`} className={({ isActive }) => `side-link${isActive ? ' active' : ''}`}>
+                <Icon size={17} aria-hidden />{t(`nav.${item.key}`)}
+              </NavLink>
+            );
+          })}
           {user?.platformAdmin && (
             <NavLink to="/platform" className={({ isActive }) => `side-link${isActive ? ' active' : ''}`}>
               <ShieldCheck size={16} aria-hidden />{t('nav.platform')}

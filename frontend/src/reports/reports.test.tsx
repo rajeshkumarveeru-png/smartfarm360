@@ -57,6 +57,15 @@ describe('dashboard and reports web', () => {
     expect(apiMock.mock.calls[0][0]).toMatch(/^\/api\/v1\/tenants\/9\/dashboard\?asOf=/);
   });
 
+  it('shows placeholders while loading, and an error that can be retried', async () => {
+    apiMock.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(dashboard);
+    renderAt('/t/9/dashboard', <DashboardPage />, '/t/:tenantId/dashboard');
+    expect(screen.getByRole('status')).toHaveTextContent('Loading');
+    await userEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+    expect(await screen.findByText('₹1,30,000.00', { selector: 'b' })).toBeInTheDocument();
+    expect(apiMock).toHaveBeenCalledTimes(2);
+  });
+
   it('shows no money tiles when the server leaves them out for the role', async () => {
     tenant.permissions = ['TENANT_READ', 'CROP_READ'];
     apiMock.mockResolvedValue({ ...dashboard, money: null, trend: null, attention: [] });

@@ -1670,6 +1670,72 @@ Frontend and mobile are unchanged since Phase 15 (88 and 76 tests), so they were
 Not done (needs the product owner): the provider and the staging resources, DNS, the email provider, the Razorpay test
 account and seller details, pushing `main` and the first tag, and then the checks in `docs/ops/staging.md`.
 
+## UI refresh (2026-10-28)
+
+The look of the web app was redesigned. Only the frontend changed: no backend, API, permission, route or business-rule
+changes, and no new features.
+
+### What changed
+
+- **Design system:** `frontend/src/theme.css`, loaded after `styles.css`. It defines tokens for colour, type, radius,
+  shadow and motion, then restyles the shared classes every screen already uses, so all modules change together without
+  edits to their markup:
+  - the shell: a deep charcoal sidebar with an accent bar on the active item, and a sticky frosted top bar;
+  - buttons (`primary`, `secondary`, `danger`, `icon-button`) with hover, press, focus and disabled states;
+  - cards and panels;
+  - KPI cards;
+  - form fields, with hover, focus ring, invalid and disabled states;
+  - tabs, with an animated underline;
+  - tables, with uppercase headers and row hover;
+  - status and stage badges;
+  - info, error and warning banners;
+  - empty states, disclosure triangles, the sign-in pages and the busy toast.
+
+  `prefers-reduced-motion` turns the animations and hover movement off. Print keeps its plain layout.
+- **Sidebar:** an icon for each section (`Layout.tsx`). Presentation only; the sections and permissions still come
+  from `NAV_ITEMS`.
+- **Dashboard:**
+  - KPI cards with icons; profit is green and a loss red; overdue money shows as a warning.
+  - The 12-month chart now spans the full card width. It had been squeezed into the narrow column of the `form-card`
+    form grid. It has rounded money axes, month names with the year, and a tooltip for each month (mouse or
+    keyboard), with the same table below it.
+  - Largest costs show their existing share as a bar.
+  - Attention items have an icon for each area.
+  - Crops in the field show a stage badge.
+  - Loading shows skeleton placeholders, and an error has *Retry*.
+  - Same data, links and permissions as before.
+- **Strings:** three new dashboard strings, in English and Tamil:
+  - the chart's message when nothing is recorded;
+  - the attention count's label;
+  - the all-clear help text.
+
+### Tests and evidence
+
+| Command | Result |
+|---|---|
+| `frontend: npm run lint` | Passed |
+| `frontend: npx tsc --noEmit` | Passed |
+| `frontend: npm test` | Passed: **89 tests** (1 new: dashboard loading and retry) |
+| `frontend: npm run build` | Passed; the bundle is still over 500 kB (known) |
+| `mobile: npx tsc --noEmit`, `npm test` (shared strings changed) | Passed: **76 tests** |
+| Browser, sign-in page at 1024 px and 375 px | New styling applied; no horizontal scroll at phone width |
+| Browser, signed-in screens | **Not reviewed**: the browser pane had no signed-in session |
+
+### Left for later
+
+These are visual items not done, and features that were deliberately not added:
+
+- Screens with their own one-off markup (for example the platform console tabs and long finance forms) were restyled
+  only through the shared classes. They have not been reviewed screen by screen.
+- Confirmations still use the browser's `window.confirm` (30 places). A styled dialog would change the tests that rely
+  on it.
+- The phone app (Expo) is unchanged.
+- Possible features, not built:
+  - a dashboard *as of* date picker (the API already accepts `asOf`);
+  - quick actions on the dashboard;
+  - turning chart series on and off;
+  - 12-month totals.
+
 ## Known gaps and defects
 
 Security and platform:
