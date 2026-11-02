@@ -714,19 +714,32 @@ public class DocumentService {
             left join sf_parties p on p.id = d.party_id and p.tenant_id = d.tenant_id
             left join sf_financial_accounts f on f.id = d.financial_account_id and f.tenant_id = d.tenant_id""";
 
+    /**
+     * Records, newest first. {@code farmId} keeps the records of one farm: those whose header or any line names it, the same
+     * rule the reports use when they post by farm. {@code costObjectId} keeps the records with a line booked to that activity
+     * (a crop cycle, herd, pond crop or batch).
+     */
     @Transactional(readOnly = true)
-    public PageResponse<DocumentSummary> list(TenantContext ctx, String type, String status, Long partyId, LocalDate from, LocalDate to,
-                                              int page, int size) {
+    public PageResponse<DocumentSummary> list(TenantContext ctx, String type, String status, Long partyId, Long farmId, Long costObjectId,
+                                              LocalDate from, LocalDate to, int page, int size) {
         PageResponse.check(page, size);
+        if (farmId != null) master.requireFarm(ctx.tenantId(), farmId);
+        if (costObjectId != null) master.requireCostObject(ctx.tenantId(), costObjectId);
         String where = """
                  where d.tenant_id = :t and (cast(:type as varchar) is null or d.doc_type = :type)
                    and (cast(:status as varchar) is null or d.status = :status) and (cast(:party as bigint) is null or d.party_id = :party)
-                   and (cast(:from as date) is null or d.doc_date >= :from) and (cast(:to as date) is null or d.doc_date <= :to)""";
+                   and (cast(:from as date) is null or d.doc_date >= :from) and (cast(:to as date) is null or d.doc_date <= :to)
+                   and (cast(:farm as bigint) is null or d.farm_id = :farm or exists (select 1 from sf_finance_document_lines fl
+                        where fl.document_id = d.id and fl.tenant_id = d.tenant_id and fl.farm_id = :farm))
+                   and (cast(:co as bigint) is null or exists (select 1 from sf_finance_document_lines cl
+                        where cl.document_id = d.id and cl.tenant_id = d.tenant_id and cl.cost_object_id = :co))""";
         Map<String, Object> params = new HashMap<>();
         params.put("t", ctx.tenantId());
         params.put("type", type);
         params.put("status", status);
         params.put("party", partyId);
+        params.put("farm", farmId);
+        params.put("co", costObjectId);
         params.put("from", from);
         params.put("to", to);
         long total = jdbc.sql("select count(*) from sf_finance_documents d " + where).params(params).query(Long.class).single();

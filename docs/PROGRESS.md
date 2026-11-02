@@ -1736,6 +1736,82 @@ These are visual items not done, and features that were deliberately not added:
   - turning chart series on and off;
   - 12-month totals.
 
+## Farm and crop-cycle workspaces, colour and glass design (2026-11-02)
+
+Asked for: an international-standard look across the app, and simple farm-wise money: open a farm and manage its
+expenses there.
+
+### Farm workspace
+
+- **Farms page:** each farm is a card that opens the farm, showing its type as a badge and its place. Land parcels moved
+  into the farm.
+- **Farm page** (`/t/{tenant}/farms/{farm}`, `FarmPage.tsx`):
+  - the farm's income, costs and profit for a chosen period (quick ranges, the financial year by default);
+  - where the money goes (costs by category, with share bars);
+  - the records booked to the farm, with *Show more*;
+  - its land parcels, with *Add land parcel*.
+  - *Add expense* and *Record sale* open the usual forms with the farm already chosen.
+  - People without finance access see the land and a note, and no money.
+- **Expense and sale form:** a new *Farm* field, filled from `?farm=` and kept when a draft is edited. *Whole business* is
+  the default, as before.
+- **Backend, one addition:** `GET /finance/documents?farmId=` lists a farm's records. A record belongs to a farm when its
+  header or any line names that farm, the same rule the reports already use when they post by farm. Another tenant's
+  farm answers 404 `FARM_NOT_FOUND`. No schema change: documents and lines already had `farm_id`, and the
+  income-statement and category reports already took `farmId`.
+
+### Crop-cycle expenses, and fixing mistakes
+
+- **Crop cycle page:** a new *Expenses & sales* tab. It lists the records with a line booked to the cycle. *Add expense*
+  and *Record sale* open the forms with the cycle's farm and the cycle itself already chosen (`?farm=&activity=`).
+- **Records panel** (`finance/RecordsPanel.tsx`), shared by the farm and cycle pages. Each row offers:
+  - **a draft:** *Edit draft*, and *Discard draft* (nothing was posted, so the accounts do not change);
+  - **a posted record:** *Reverse*, which posts an opposite entry, and *Correct*, which reverses the record today and
+    opens a copy to fix and save.
+
+  Posted records are never deleted: the journal is append-only (ADR 0004), and reversal is the audited way to undo a
+  mistake. Each action asks first. The buttons follow the existing permissions (`FINANCE_WRITE`, `FINANCE_REVERSE`).
+- **Record form:** `?copy=` starts from a reversed record and shows a *Correcting …* note. `?activity=` books each line
+  to that cycle.
+- **Backend:** `GET /finance/documents?costObjectId=` lists an activity's records. Another tenant's activity answers 404
+  `COST_OBJECT_NOT_FOUND`.
+
+### Design upgrade
+
+- **Font:** Inter (with Noto Sans Tamil) instead of DM Sans. DM Sans drew the rupee sign as an odd glyph. Inter's
+  figures also line up in tables.
+- **Top bar:** compact, a breadcrumb (*SMARTFARM360 / business*) instead of a large repeated title.
+- **Cards:** KPI cards fit five across on a laptop. There are new farm cards, the farm hero and records list, and a
+  lighter welcome banner.
+- **Colour and glass:** a soft multi-colour backdrop, with frosted cards, panels, tables and controls over it.
+  - Every KPI grid in the app colours its cards in turn: green, sky, amber, violet, rose and teal.
+  - Page titles use a green-to-teal gradient.
+  - Tabs are a frosted segmented control.
+  - Buttons have gradients.
+  - Print stays plain.
+- **Fields:** one style for every text field, date, number, select and textarea across the app, including fields outside
+  cards. Fields are 44 px tall with a soft inset, a hover border, a green focus glow, and invalid and disabled states.
+
+### Tests and evidence
+
+| Command | Result |
+|---|---|
+| `backend: gradlew test --tests FarmRecordsTest, CrossTenantIsolationTest, TenantEndpointInventoryTest` | Passed (FarmRecordsTest now 5 tests, 592, 2) |
+| `backend: gradlew test bootJar` | **834 of 835 passed.** `DashboardPerformanceTest` failed at 1,748 ms against its 1,000 ms budget (also 1,268 ms in an earlier full run) |
+| `DashboardPerformanceTest` alone, previous commit vs this change | 846 ms vs 754 ms: both pass, no regression. The dashboard never calls the changed records query |
+| `frontend: npm run lint`, `npx tsc --noEmit` | Passed |
+| `frontend: npm test` | Passed: **99 tests** (10 new: `farm.test.tsx` 4, `records-panel.test.tsx` 6). An earlier run during the backend suite failed one sign-in test on vitest's 5-second timeout; that file passed alone, and the full suite passed when run again |
+| `frontend: npm run build` | Passed |
+| `mobile: npm test` | Passed: **76 tests** |
+| Browser review of the signed-in screens | **Not done**: the browser pane had no signed-in session |
+
+The dashboard performance budget is now tight on this machine when it is busy. The shared machine was running IntelliJ,
+three Gradle daemons, another project's app on port 8091 and the IDE backend. Phase 15's full run measured 365 ms. Re-check
+it on CI or a quiet machine; the test was not relaxed.
+
+The farm records list needs the new backend. A backend started before this change ignores `farmId` and would list
+every record on the farm page, so restart it.
+
+
 ## Known gaps and defects
 
 Security and platform:

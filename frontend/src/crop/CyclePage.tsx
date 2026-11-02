@@ -16,8 +16,9 @@ import { baseUnitLabel, isQuantity, unitChoices } from '../stock/types';
 import type { Activity, Cycle, CycleReport, Harvest, Observation } from './types';
 import { ACTIVITY_TYPES, OBSERVATION_KINDS, SEVERITIES } from './types';
 import { ExportBar } from '../reports/ReportTools';
+import RecordsPanel from '../finance/RecordsPanel';
 
-type Tab = 'activities' | 'harvests' | 'observations';
+type Tab = 'activities' | 'money' | 'harvests' | 'observations';
 type Input = { itemId: string; quantity: string; unit: string; lotNo: string };
 
 /** One cultivation cycle: stage, figures and its field records (crop design, sections 3–8). */
@@ -77,6 +78,7 @@ export default function CyclePage() {
   if (!cycle) return error ? <ErrorBanner message={error} /> : <Loading />;
   const open = cycle.status !== 'CLOSED' && cycle.status !== 'CANCELLED';
   const canRecord = can(tenant, 'CROP_ACTIVITY_WRITE') && open;
+  const canMoney = can(tenant, 'FINANCE_READ');
   const canWrite = can(tenant, 'CROP_WRITE');
   const canReverse = can(tenant, 'FINANCE_REVERSE');
   const canSeeFinance = can(tenant, 'FINANCE_READ');
@@ -145,10 +147,13 @@ export default function CyclePage() {
       )}
 
       <div className="crop-tabs section-space" role="tablist">
-        {(['activities', 'harvests', 'observations'] as Tab[]).map(x => (
+        {(['activities', 'money', 'harvests', 'observations'] as Tab[]).filter(x => x !== 'money' || (canMoney && cycle.costObjectId)).map(x => (
           <button key={x} role="tab" aria-selected={tab === x} className={tab === x ? 'active' : ''} onClick={() => { setTab(x); setForm(''); }}>{t(x)}</button>
         ))}
       </div>
+      {tab === 'money' && cycle.costObjectId && (
+        <RecordsPanel filter={`costObjectId=${cycle.costObjectId}`} prefill={`farm=${cycle.farmId}&activity=${cycle.costObjectId}`} title={t('moneyTitle')} />
+      )}
       {tab === 'activities' && <>
         {canRecord && form !== 'activity' && <button type="button" className="primary" onClick={() => setForm('activity')}><Plus size={16} aria-hidden />{t('logActivity')}</button>}
         {form === 'activity' && <ActivityForm cycle={cycle} onDone={warnings => { setForm(''); setNotice(warnings.length ? ts('warning.LOT_EXPIRED', { item: warnings[0].split(':')[1], lot: warnings[0].split(':')[2] }) : ''); void load(); }}

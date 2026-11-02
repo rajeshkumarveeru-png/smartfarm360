@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Plus, Trash2 } from 'lucide-react';
 import { api } from '../api/client';
-import type { Page } from '../api/types';
+import type { Farm, Page } from '../api/types';
 import { useTenant } from '../auth/useCurrentTenant';
 import { ErrorBanner, Loading } from '../components/common';
 import { currentLanguage, useNs } from '../i18n';
@@ -49,11 +49,26 @@ function useStockChoices() {
   return state;
 }
 
+/** The tenant's active farms, so a bill or sale can be booked to one (empty without FARM_READ). */
+function useFarmChoices(): Farm[] {
+  const tenant = useTenant();
+  const [farms, setFarms] = useState<Farm[]>([]);
+  useEffect(() => {
+    if (!can(tenant, 'FARM_READ')) return;
+    api<Farm[]>(`/api/v1/tenants/${tenant.id}/farms`).then(list => setFarms(list.filter(f => f.active))).catch(() => undefined);
+  }, [tenant]);
+  return farms;
+}
+
 export default function NewRecordPage() {
   const tenant = useTenant();
   const kind = (useParams().kind ?? 'expense') as RecordKind;
   const [search] = useSearchParams();
   const draftId = search.get('draft');
+  // A corrected copy of a reversed record starts from that record; a record opened from a crop cycle or herd is booked to it
+  const copyId = search.get('copy');
+  const activity = search.get('activity') ?? '';
+  const newLine = (): Line => ({ ...emptyLine(), costObjectId: activity });
   const navigate = useNavigate();
   const t = useNs('fin');
   const tc = useNs('common');
@@ -67,8 +82,10 @@ export default function NewRecordPage() {
   const isInvoice = kind === 'expense' || kind === 'sale';
 
   const [key, setKey] = useState(newIdempotencyKey);
-  const [form, setForm] = useState<Record<string, string>>({ docDate: today(), direction: 'IN' });
-  const [lines, setLines] = useState<Line[]>([emptyLine()]);
+  const [form, setForm] = useState<Record<string, string>>({ docDate: today(), direction: 'IN', farmId: search.get('farm') ?? '' });
+  const farms = useFarmChoices();
+  const [lines, setLines] = useState<Line[]>(() => [newLine()]);
+  const [copiedNumber, setCopiedNumber] = useState('');
   const [openingLines, setOpeningLines] = useState<OpeningLine[]>([emptyOpening()]);
   const [openDocs, setOpenDocs] = useState<DocumentSummary[]>([]);
   const [allocations, setAllocations] = useState<Record<number, string>>({});
@@ -76,17 +93,19 @@ export default function NewRecordPage() {
   const [busy, setBusy] = useState(false);
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
-  // Editing a draft bill or sale
+  // Editing a draft bill or sale, or starting a corrected copy of one
   useEffect(() => {
-    if (!draftId) return;
-    api<FinanceDocument>(`${base}/documents/${draftId}`).then(d => {
+    const sourceId = draftId ?? copyId;
+    if (!sourceId) return;
+    api<FinanceDocument>(`${base}/documents/${sourceId}`).then(d => {
+      if (!draftId) setCopiedNumber(d.summary.number ?? String(d.summary.id));
       setForm({ docDate: d.summary.docDate, dueDate: d.summary.dueDate ?? '', partyId: d.summary.partyId ? String(d.summary.partyId) : '',
-        financialAccountId: d.financialAccountId ? String(d.financialAccountId) : '', notes: d.notes ?? '', referenceNo: d.referenceNo ?? '' });
+        financialAccountId: d.financialAccountId ? String(d.financialAccountId) : '', notes: d.notes ?? '', referenceNo: d.referenceNo ?? '', farmId: d.farmId ? String(d.farmId) : '' });
       setLines(d.lines.map(l => ({ categoryId: String(l.categoryId ?? ''), description: l.description ?? '', amount: String(l.amount),
         quantity: l.quantity != null ? String(l.quantity) : '', rate: l.rate != null ? String(l.rate) : '', costObjectId: l.costObjectId ? String(l.costObjectId) : '',
         assetId: l.assetId ? String(l.assetId) : '', itemId: l.itemId ? String(l.itemId) : '', unit: l.unit ?? '', locationId: l.locationId ? String(l.locationId) : '', lotNo: l.lotNo ?? '', lotExpiry: '' })));
     }).catch(e => setError(describeError(e)));
-  }, [base, draftId]);
+  }, [base, draftId, copyId]);
 
   // Open bills/sales of the chosen party, for matching a payment or receipt
   useEffect(() => {
@@ -152,7 +171,7 @@ export default function NewRecordPage() {
     switch (kind) {
       case 'expense': case 'sale':
         return {
-          docDate: date, dueDate: form.dueDate || null, partyId: form.partyId ? Number(form.partyId) : null,
+          docDate: date, dueDate: form.dueDate || null, partyId: form.partyId ? Number(form.partyId) : null, farmId: form.farmId ? Number(form.farmId) : null,
           financialAccountId: !form.partyId && form.financialAccountId ? Number(form.financialAccountId) : null,
           lines: lines.map(l => ({ categoryId: l.categoryId && !(kind === 'expense' && l.itemId) ? Number(l.categoryId) : null, description: l.description || null,
             ...(l.quantity && l.rate ? { quantity: l.quantity, rate: l.rate } : { amount: l.amount, quantity: l.quantity || null }),
@@ -208,10 +227,13 @@ export default function NewRecordPage() {
     <>
       <div className="crop-page-head"><div><h2>{t(`kind.${kind}`)}</h2><p>{t(`help.${kind}`)}</p></div></div>
       <ErrorBanner message={error || data.error} />
+      {copiedNumber && <p className="info-banner" role="status">{t('correcting', { number: copiedNumber })}</p>}
       <form className="form-card form-grid" noValidate onSubmit={e => { e.preventDefault(); void submit(true); }}>
         <label>{t('date')}<input type="date" required value={form.docDate ?? ''} onChange={e => set('docDate', e.target.value)} /></label>
 
         {isInvoice && <>
+          {farms.length > 0 && <label>{t('farm')}<select value={form.farmId ?? ''} onChange={e => set('farmId', e.target.value)}>
+            <option value="">{t('noFarm')}</option>{farms.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</select></label>}
           <label>{t('party')} <small>{tc('optional')}</small><select value={form.partyId ?? ''} onChange={e => set('partyId', e.target.value)}>{partyOptions()}</select></label>
           {!form.partyId && <label>{kind === 'expense' ? t('paidFrom') : t('receivedInto')}<select value={form.financialAccountId ?? ''} onChange={e => set('financialAccountId', e.target.value)}>{accountOptions}</select></label>}
           {form.partyId && <label>{t('dueDate')} <small>{tc('optional')}</small><input type="date" min={form.docDate} value={form.dueDate ?? ''} onChange={e => set('dueDate', e.target.value)} /></label>}
@@ -251,7 +273,7 @@ export default function NewRecordPage() {
                 {lines.length > 1 && <button type="button" className="text-action" aria-label={tc('remove')} onClick={() => setLines(ls => ls.filter((_, j) => j !== i))}><Trash2 size={16} /></button>}
               </div>
             ))}
-            <button type="button" className="secondary" onClick={() => setLines(ls => [...ls, emptyLine()])}><Plus size={16} />{t('addLine')}</button>
+            <button type="button" className="secondary" onClick={() => setLines(ls => [...ls, newLine()])}><Plus size={16} />{t('addLine')}</button>
             <p className="total-line">{t('total')}: <b>{formatMoney(invoiceTotal, lang)}</b></p>
           </fieldset>
           {form.partyId && !draftId && <>

@@ -42,7 +42,24 @@
     "languageEn": "English",
     "setupTitle": "Your farming, organized in one place.",
     "setupIntro": "Add your farms, then record each land parcel.",
-    "deactivate": "Deactivate"
+    "deactivate": "Deactivate",
+    "open": "Open",
+    "back": "All farms",
+    "addExpense": "Add expense",
+    "recordSale": "Record sale",
+    "income": "Income",
+    "costs": "Costs",
+    "profit": "Profit",
+    "money": "Money for this farm",
+    "moneyHelp": "Expenses and sales booked to this farm, including lines booked to it on shared bills.",
+    "whereMoneyGoes": "Where the money goes",
+    "noCosts": "No costs are booked to this farm in this period.",
+    "records": "Recent records",
+    "noRecords": "No records are booked to this farm yet. Add an expense to start.",
+    "showMore": "Show more",
+    "openHint": "Open a farm to see its money, records and land.",
+    "parcels": "{{count}} land parcels",
+    "noMoneyAccess": "You can see this farm’s land. Money for the farm needs finance access."
   },
   "mobile": {
     "appName": "SmartFarm360",
@@ -1354,7 +1371,17 @@
       "stays": "stays as overhead: {{amount}}",
       "post": "Record the allocation"
     },
-    "forAsset": "For asset"
+    "forAsset": "For asset",
+    "noFarm": "Whole business (no single farm)",
+    "confirmDiscard": "Discard this draft? It was never posted, so your accounts do not change.",
+    "confirmCorrect": "Correct this record? It will be reversed today, and a copy will open for you to fix and save.",
+    "newSale": "Record sale",
+    "newExpense": "Add expense",
+    "noRecordsHere": "No money records here yet. Add an expense to start.",
+    "edit": "Edit draft",
+    "correct": "Correct (reverse and re-enter)",
+    "showMore": "Show more",
+    "correcting": "Correcting {{number}}: the original was reversed. Fix the details below and save."
   },
   "financeCategory": {
     "SEEDS": "Seeds",
@@ -1763,7 +1790,9 @@
     "errors": {
       "rainfall": "Enter rainfall in mm (up to one decimal)."
     },
-    "estimatePriceNoHarvest": "Price for unsold produce (₹, estimate)"
+    "estimatePriceNoHarvest": "Price for unsold produce (₹, estimate)",
+    "money": "Expenses & sales",
+    "moneyTitle": "Money for this cycle"
   },
   "workforce": {
     "title": "Workers & wages",

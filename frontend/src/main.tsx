@@ -19,6 +19,7 @@ import SetupPage from './crop/SetupPage';
 import WeatherPage from './crop/WeatherPage';
 import AllocationPage from './finance/AllocationPage';
 import FarmsPage from './pages/FarmsPage';
+import FarmPage from './pages/FarmPage';
 import AccountsPage from './finance/AccountsPage';
 import DocumentPage from './finance/DocumentPage';
 import FinanceHome from './finance/FinanceHome';
@@ -142,6 +143,7 @@ function App() {
             <Route path="reports/wages" element={<WagesReportPage />} />
             <Route path="reports/running-costs" element={<RunningCostsPage />} />
             <Route path="farms" element={<FarmsPage />} />
+            <Route path="farms/:farmId" element={<FarmPage />} />
             <Route path="crops" element={<CropLayout />}>
               <Route index element={<CyclesPage />} />
               <Route path="cycles/:cycleId" element={<CyclePage />} />
