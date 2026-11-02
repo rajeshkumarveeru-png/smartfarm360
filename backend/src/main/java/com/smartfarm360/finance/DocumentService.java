@@ -717,22 +717,25 @@ public class DocumentService {
     /**
      * Records, newest first. {@code farmId} keeps the records of one farm: those whose header or any line names it, the same
      * rule the reports use when they post by farm. {@code costObjectId} keeps the records with a line booked to that activity
-     * (a crop cycle, herd, pond crop or batch).
+     * (a crop cycle, herd, pond crop or batch), and {@code categoryId} those with a line in that category; given both, the same
+     * line must match both. Each record lists the categories of its lines (of the matching lines when filtered by activity).
      */
     @Transactional(readOnly = true)
     public PageResponse<DocumentSummary> list(TenantContext ctx, String type, String status, Long partyId, Long farmId, Long costObjectId,
-                                              LocalDate from, LocalDate to, int page, int size) {
+                                              Long categoryId, LocalDate from, LocalDate to, int page, int size) {
         PageResponse.check(page, size);
         if (farmId != null) master.requireFarm(ctx.tenantId(), farmId);
         if (costObjectId != null) master.requireCostObject(ctx.tenantId(), costObjectId);
+        if (categoryId != null) master.category(ctx, categoryId);
         String where = """
                  where d.tenant_id = :t and (cast(:type as varchar) is null or d.doc_type = :type)
                    and (cast(:status as varchar) is null or d.status = :status) and (cast(:party as bigint) is null or d.party_id = :party)
                    and (cast(:from as date) is null or d.doc_date >= :from) and (cast(:to as date) is null or d.doc_date <= :to)
                    and (cast(:farm as bigint) is null or d.farm_id = :farm or exists (select 1 from sf_finance_document_lines fl
                         where fl.document_id = d.id and fl.tenant_id = d.tenant_id and fl.farm_id = :farm))
-                   and (cast(:co as bigint) is null or exists (select 1 from sf_finance_document_lines cl
-                        where cl.document_id = d.id and cl.tenant_id = d.tenant_id and cl.cost_object_id = :co))""";
+                   and ((cast(:co as bigint) is null and cast(:cat as bigint) is null) or exists (select 1 from sf_finance_document_lines cl
+                        where cl.document_id = d.id and cl.tenant_id = d.tenant_id
+                          and (cast(:co as bigint) is null or cl.cost_object_id = :co) and (cast(:cat as bigint) is null or cl.category_id = :cat)))""";
         Map<String, Object> params = new HashMap<>();
         params.put("t", ctx.tenantId());
         params.put("type", type);
@@ -740,6 +743,7 @@ public class DocumentService {
         params.put("party", partyId);
         params.put("farm", farmId);
         params.put("co", costObjectId);
+        params.put("cat", categoryId);
         params.put("from", from);
         params.put("to", to);
         long total = jdbc.sql("select count(*) from sf_finance_documents d " + where).params(params).query(Long.class).single();
@@ -747,7 +751,7 @@ public class DocumentService {
         params.put("offset", (long) page * size);
         List<DocumentSummary> items = jdbc.sql(SUMMARY_SELECT + " " + where + " order by d.doc_date desc, d.id desc limit :limit offset :offset")
                 .params(params).query((rs, i) -> summary(rs)).list();
-        return PageResponse.of(items, page, size, total);
+        return PageResponse.of(withCategories(ctx.tenantId(), items, costObjectId), page, size, total);
     }
 
     @Transactional(readOnly = true)
@@ -798,6 +802,22 @@ public class DocumentService {
                 (Long) extra.get("original_document_id"), lines, allocations, stock.movements(ctx.tenantId(), id));
     }
 
+    /** The categories of each record's lines, with their amounts; only the lines of {@code costObjectId} when given. */
+    private List<DocumentSummary> withCategories(long tenantId, List<DocumentSummary> items, Long costObjectId) {
+        if (items.isEmpty()) return items;
+        Map<Long, List<LineCategory>> byDocument = new HashMap<>();
+        jdbc.sql("""
+                        select l.document_id, c.id, c.code, c.name, sum(l.amount) as amount
+                        from sf_finance_document_lines l
+                        join sf_finance_categories c on c.id = l.category_id and (c.tenant_id is null or c.tenant_id = l.tenant_id)
+                        where l.tenant_id = :t and l.document_id in (:ids) and (cast(:co as bigint) is null or l.cost_object_id = :co)
+                        group by l.document_id, c.id, c.code, c.name order by sum(l.amount) desc""")
+                .param("t", tenantId).param("ids", items.stream().map(DocumentSummary::id).toList()).param("co", costObjectId)
+                .query((rs, i) -> Map.entry(rs.getLong(1), new LineCategory(rs.getLong(2), rs.getString(3), rs.getString(4), rs.getBigDecimal(5))))
+                .list().forEach(e -> byDocument.computeIfAbsent(e.getKey(), k -> new ArrayList<>()).add(e.getValue()));
+        return items.stream().map(d -> d.withCategories(byDocument.getOrDefault(d.id(), List.of()))).toList();
+    }
+
     private static DocumentSummary summary(ResultSet rs) throws SQLException {
         DocType type = DocType.valueOf(rs.getString("doc_type"));
         BigDecimal total = rs.getBigDecimal("total_amount");
@@ -810,7 +830,7 @@ public class DocumentService {
         if (type.isInvoice() && rs.getObject("party_id") == null) { settled = total; open = BigDecimal.ZERO.setScale(2); }
         return new DocumentSummary(rs.getLong("id"), type.name(), status, rs.getString("number"), rs.getObject("doc_date", LocalDate.class),
                 rs.getObject("due_date", LocalDate.class), (Long) rs.getObject("party_id"), rs.getString("party_name"), rs.getString("fin_name"),
-                total, settled, open, paymentStatus, rs.getBoolean("needs_review"), rs.getTimestamp("created_at").toInstant());
+                total, settled, open, paymentStatus, rs.getBoolean("needs_review"), rs.getTimestamp("created_at").toInstant(), List.of());
     }
 
     // ---- Internals -----------------------------------------------------------------------------------------------

@@ -61,6 +61,40 @@ class FarmRecordsTest extends FinanceTestSupport {
     }
 
     @Test
+    void recordsShowTheirCategoriesAndFilterByCategoryWithinAnActivity() throws Exception {
+        newFinanceTenant("category-records");
+        long activity = body(get(f("/cost-objects"), owner)).get(0).get("id").asLong();
+        Map<String, Object> seedsHere = line("SEEDS", 300, activity);
+        Map<String, Object> fuelElsewhere = line("FERTILIZER", 50, null);
+        long mixed = body(post(f("/bills"), owner, Map.of("docDate", "2026-07-02", "financialAccountId", cash, "lines", List.of(seedsHere, fuelElsewhere)))
+                .andExpect(status().isCreated())).at("/summary/id").asLong();
+        long fertilizerHere = bill("2026-07-03", null, line("FERTILIZER", 70, activity));
+
+        JsonNode items = body(get(f("/documents?costObjectId=" + activity), owner).andExpect(status().isOk())).get("items");
+        JsonNode mixedRow = StreamSupport.stream(items.spliterator(), false).filter(n -> n.get("id").asLong() == mixed).findFirst().orElseThrow();
+        // Only the line booked to the activity is listed for it
+        assertThat(mixedRow.get("categories")).hasSize(1);
+        assertThat(mixedRow.at("/categories/0/code").asText()).isEqualTo("SEEDS");
+        money(mixedRow.at("/categories/0/amount"), "300");
+
+        long seeds = mixedRow.at("/categories/0/categoryId").asLong();
+        long fertilizer = categoryId("FERTILIZER");
+        assertThat(recordIds("costObjectId=" + activity + "&categoryId=" + seeds)).containsExactly(mixed);
+        assertThat(recordIds("costObjectId=" + activity + "&categoryId=" + fertilizer)).containsExactly(fertilizerHere);
+        assertThat(recordIds("categoryId=" + fertilizer)).contains(mixed, fertilizerHere);
+        // The report also counts lines booked to no activity under overhead (the first cost object), so 300 + 70 + 50
+        money(report("categories?from=2026-07-01&to=2026-07-31&kind=COSTS&costObjectId=" + activity).get("total"), "420");
+    }
+
+    @Test
+    void anotherTenantsCategoryCannotBeUsedToListRecords() throws Exception {
+        newFinanceTenant("category-records-b");
+        long categoryB = id(post(f("/categories"), owner, Map.of("name", "B special", "kind", "EXPENSE", "accountCode", "5600")));
+        newFinanceTenant("category-records-a");
+        get(f("/documents?categoryId=" + categoryB), owner).andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("CATEGORY_NOT_FOUND"));
+    }
+
+    @Test
     void anotherTenantsActivityCannotBeUsedToListRecords() throws Exception {
         newFinanceTenant("activity-records-b");
         long activityB = body(get(f("/cost-objects"), owner)).get(0).get("id").asLong();

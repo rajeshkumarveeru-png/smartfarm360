@@ -126,8 +126,9 @@ public class FinanceController {
                                               @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
                                               @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
                                               @RequestParam(required = false) Long farmId, @RequestParam(required = false) Long costObjectId,
+                                              @RequestParam(required = false) Long categoryId,
                                               @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) {
-        return documents.list(ctx, type, status, partyId, farmId, costObjectId, from, to, page, size);
+        return documents.list(ctx, type, status, partyId, farmId, costObjectId, categoryId, from, to, page, size);
     }
 
     @GetMapping("/documents/{documentId}")

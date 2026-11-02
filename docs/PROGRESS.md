@@ -1812,6 +1812,43 @@ The farm records list needs the new backend. A backend started before this chang
 every record on the farm page, so restart it.
 
 
+## Spending by category in a crop cycle (2026-11-02)
+
+Asked for: each record's category in the cycle's list, a category filter that shows how much the cycle spent on it, and
+more polish.
+
+- **Records panel** (crop cycle and farm pages):
+  - A colourful **category bar** sits above the records. It has *All categories* with the total, and one card per category
+    showing what was spent on it here, its share of the costs and a share bar.
+  - Picking a category lists only its records and shows a summary: *Spent on Seeds*, the amount, the share and the
+    number of records. Picking it again clears the filter.
+  - Each record shows its **category tags**, in the same colours as the bar, with the amount of each when a record has
+    several.
+  - The figures come from the existing cost-by-category report for the cycle or farm, so they match the cycle report.
+- **Crop cycle header** is now a hero card:
+  - the stage badge;
+  - chips for crop, farm and field, area, season and dates;
+  - a back link.
+
+  The profit card turns green or red.
+- **Backend:**
+  - Record summaries in lists carry `categories` (category id, code, name and amount of the record's lines; with an
+    activity filter, only that activity's lines).
+  - `GET /finance/documents` takes `categoryId`. With `costObjectId`, the same line must match both.
+  - Another tenant's category answers 404 `CATEGORY_NOT_FOUND`.
+
+  The report counts lines with no activity under overhead, while the records filter matches lines booked explicitly.
+  The two agree for crop cycles, herds, ponds and batches.
+
+| Command | Result |
+|---|---|
+| `backend: gradlew test --tests FarmRecordsTest` | Passed: **7 tests** (2 new: categories and filter, cross-tenant category) |
+| `backend: gradlew test bootJar` | **836 of 837 passed.** Only `DashboardPerformanceTest` failed, at 1,474 ms on the busy machine; see the entry above for the no-regression comparison |
+| `frontend: npm run lint`, `npx tsc --noEmit`, `npm run build` | Passed |
+| `frontend: npm test` | Passed: **100 tests** (1 new: category bar, filter and tags) |
+| `mobile: npm test` | Passed: **76 tests** |
+| Browser review | Not done by me; the owner is checking the screens |
+
 ## Known gaps and defects
 
 Security and platform:

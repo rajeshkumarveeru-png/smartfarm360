@@ -16,7 +16,10 @@ export type DocumentSummary = {
   id: number; type: DocType; status: 'DRAFT' | 'POSTED' | 'REVERSED' | 'CANCELLED'; number: string | null; docDate: string; dueDate: string | null;
   partyId: number | null; partyName: string | null; financialAccountName: string | null; totalAmount: number; settledAmount: number;
   openAmount: number; paymentStatus: 'UNPAID' | 'PARTLY_PAID' | 'PAID' | null; needsReview: boolean; createdAt: string;
+  /** What the lines were booked to (filled in record lists). */
+  categories?: LineCategory[];
 };
+export type LineCategory = { categoryId: number; code: string | null; name: string | null; amount: number };
 export type DocumentLine = {
   id: number; lineNo: number; categoryId: number | null; categoryCode: string | null; categoryName: string | null; accountCode: string; side: string | null;
   description: string | null; quantity: number | null; unit: string | null; rate: number | null; amount: number; costObjectId: number | null; assetId?: number | null;

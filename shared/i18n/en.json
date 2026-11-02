@@ -1381,7 +1381,11 @@
     "edit": "Edit draft",
     "correct": "Correct (reverse and re-enter)",
     "showMore": "Show more",
-    "correcting": "Correcting {{number}}: the original was reversed. Fix the details below and save."
+    "correcting": "Correcting {{number}}: the original was reversed. Fix the details below and save.",
+    "byCategory": "Filter by category",
+    "allCategories": "All categories",
+    "categorySpent": "Spent on {{category}}",
+    "categoryShare": "{{percent}}% of the costs here · records: {{count}}"
   },
   "financeCategory": {
     "SEEDS": "Seeds",

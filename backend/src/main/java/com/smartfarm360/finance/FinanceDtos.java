@@ -152,10 +152,19 @@ public final class FinanceDtos {
                              String targetNumber, String targetType, BigDecimal amount, LocalDate allocationDate) {}
 
     /** paymentStatus (bills and sales only): UNPAID, PARTLY_PAID or PAID, computed from allocations. */
+    /** {@code categories}: what the record's lines were booked to, filled in record lists (empty elsewhere). */
     public record DocumentSummary(long id, String type, String status, String number, LocalDate docDate, LocalDate dueDate,
                                   Long partyId, String partyName, String financialAccountName, BigDecimal totalAmount,
                                   BigDecimal settledAmount, BigDecimal openAmount, String paymentStatus, boolean needsReview,
-                                  Instant createdAt) {}
+                                  Instant createdAt, List<LineCategory> categories) {
+        DocumentSummary withCategories(List<LineCategory> list) {
+            return new DocumentSummary(id, type, status, number, docDate, dueDate, partyId, partyName, financialAccountName, totalAmount,
+                    settledAmount, openAmount, paymentStatus, needsReview, createdAt, list);
+        }
+    }
+
+    /** A category on a record's lines, with the amount of those lines (system categories carry a code, own ones a name). */
+    public record LineCategory(long categoryId, String code, String name, BigDecimal amount) {}
 
     public record Document(DocumentSummary summary, Long farmId, Long financialAccountId, Long toFinancialAccountId,
                            String toFinancialAccountName, Long loanId, String loanName, BigDecimal principalAmount,

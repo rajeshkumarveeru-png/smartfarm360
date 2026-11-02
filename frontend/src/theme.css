@@ -643,6 +643,55 @@ body {
 .rp-void .fw-record-main strong { text-decoration: line-through; }
 @media (hover: none) { .rp-actions { opacity: 1; } }
 
+/* ---- Category bar and tags (records panel) ------------------------------------------------------------------ */
+.rp-cats { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 12px; margin: 0 -2px 6px; scrollbar-width: thin; }
+.rp-cat {
+  --hue: 47 133 80; position: relative; flex: 0 0 auto; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 2px 8px;
+  min-width: 150px; padding: 10px 12px 12px; border-radius: 14px; cursor: pointer; text-align: left; font: inherit; color: var(--sf-text);
+  border: 1px solid rgb(var(--hue) / 25%); background: linear-gradient(150deg, rgb(var(--hue) / 12%), rgb(255 255 255 / 85%) 60%);
+  box-shadow: 0 1px 0 rgb(255 255 255 / 90%) inset, 0 4px 14px -10px rgb(var(--hue) / 60%);
+  transition: transform var(--sf-base) var(--sf-ease), box-shadow var(--sf-base) var(--sf-ease), border-color var(--sf-base) var(--sf-ease), background var(--sf-base) var(--sf-ease);
+}
+.rp-cat:hover { transform: translateY(-2px); border-color: rgb(var(--hue) / 50%); box-shadow: 0 12px 24px -14px rgb(var(--hue) / 70%); }
+.rp-cat > span:first-of-type { grid-column: 2; font-size: 12.5px; font-weight: 600; color: var(--sf-text-2); white-space: nowrap; }
+.rp-cat b { grid-column: 1 / -1; font-size: 16px; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.rp-cat small { grid-row: 1; grid-column: 3; font-size: 11px; font-weight: 700; color: rgb(var(--hue)); }
+.rp-dot { grid-row: 1; grid-column: 1; width: 9px; height: 9px; border-radius: 50%; background: rgb(var(--hue)); box-shadow: 0 0 0 3px rgb(var(--hue) / 18%); }
+.rp-cat-bar { position: absolute; left: 12px; right: 12px; bottom: 6px; height: 3px; border-radius: 3px; background: rgb(var(--hue) / 14%); overflow: hidden; }
+.rp-cat-bar > span { display: block; height: 100%; border-radius: inherit; background: rgb(var(--hue)); }
+.rp-cat[aria-pressed=true] {
+  color: #fff; border-color: transparent; background: linear-gradient(135deg, rgb(var(--hue)), rgb(var(--hue) / 78%));
+  box-shadow: 0 12px 26px -12px rgb(var(--hue) / 85%);
+}
+.rp-cat[aria-pressed=true] > span:first-of-type, .rp-cat[aria-pressed=true] small { color: rgb(255 255 255 / 90%); }
+.rp-cat[aria-pressed=true] .rp-dot { background: #fff; box-shadow: 0 0 0 3px rgb(255 255 255 / 35%); }
+.rp-cat[aria-pressed=true] .rp-cat-bar { background: rgb(255 255 255 / 30%); }
+.rp-cat[aria-pressed=true] .rp-cat-bar > span { background: #fff; }
+.rp-cat-all { --hue: 15 118 110; grid-template-columns: 1fr; }
+.rp-cat-all > span:first-of-type { grid-column: 1; }
+.rp-focus {
+  --hue: 47 133 80; display: flex; align-items: center; gap: 12px; padding: 12px 14px; margin-bottom: 10px; border-radius: 14px;
+  border: 1px solid rgb(var(--hue) / 30%); background: linear-gradient(120deg, rgb(var(--hue) / 14%), rgb(255 255 255 / 80%));
+  animation: sf-rise var(--sf-slow) var(--sf-ease);
+}
+.rp-focus-icon { flex: 0 0 38px; width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; color: #fff; background: rgb(var(--hue)); }
+.rp-focus-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rp-focus-text strong { font-size: 14px; }
+.rp-focus-text small { color: var(--sf-text-2); font-size: 12px; }
+.rp-focus-amount { font-size: 22px; letter-spacing: -.03em; color: rgb(var(--hue)); font-variant-numeric: tabular-nums; filter: brightness(.8); }
+.rp-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+.rp-tag {
+  --hue: 47 133 80; display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 650;
+  color: rgb(var(--hue)); background: rgb(var(--hue) / 12%); border: 1px solid rgb(var(--hue) / 22%); filter: saturate(1.1) brightness(.85);
+}
+.rp-tag em { font-style: normal; font-weight: 500; opacity: .8; }
+@media (max-width: 600px) { .rp-cat { min-width: 132px; } .rp-focus-amount { font-size: 18px; } }
+
+/* ---- Crop cycle hero ---- */
+.cycle-hero h2 { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.cycle-hero h2 .stage { font-size: 12px; -webkit-text-fill-color: currentColor; }
+.cycle-dates { margin-top: 8px !important; font-size: 12.5px; }
+
 /* ---- Motion and print ----------------------------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }

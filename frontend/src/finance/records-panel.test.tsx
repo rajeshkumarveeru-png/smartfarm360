@@ -16,10 +16,19 @@ const tenant: TenantSummary = { id: 9, name: 'Test farm', slug: 't', preferredLa
 vi.mock('../auth/useCurrentTenant', () => ({ useTenant: () => tenant, useCurrentTenant: () => tenant }));
 
 const doc = (id: number, status: string, number: string | null) => ({ id, type: 'BILL', status, number, docDate: '2026-07-02', partyName: null,
-  financialAccountName: 'Cash in hand', totalAmount: 450, paymentStatus: status === 'POSTED' ? 'PAID' : null });
+  financialAccountName: 'Cash in hand', totalAmount: 450, paymentStatus: status === 'POSTED' ? 'PAID' : null,
+  categories: [{ categoryId: 1, code: 'SEEDS', name: null, amount: 450 }] });
 
 function routeApi(url: string, init?: { method?: string }) {
   if (init?.method === 'POST') return Promise.resolve({ summary: { id: 99 } });
+  if (url.includes('/reports/categories?costObjectId=7')) {
+    return Promise.resolve({ rows: [{ accountCode: '5000', categoryId: 1, categoryCode: 'SEEDS', categoryName: null, amount: 30000, share: 94 },
+      { accountCode: '5000', categoryId: 3, categoryCode: 'FUEL', categoryName: null, amount: 2000, share: 6 }], total: 32000 });
+  }
+  if (url.includes('/documents?costObjectId=7&categoryId=3')) {
+    return Promise.resolve({ items: [{ ...doc(43, 'POSTED', 'BILL/2026-27/0002'), totalAmount: 2000, categories: [{ categoryId: 3, code: 'FUEL', name: null, amount: 2000 }] }],
+      page: 0, size: 10, totalItems: 1, totalPages: 1 });
+  }
   if (url.includes('/documents?costObjectId=7')) {
     return Promise.resolve({ items: [doc(41, 'POSTED', 'BILL/2026-27/0004'), doc(42, 'DRAFT', null)], page: 0, size: 10, totalItems: 2, totalPages: 1 });
   }
@@ -55,6 +64,19 @@ describe('records panel', () => {
     expect(await screen.findByRole('link', { name: /BILL\/2026-27\/0004/ })).toHaveAttribute('href', '/t/9/finance/records/41');
     expect(screen.getByRole('link', { name: 'Add expense' })).toHaveAttribute('href', '/t/9/finance/new/expense?farm=2&activity=7');
     expect(screen.getByRole('link', { name: /Edit draft/ })).toHaveAttribute('href', '/t/9/finance/new/expense?draft=42');
+  });
+
+  it('shows each record category, and filters by category with what was spent on it here', async () => {
+    renderAt('/t/9/x', panel, '/t/:tenantId/x');
+    expect(await screen.findByRole('button', { name: /All categories.*₹32,000\.00/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getAllByText('Seeds').length).toBeGreaterThan(1);   // in the bar and as a tag on each record
+    await userEvent.click(screen.getByRole('button', { name: /Diesel and fuel/ }));
+    expect(await screen.findByRole('status')).toHaveTextContent(/Spent on Diesel and fuel.*6% of the costs here · records: 1.*₹2,000\.00/);
+    expect(await screen.findByRole('link', { name: /BILL\/2026-27\/0002/ })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /BILL\/2026-27\/0004/ })).not.toBeInTheDocument();
+    expect(apiMock.mock.calls.some(([u]) => String(u).includes('/documents?costObjectId=7&categoryId=3&page=0'))).toBe(true);
+    await userEvent.click(screen.getByRole('button', { name: /Diesel and fuel/ }));
+    expect(await screen.findByRole('link', { name: /BILL\/2026-27\/0004/ })).toBeInTheDocument();
   });
 
   it('discards a draft and reverses a posted record, after asking', async () => {

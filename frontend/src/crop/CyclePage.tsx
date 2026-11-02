@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, CalendarDays, MapPin, Plus, Ruler, Sprout, Trash2 } from 'lucide-react';
 import { api } from '../api/client';
 import type { Page } from '../api/types';
 import { useTenant } from '../auth/useCurrentTenant';
@@ -84,18 +84,28 @@ export default function CyclePage() {
   const canSeeFinance = can(tenant, 'FINANCE_READ');
   return (
     <>
-      <div className="crop-page-head">
-        <div>
-          <h2>{cycle.name} <span className={`stage stage-${cycle.status.toLowerCase()}`}>{t(`stage.${cycle.status}`)}</span></h2>
-          <p>{cycle.cropName}{cycle.varietyName ? ` (${cycle.varietyName})` : ''} · {cycle.farmName} / {cycle.parcelName}
-            {cycle.areaAcres != null ? ` · ${formatNumber(cycle.areaAcres, lang, 2)} ${tu('ACRE')}` : ''}{cycle.seasonName ? ` · ${cycle.seasonName}` : ''}</p>
-          <p>{t('sowing')}: {formatDate(cycle.plannedSowingDate, lang)}{cycle.actualSowingDate ? ` · ${t('sown')}: ${formatDate(cycle.actualSowingDate, lang)}` : ''}
-            {cycle.expectedHarvestDate ? ` · ${t('expected')}: ${formatDate(cycle.expectedHarvestDate, lang)}` : ''}
-            {cycle.closedOn ? ` · ${t('closedOn')}: ${formatDate(cycle.closedOn, lang)}` : ''}</p>
-          {cycle.warnings.includes('FIELD_OVERCOMMITTED') && <p className="low-stock-label">{t('warning.FIELD_OVERCOMMITTED')}</p>}
+      <Link className="fw-back" to={`/t/${tenant.id}/crops`}><ArrowLeft size={16} aria-hidden />{tc('back')}</Link>
+      <header className="fw-hero cycle-hero">
+        <div className="fw-hero-main">
+          <div className="fw-hero-icon" aria-hidden><Sprout size={26} /></div>
+          <div>
+            <h2>{cycle.name} <span className={`stage stage-${cycle.status.toLowerCase()}`}>{t(`stage.${cycle.status}`)}</span></h2>
+            <p className="fw-meta">
+              <span className="pill">{cycle.cropName}{cycle.varietyName ? ` · ${cycle.varietyName}` : ''}</span>
+              <span><MapPin size={14} aria-hidden />{cycle.farmName} / {cycle.parcelName}</span>
+              {cycle.areaAcres != null && <span><Ruler size={14} aria-hidden />{formatNumber(cycle.areaAcres, lang, 2)} {tu('ACRE')}</span>}
+              {cycle.seasonName && <span><CalendarDays size={14} aria-hidden />{cycle.seasonName}</span>}
+            </p>
+            <p className="fw-meta cycle-dates">
+              <span><CalendarDays size={14} aria-hidden />{t('sowing')}: {formatDate(cycle.plannedSowingDate, lang)}</span>
+              {cycle.actualSowingDate && <span>{t('sown')}: {formatDate(cycle.actualSowingDate, lang)}</span>}
+              {cycle.expectedHarvestDate && <span>{t('expected')}: {formatDate(cycle.expectedHarvestDate, lang)}</span>}
+              {cycle.closedOn && <span>{t('closedOn')}: {formatDate(cycle.closedOn, lang)}</span>}
+            </p>
+            {cycle.warnings.includes('FIELD_OVERCOMMITTED') && <p className="low-stock-label">{t('warning.FIELD_OVERCOMMITTED')}</p>}
+          </div>
         </div>
-        <Link className="secondary" to={`/t/${tenant.id}/crops`}>{tc('back')}</Link>
-      </div>
+      </header>
       <ErrorBanner message={error} />
       {notice && <p className="low-stock-label" role="status">{notice}</p>}
       {canWrite && <StageActions cycle={cycle} onAction={(action, date) => void act(`/cultivation-cycles/${cycle.id}/status`, { action, date: date || null })} />}
@@ -118,7 +128,7 @@ export default function CyclePage() {
             <div className="finance-stat"><span>{tf('revenue')}</span><b>{formatMoney(report.revenueTotal, lang)}</b></div>
             <div className="finance-stat"><span>{t('directCosts')}</span><b>{formatMoney(report.directCostTotal, lang)}</b></div>
             <div className="finance-stat"><span>{t('allocatedOverhead')}</span><b>{formatMoney(report.allocatedTotal, lang)}</b></div>
-            <div className="finance-stat"><span>{t('profit')}</span><b>{formatMoney(report.profit, lang)}</b></div>
+            <div className={`finance-stat${report.profit > 0 ? ' positive' : report.profit < 0 ? ' negative' : ''}`}><span>{t('profit')}</span><b>{formatMoney(report.profit, lang)}</b></div>
             <div className="finance-stat"><span>{t('costPerAcre')}</span><b>{report.costPerAcre != null ? formatMoney(report.costPerAcre, lang) : '—'}</b></div>
             <div className="finance-stat"><span>{t('yield')}</span>
               <b>{report.harvested[0] ? `${formatNumber(report.harvested[0].quantity, lang, 2)} ${ts(`unit.${report.harvested[0].baseUnit}`)}` : '—'}</b>
