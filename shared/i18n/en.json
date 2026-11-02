@@ -59,7 +59,34 @@
     "showMore": "Show more",
     "openHint": "Open a farm to see its money, records and land.",
     "parcels": "{{count}} land parcels",
-    "noMoneyAccess": "You can see this farm’s land. Money for the farm needs finance access."
+    "noMoneyAccess": "You can see this farm’s land. Money for the farm needs finance access.",
+    "cyclePnl": "Profit & loss by crop cycle",
+    "cyclePnlHelp": "Income, costs and profit of each crop, herd or pond on this farm in the chosen period. Click one for its breakdown.",
+    "noCycles": "No crop cycles, herds or ponds on this farm yet.",
+    "openCycle": "Open the cycle",
+    "incomeTitle": "Income",
+    "costsTitle": "Costs",
+    "profitTitle": "Profit by cycle",
+    "byCategory": "By category",
+    "noIncome": "No income is booked to this farm in this period.",
+    "margin": "Margin",
+    "cycles": "Cycles",
+    "inProfit": "In profit",
+    "inLoss": "In loss",
+    "shareOfCosts": "{{percent}}% of costs",
+    "categoryRecords": "Records in this category",
+    "recordsCount": "Records",
+    "noCategoryRecords": "No records in this category.",
+    "kind": {
+      "OVERHEAD": "Farm overhead",
+      "CROP_CYCLE": "Crop cycle",
+      "ANIMAL_GROUP": "Herd / flock",
+      "POND_CYCLE": "Pond crop",
+      "ORGANIC_BATCH": "Compost batch",
+      "PROCESSING_BATCH": "Processing batch"
+    },
+    "clickHint": "Click for details",
+    "notInCycles": "Not booked to a cycle"
   },
   "mobile": {
     "appName": "SmartFarm360",
@@ -281,7 +308,9 @@
     "previous": "Previous",
     "next": "Next",
     "status": "Status",
-    "loadLatest": "Load the latest version"
+    "loadLatest": "Load the latest version",
+    "close": "Close",
+    "search": "Search"
   },
   "auth": {
     "signIn": "Sign in",

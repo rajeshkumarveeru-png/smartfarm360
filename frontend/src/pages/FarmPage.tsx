@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, Leaf, MapPin, MapPinned, Plus, Receipt, ShoppingBag, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Layers, Leaf, MapPin, MapPinned, Plus, Receipt, ShoppingBag, Sprout, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
 import { api } from '../api/client';
 import type { Farm, Parcel } from '../api/types';
 import { useTenant } from '../auth/useCurrentTenant';
@@ -15,6 +15,7 @@ import { can } from '../lib/nav';
 import { rangeFor } from '../reports/ranges';
 import { QuickRanges, useFiscalStartMonth } from '../reports/ReportTools';
 import type { CategoryBreakdown } from '../reports/types';
+import { FarmInsight, type Insight, useFarmCycles } from './FarmInsights';
 import { FARM_TYPE_KEYS } from './FarmsPage';
 
 const AREA_UNITS = ['ACRE', 'HECTARE', 'CENT', 'SQFT'] as const;
@@ -47,6 +48,8 @@ export default function FarmPage() {
   const [busy, setBusy] = useState(false);
   const [showParcel, setShowParcel] = useState(false);
   const [parcelForm, setParcelForm] = useState({ name: '', area: '', areaUnit: 'ACRE', soilType: '', irrigationType: '' });
+  const [insight, setInsight] = useState<Insight | null>(null);
+  const { cycles, error: cyclesError } = useFarmCycles(farmId, range, canMoney);
 
   // The financial year follows finance settings once they arrive
   useEffect(() => { setRange(rangeFor('thisYear', new Date(), startMonth)); }, [startMonth]);
@@ -126,25 +129,60 @@ export default function FarmPage() {
         </div>
         <p className="hint fw-range">{formatDate(range.from, lang)} – {formatDate(range.to, lang)}</p>
         <div className="finance-stats db-kpis fw-kpis">
-          <div className="finance-stat db-kpi"><span className="db-kpi-label"><i className="db-kpi-icon tone-income"><TrendingUp size={16} aria-hidden /></i>{t('income')}</span>
-            <b>{statement ? money(statement.operatingRevenueTotal) : '…'}</b></div>
-          <div className="finance-stat db-kpi"><span className="db-kpi-label"><i className="db-kpi-icon tone-costs"><TrendingDown size={16} aria-hidden /></i>{t('costs')}</span>
-            <b>{statement ? money(statement.operatingCostTotal) : '…'}</b></div>
-          <div className={`finance-stat db-kpi${profit > 0 ? ' positive' : profit < 0 ? ' negative' : ''}`}>
+          <button type="button" className="finance-stat db-kpi kpi-button" onClick={() => setInsight({ type: 'income' })}>
+            <span className="db-kpi-label"><i className="db-kpi-icon tone-income"><TrendingUp size={16} aria-hidden /></i>{t('income')}</span>
+            <b>{statement ? money(statement.operatingRevenueTotal) : '…'}</b><small className="kpi-hint">{t('clickHint')}<ChevronRight size={13} aria-hidden /></small></button>
+          <button type="button" className="finance-stat db-kpi kpi-button" onClick={() => setInsight({ type: 'costs' })}>
+            <span className="db-kpi-label"><i className="db-kpi-icon tone-costs"><TrendingDown size={16} aria-hidden /></i>{t('costs')}</span>
+            <b>{statement ? money(statement.operatingCostTotal) : '…'}</b><small className="kpi-hint">{t('clickHint')}<ChevronRight size={13} aria-hidden /></small></button>
+          <button type="button" className={`finance-stat db-kpi kpi-button${profit > 0 ? ' positive' : profit < 0 ? ' negative' : ''}`} onClick={() => setInsight({ type: 'profit' })}>
             <span className="db-kpi-label"><i className="db-kpi-icon tone-profit"><Wallet size={16} aria-hidden /></i>{t('profit')}</span>
-            <b>{statement ? money(profit) : '…'}</b></div>
+            <b>{statement ? money(profit) : '…'}</b><small className="kpi-hint">{t('clickHint')}<ChevronRight size={13} aria-hidden /></small></button>
+        </div>
+
+        <div className="db-card cycle-pnl">
+          <div className="db-card-head"><div><h3><Layers size={18} aria-hidden />{t('cyclePnl')}</h3><p className="hint">{t('cyclePnlHelp')}</p></div></div>
+          <ErrorBanner message={cyclesError} />
+          {!cycles ? <Loading /> : cycles.length === 0 ? <div className="db-all-clear muted"><Sprout size={26} aria-hidden /><p className="hint">{t('noCycles')}</p></div> : (
+            <div className="pnl-grid">
+              {cycles.map(c => {
+                const max = Math.max(1, ...cycles.map(x => Math.max(x.revenue, x.costs)));
+                return (
+                  <button key={c.costObjectId} type="button" className={`pnl-card${c.contribution < 0 ? ' loss' : c.contribution > 0 ? ' gain' : ''}`} onClick={() => setInsight({ type: 'cycle', cycle: c })}>
+                    <span className="pnl-top"><span className="pnl-icon" aria-hidden><Sprout size={16} /></span>
+                      <span className="pnl-name"><strong>{c.name}</strong><small>{t(`kind.${c.kind}`)}</small></span>
+                      <ChevronRight className="db-chevron" size={16} aria-hidden /></span>
+                    <span className="pnl-figures">
+                      <span><small>{t('income')}</small><b>{money(c.revenue)}</b></span>
+                      <span><small>{t('costs')}</small><b>{money(c.costs)}</b></span>
+                    </span>
+                    <span className="pnl-bars" aria-hidden>
+                      <span className="pnl-bar in"><span style={{ width: `${(c.revenue / max) * 100}%` }} /></span>
+                      <span className="pnl-bar out"><span style={{ width: `${(c.costs / max) * 100}%` }} /></span>
+                    </span>
+                    <span className="pnl-result"><small>{t('profit')}</small><b>{money(c.contribution)}</b></span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <div className="db-grid fw-grid">
           <div className="db-card">
             <div className="db-card-head"><h3>{t('whereMoneyGoes')}</h3>{costs && costs.total > 0 && <b>{money(costs.total)}</b>}</div>
             {!costs ? <Loading /> : costs.rows.length === 0 ? <div className="db-all-clear muted"><Receipt size={26} aria-hidden /><p className="hint">{t('noCosts')}</p></div> : (
-              <ul className="plain-list fw-costs">{costs.rows.map(c => (
-                <li key={`${c.accountCode}-${c.categoryId}`}>
-                  <span className="db-cost-name">{c.categoryId ? categoryLabel({ code: c.categoryCode, name: c.categoryName }) : tf(`ledger.${c.accountCode}`)}</span>
+              <ul className="plain-list fw-costs">{costs.rows.map(c => {
+                const label = c.categoryId ? categoryLabel({ code: c.categoryCode, name: c.categoryName }) : tf(`ledger.${c.accountCode}`);
+                const inner = <>
+                  <span className="db-cost-name">{label}</span>
                   <span className="db-cost-figures"><b>{money(c.amount)}</b>{c.share != null && <small> · {c.share}%</small>}</span>
                   {c.share != null && <span className="db-cost-bar" aria-hidden><span style={{ width: `${Math.min(100, Math.max(0, c.share))}%` }} /></span>}
-                </li>))}</ul>
+                </>;
+                return <li key={`${c.accountCode}-${c.categoryId}`}>{c.categoryId
+                  ? <button type="button" className="cost-row-button" onClick={() => setInsight({ type: 'category', categoryId: c.categoryId!, label, kind: 'COSTS' })}>{inner}</button>
+                  : inner}</li>;
+              })}</ul>
             )}
           </div>
 
@@ -185,6 +223,7 @@ export default function FarmPage() {
         ))}
         {!parcels.length && <EmptyState><MapPinned size={18} aria-hidden /> {t('emptyLand')}</EmptyState>}
       </div>
+      {insight && <FarmInsight insight={insight} farmId={farm.id} farmName={farm.name} range={range} cycles={cycles} onOpen={setInsight} onClose={() => setInsight(null)} />}
     </section>
   );
 }

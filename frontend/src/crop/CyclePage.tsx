@@ -17,6 +17,7 @@ import type { Activity, Cycle, CycleReport, Harvest, Observation } from './types
 import { ACTIVITY_TYPES, OBSERVATION_KINDS, SEVERITIES } from './types';
 import { ExportBar } from '../reports/ReportTools';
 import RecordsPanel from '../finance/RecordsPanel';
+import { FarmInsight, type Insight } from '../pages/FarmInsights';
 
 type Tab = 'activities' | 'money' | 'harvests' | 'observations';
 type Input = { itemId: string; quantity: string; unit: string; lotNo: string };
@@ -43,6 +44,7 @@ export default function CyclePage() {
   const [form, setForm] = useState<'' | 'activity' | 'harvest' | 'observation'>('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [insight, setInsight] = useState<Insight | null>(null);
 
   const load = useCallback(async () => {
     setError('');
@@ -79,6 +81,7 @@ export default function CyclePage() {
   const open = cycle.status !== 'CLOSED' && cycle.status !== 'CANCELLED';
   const canRecord = can(tenant, 'CROP_ACTIVITY_WRITE') && open;
   const canMoney = can(tenant, 'FINANCE_READ');
+  const openBreakdown = () => { if (cycle.costObjectId) setInsight({ type: 'cycle', cycle: { costObjectId: cycle.costObjectId, kind: 'CROP_CYCLE', name: cycle.name, revenue: 0, costs: 0, contribution: 0 } }); };
   const canWrite = can(tenant, 'CROP_WRITE');
   const canReverse = can(tenant, 'FINANCE_REVERSE');
   const canSeeFinance = can(tenant, 'FINANCE_READ');
@@ -125,10 +128,10 @@ export default function CyclePage() {
           </div>
           <p className="hint">{tf('rangeLabel', { from: formatDate(report.from, lang), to: formatDate(report.to, lang) })} · {tf('actualFigures')}</p>
           <div className="finance-stats">
-            <div className="finance-stat"><span>{tf('revenue')}</span><b>{formatMoney(report.revenueTotal, lang)}</b></div>
-            <div className="finance-stat"><span>{t('directCosts')}</span><b>{formatMoney(report.directCostTotal, lang)}</b></div>
-            <div className="finance-stat"><span>{t('allocatedOverhead')}</span><b>{formatMoney(report.allocatedTotal, lang)}</b></div>
-            <div className={`finance-stat${report.profit > 0 ? ' positive' : report.profit < 0 ? ' negative' : ''}`}><span>{t('profit')}</span><b>{formatMoney(report.profit, lang)}</b></div>
+            <button type="button" className="finance-stat kpi-button" onClick={openBreakdown}><span>{tf('revenue')}</span><b>{formatMoney(report.revenueTotal, lang)}</b></button>
+            <button type="button" className="finance-stat kpi-button" onClick={openBreakdown}><span>{t('directCosts')}</span><b>{formatMoney(report.directCostTotal, lang)}</b></button>
+            <button type="button" className="finance-stat kpi-button" onClick={openBreakdown}><span>{t('allocatedOverhead')}</span><b>{formatMoney(report.allocatedTotal, lang)}</b></button>
+            <button type="button" className={`finance-stat kpi-button${report.profit > 0 ? ' positive' : report.profit < 0 ? ' negative' : ''}`} onClick={openBreakdown}><span>{t('profit')}</span><b>{formatMoney(report.profit, lang)}</b></button>
             <div className="finance-stat"><span>{t('costPerAcre')}</span><b>{report.costPerAcre != null ? formatMoney(report.costPerAcre, lang) : '—'}</b></div>
             <div className="finance-stat"><span>{t('yield')}</span>
               <b>{report.harvested[0] ? `${formatNumber(report.harvested[0].quantity, lang, 2)} ${ts(`unit.${report.harvested[0].baseUnit}`)}` : '—'}</b>
@@ -156,6 +159,8 @@ export default function CyclePage() {
         </>
       )}
 
+      {insight && report && <FarmInsight insight={insight} farmId={cycle.farmId} farmName={cycle.farmName} range={{ from: report.from, to: report.to }} cycles={null}
+        onOpen={setInsight} onClose={() => setInsight(null)} />}
       <div className="crop-tabs section-space" role="tablist">
         {(['activities', 'money', 'harvests', 'observations'] as Tab[]).filter(x => x !== 'money' || (canMoney && cycle.costObjectId)).map(x => (
           <button key={x} role="tab" aria-selected={tab === x} className={tab === x ? 'active' : ''} onClick={() => { setTab(x); setForm(''); }}>{t(x)}</button>

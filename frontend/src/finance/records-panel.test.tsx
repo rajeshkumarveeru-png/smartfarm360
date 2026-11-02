@@ -77,6 +77,10 @@ describe('records panel', () => {
     expect(apiMock.mock.calls.some(([u]) => String(u).includes('/documents?costObjectId=7&categoryId=3&page=0'))).toBe(true);
     await userEvent.click(screen.getByRole('button', { name: /Diesel and fuel/ }));
     expect(await screen.findByRole('link', { name: /BILL\/2026-27\/0004/ })).toBeInTheDocument();
+    // The totals ask for at most ten years, the longest range the reports accept
+    const [url] = apiMock.mock.calls.find(([u]) => String(u).includes('/reports/categories'))!;
+    const from = new Date(/from=(\d{4}-\d{2}-\d{2})/.exec(url)![1]);
+    expect((Date.now() - from.getTime()) / 86_400_000).toBeLessThan(3700);
   });
 
   it('discards a draft and reverses a posted record, after asking', async () => {

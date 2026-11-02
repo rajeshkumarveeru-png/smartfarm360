@@ -1849,6 +1849,40 @@ more polish.
 | `mobile: npm test` | Passed: **76 tests** |
 | Browser review | Not done by me; the owner is checking the screens |
 
+## Pop-up details, profit and loss by crop cycle (2026-11-02)
+
+Asked for: the expenses filter on the same screen, cycle-wise profit and loss on the farm page, a pop-up with the
+details behind any card (like BizManager and SmartBill360), and a more professional look.
+
+- **Fixed: the category bar did not appear.** It asked the cost report for everything since 2000, and the reports refuse
+  ranges over about ten years (`INVALID_DATE_RANGE`, 3,700 days). The error was swallowed and the unit test faked the
+  report. The bar now asks for the last ten years, and the test checks the range sent.
+- **Pop-up** (`components/InsightModal.tsx`), the same pattern as SmartBill360's InsightModal:
+  - a coloured header in the card's tone, summary tiles, and a colourful list (searchable when long);
+  - closes with Esc, the close button or a click outside, and focus returns to the card;
+  - a bottom sheet on phones;
+  - rows are real buttons or links inside list items.
+- **Farm page:**
+  - The *Income*, *Costs* and *Profit* cards open pop-ups: income or costs by category, or profit and loss per cycle.
+  - A new **Profit & loss by crop cycle** card shows one coloured card per crop cycle, herd or pond on the farm, with
+    income, costs, bars and profit (green or red). It comes from the activity report, kept to the farm's cost objects, and
+    lists cycles with no money yet at zero. Clicking a cycle opens its income and costs by category, with *Open the cycle*.
+  - Rows under *Where the money goes* open that category's records for the farm.
+- **Crop cycle page:** the revenue, direct cost, overhead and profit cards open the cycle's breakdown pop-up.
+- **Look:**
+  - every plain link in the app is green with an animated underline (no more default blue);
+  - crop rows have an icon;
+  - the period buttons are a frosted segmented control;
+  - cards show *Click for details* on hover.
+- No backend change in this step.
+
+| Command | Result |
+|---|---|
+| `frontend: npm run lint`, `npx tsc --noEmit`, `npm run build` | Passed |
+| `frontend: npm test` | Passed: **101 tests** (1 new farm pop-up test; the panel test now checks the date range). One full run failed an unrelated registration test on vitest's 5-second timeout; it passed alone and the next full run passed, so the 5-second default is tight on this busy machine |
+| `mobile: npm test` | Passed: **76 tests** |
+| Backend | Unchanged since the previous entry (836 of 837; see the dashboard timing note there) |
+
 ## Known gaps and defects
 
 Security and platform:

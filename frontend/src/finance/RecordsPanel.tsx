@@ -16,6 +16,8 @@ import { useCategoryLabel } from './useFinanceData';
 const PAGE = 10;
 const KIND: Partial<Record<DocumentSummary['type'], 'expense' | 'sale'>> = { BILL: 'expense', SALE: 'sale' };
 const isIn = (d: DocumentSummary) => d.type === 'SALE' || d.type === 'RECEIPT';
+/** The start of the category totals: ten years back, within the longest range the reports accept. */
+const tenYearsAgo = () => { const d = new Date(); d.setFullYear(d.getFullYear() - 10); d.setDate(d.getDate() + 2); return d.toISOString().slice(0, 10); };
 /** Category colours, in turn, so a category keeps the same colour in the bar and on its records. */
 const HUES = ['16 185 129', '14 165 233', '245 158 11', '139 92 246', '244 63 94', '20 184 166', '234 88 12', '99 102 241'];
 
@@ -52,7 +54,7 @@ export default function RecordsPanel({ filter, prefill, title, newButtons = true
   useEffect(() => load(0), [load]);
 
   const loadCosts = useCallback(() => {
-    api<CategoryBreakdown>(`${base}/reports/categories?${filter}&kind=COSTS&from=2000-01-01&to=${today()}`).then(setCosts).catch(() => setCosts(null));
+    api<CategoryBreakdown>(`${base}/reports/categories?${filter}&kind=COSTS&from=${tenYearsAgo()}&to=${today()}`).then(setCosts).catch(() => setCosts(null));
   }, [base, filter]);
   useEffect(loadCosts, [loadCosts]);
 

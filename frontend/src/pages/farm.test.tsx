@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { Permission, TenantSummary } from '../api/types';
@@ -26,6 +26,7 @@ function routeApi(url: string, init?: { method?: string }) {
   if (url.includes('/reports/income-statement')) {
     return Promise.resolve({ operatingRevenueTotal: 50000, operatingCostTotal: 12000, operatingProfit: 38000, operatingRevenue: [], operatingCosts: [] });
   }
+  if (url.includes('/reports/categories') && url.includes('kind=INCOME')) return Promise.resolve({ rows: [], total: 0 });
   if (url.includes('/reports/categories')) {
     return Promise.resolve({ rows: [{ accountCode: '5000', categoryId: 1, categoryCode: 'SEEDS', categoryName: null, amount: 12000, share: 100 }], total: 12000 });
   }
@@ -36,6 +37,16 @@ function routeApi(url: string, init?: { method?: string }) {
   if (url.endsWith('/finance/categories')) return Promise.resolve([{ id: 1, code: 'SEEDS', name: null, kind: 'EXPENSE', accountCode: '5000', system: true, active: true }]);
   if (url.endsWith('/finance/accounts')) return Promise.resolve([{ id: 5, name: 'Cash in hand', kind: 'CASH', active: true, balance: 0 }]);
   if (url.endsWith('/finance/settings')) return Promise.resolve({ lockDate: null, fiscalYearStartMonth: 4 });
+  if (url.endsWith('/finance/cost-objects')) {
+    return Promise.resolve([{ id: 1, kind: 'OVERHEAD', name: 'Farm overhead', active: true },
+      { id: 7, kind: 'CROP_CYCLE', name: 'GroundNut', cropCycleId: 1, farmId: 2, active: true },
+      { id: 8, kind: 'CROP_CYCLE', name: 'Paddy', cropCycleId: 2, farmId: 2, active: true },
+      { id: 9, kind: 'CROP_CYCLE', name: 'Other farm crop', cropCycleId: 3, farmId: 5, active: true }]);
+  }
+  if (url.includes('/reports/activity')) {
+    return Promise.resolve({ rows: [{ costObjectId: 7, kind: 'CROP_CYCLE', name: 'GroundNut', revenue: 0, costs: 32000, contribution: -32000 },
+      { costObjectId: 9, kind: 'CROP_CYCLE', name: 'Other farm crop', revenue: 900, costs: 0, contribution: 900 }] });
+  }
   return Promise.resolve([]);
 }
 
@@ -65,6 +76,32 @@ describe('farm workspace', () => {
     expect(screen.getByRole('link', { name: 'Add expense' })).toHaveAttribute('href', '/t/9/finance/new/expense?farm=2');
     expect(screen.getByRole('link', { name: 'Record sale' })).toHaveAttribute('href', '/t/9/finance/new/sale?farm=2');
     expect(apiMock.mock.calls.some(([u]) => /income-statement\?from=.*&farmId=2$/.test(u))).toBe(true);
+  });
+
+  it('shows profit and loss by crop cycle for this farm only, and opens pop-ups with the detail', async () => {
+    renderAt('/t/9/farms/2', <FarmPage />, '/t/:tenantId/farms/:farmId');
+    const groundnut = await screen.findByRole('button', { name: /GroundNut.*-₹32,000\.00/ });
+    expect(screen.getByRole('button', { name: /Paddy/ })).toBeInTheDocument();
+    expect(screen.queryByText('Other farm crop')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /^Profit/ }));
+    let dialog = await screen.findByRole('dialog', { name: 'Profit by cycle' });
+    expect(dialog).toHaveTextContent('In loss');
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    await userEvent.click(groundnut);
+    dialog = await screen.findByRole('dialog', { name: 'GroundNut' });
+    expect(await within(dialog).findByText('Seeds')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open the cycle' })).toHaveAttribute('href', '/t/9/crops/cycles/1');
+    expect(apiMock.mock.calls.some(([u]) => /reports\/categories\?costObjectId=7&from=.*&kind=COSTS/.test(u))).toBe(true);
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+    await userEvent.click(screen.getByRole('button', { name: /^Costs/ }));
+    dialog = await screen.findByRole('dialog', { name: 'Costs' });
+    await userEvent.click(await within(dialog).findByRole('button', { name: /Seeds/ }));
+    expect(await screen.findByRole('dialog', { name: 'Seeds' })).toBeInTheDocument();
+    expect(apiMock.mock.calls.some(([u]) => /documents\?farmId=2&categoryId=1&from=/.test(u))).toBe(true);
   });
 
   it('shows land without money to people who cannot read finance', async () => {

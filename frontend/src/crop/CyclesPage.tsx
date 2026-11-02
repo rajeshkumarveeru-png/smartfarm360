@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus } from 'lucide-react';
+import { Plus, Sprout } from 'lucide-react';
 import { api } from '../api/client';
 import type { Farm, Page, Parcel } from '../api/types';
 import { useTenant } from '../auth/useCurrentTenant';
@@ -137,7 +137,8 @@ export default function CyclesPage() {
         <>
           <div className="activity-list">
             {cycles.items.map(c => (
-              <article className="activity-row" key={c.id}>
+              <article className="activity-row cycle-row" key={c.id}>
+                <div className="record-icon" aria-hidden><Sprout size={20} /></div>
                 <div className="cycle-main">
                   <Link to={`/t/${tenant.id}/crops/cycles/${c.id}`}><b>{c.name}</b></Link>
                   <small> · {c.cropName}{c.varietyName ? ` (${c.varietyName})` : ''} · {c.farmName} / {c.parcelName}</small>

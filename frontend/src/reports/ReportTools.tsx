@@ -26,7 +26,7 @@ export function QuickRanges({ onPick }: { onPick: (r: { from: string; to: string
   const startMonth = useFiscalStartMonth();
   const [picked, setPicked] = useState<QuickRange>('custom');
   return (
-    <div className="quick-actions no-print" role="group" aria-label={t('quickRange')}>
+    <div className="quick-actions range-pills no-print" role="group" aria-label={t('quickRange')}>
       {QUICK_RANGES.filter(r => r !== 'custom').map(r => {
         const range = rangeFor(r as Exclude<QuickRange, 'custom'>, new Date(), startMonth);
         return (
