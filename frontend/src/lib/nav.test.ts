@@ -18,6 +18,16 @@ describe('navigation visibility', () => {
     expect(visibleNav(owner).map(i => i.key)).not.toContain('crops');
   });
 
+  it('gives poultry its own entry, and shows livestock only for dairy, goats or sheep', () => {
+    const owner = (modules: TenantSummary['enabledModules']) => visibleNav(tenant(['TENANT_READ', 'LIVESTOCK_READ'], modules)).map(i => i.key);
+    expect(owner(['POULTRY'])).toContain('poultry');
+    expect(owner(['POULTRY'])).not.toContain('livestock');
+    expect(owner(['DAIRY'])).toEqual(expect.arrayContaining(['livestock']));
+    expect(owner(['DAIRY'])).not.toContain('poultry');
+    expect(owner(['DAIRY', 'POULTRY'])).toEqual(expect.arrayContaining(['livestock', 'poultry']));
+    expect(visibleNav(tenant(['TENANT_READ', 'LIVESTOCK_READ'], ['POULTRY'])).find(i => i.key === 'poultry')!.path).toBe('livestock/poultry');
+  });
+
   it('treats a suspended tenant as having no permissions', () => {
     const suspended = tenant(['TENANT_READ', 'FARM_READ'], ['CROP'], false);
     expect(can(suspended, 'FARM_READ')).toBe(false);

@@ -1956,6 +1956,23 @@ ambiguous. This replaces the "Work diary" and "Expenses & sales" split of the pr
 | `mobile: npm test` | Passed: **76 tests** |
 | Backend | Unchanged |
 
+## Poultry in the menu (2026-11-03)
+
+The owner turned Poultry on and did not see it in the menu: it was a tab inside *Livestock*, which showed for any animal
+module.
+
+- The menu has its own **Poultry** item (bird icon) when the Poultry module is on. It opens the batches
+  (`livestock/poultry`).
+- **Livestock** now shows for dairy, goats or sheep only. With both on, both items show, and Livestock still holds the
+  poultry tab. On poultry pages, Poultry is the highlighted item.
+- New string `nav.poultry` (English and Tamil).
+
+| Command | Result |
+|---|---|
+| `frontend: npm run lint`, `npx tsc --noEmit`, `npm run build` | Passed |
+| `frontend: npm test` | Passed: **108 tests** (1 new: poultry entry and when Livestock shows) |
+| `mobile: npm test` | Passed: **76 tests** |
+
 ## Known gaps and defects
 
 Security and platform:

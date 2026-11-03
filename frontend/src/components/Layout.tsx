@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { ChartColumn, Factory, Fish, HardHat, LayoutDashboard, Leaf, LogOut, Map as MapIcon, Milk, Package, ScrollText, Settings, ShieldCheck, Sprout,
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Bird, ChartColumn, Factory, Fish, HardHat, LayoutDashboard, Leaf, LogOut, Map as MapIcon, Milk, Package, ScrollText, Settings, ShieldCheck, Sprout,
   Tractor, UserRound, UsersRound, Wallet, type LucideIcon } from 'lucide-react';
 import { api } from '../api/client';
 import type { Announcement } from '../api/types';
@@ -22,7 +22,7 @@ export function AnnouncementBanner() {
 
 /** An icon for each section of the menu (presentation only; the sections and their permissions come from NAV_ITEMS). */
 const NAV_ICONS: Record<string, LucideIcon> = {
-  dashboard: LayoutDashboard, farms: MapIcon, crops: Sprout, livestock: Milk, aquaculture: Fish, organic: Leaf, processing: Factory, finance: Wallet,
+  dashboard: LayoutDashboard, farms: MapIcon, crops: Sprout, livestock: Milk, poultry: Bird, aquaculture: Fish, organic: Leaf, processing: Factory, finance: Wallet,
   stock: Package, workforce: HardHat, assets: Tractor, reports: ChartColumn, members: UsersRound, audit: ScrollText, settings: Settings,
 };
 
@@ -31,6 +31,9 @@ export default function Layout() {
   const { user, tenants, logout } = useAuth();
   const tenant = useCurrentTenant();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  // The poultry pages live under /livestock: there the Poultry entry is the active one, not Livestock
+  const onPoultry = pathname.includes('/livestock/poultry');
   const items = visibleNav(tenant);
 
   return (
@@ -54,7 +57,8 @@ export default function Layout() {
           {tenant && items.map(item => {
             const Icon = NAV_ICONS[item.key] ?? LayoutDashboard;
             return (
-              <NavLink key={item.key} to={`/t/${tenant.id}/${item.path}`} className={({ isActive }) => `side-link${isActive ? ' active' : ''}`}>
+              <NavLink key={item.key} to={`/t/${tenant.id}/${item.path}`}
+                className={({ isActive }) => `side-link${isActive && !(item.key === 'livestock' && onPoultry) ? ' active' : ''}`}>
                 <Icon size={17} aria-hidden />{t(`nav.${item.key}`)}
               </NavLink>
             );
