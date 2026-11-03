@@ -1827,7 +1827,14 @@
     "money": "Expenses & sales",
     "moneyTitle": "Money for this cycle",
     "moneyElsewhere": "The diary records the work and any stock used. Money for it (labour, machine hire, anything bought) goes under Expenses & sales, so it is entered once and counts in the profit.",
-    "goToMoney": "Add an expense"
+    "goToMoney": "Add an expense",
+    "missingFields": "Please fill in: {{fields}}.",
+    "animalFarm": "{{farm}} is not a crop farm. Its birds or animals are tracked under {{section}}: the number you have, what you paid, daily eggs or milk, sales and profit. A crop cycle needs a field and a crop.",
+    "openSection": "Open {{section}}",
+    "turnOnSection": "Turn on {{section}} in Settings",
+    "noFieldsYet": "This farm has no fields yet.",
+    "addField": "Add a field",
+    "noCropsYet": "No crops set up yet."
   },
   "workforce": {
     "title": "Workers & wages",

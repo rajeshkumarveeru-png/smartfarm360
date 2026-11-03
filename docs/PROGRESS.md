@@ -1907,6 +1907,25 @@ could also book paid labour or machine hire, so money could be entered in two pl
 | `mobile: npx tsc --noEmit`, `npm test` | Passed: **76 tests** |
 | Backend | Unchanged |
 
+## New crop cycle: say what is missing; animal farms go elsewhere (2026-11-03)
+
+The owner tried to start a crop cycle for a poultry farm and got only *"This field is required."*
+
+- The new-cycle form now names the missing fields (*"Please fill in: Field, Crop."*), and marks them red with
+  `aria-invalid`.
+- If the chosen farm has no fields, a note says so, with a link to add one on the farm page. If no crops are set up, a
+  link goes to crop setup.
+- Choosing a poultry, dairy, goat and sheep or fish farm shows a note: it is not a crop farm, and its birds or animals are
+  tracked in their own section. The note links to that section (Livestock → Poultry, Livestock, Small stock, Fish farming),
+  or to *Settings* to turn the module on when it is off.
+
+| Command | Result |
+|---|---|
+| `frontend: npm run lint`, `npx tsc --noEmit`, `npm run build` | Passed |
+| `frontend: npm test` | Passed: **104 tests** (2 new: missing fields named and marked; poultry farm pointed to its section) |
+| `mobile: npm test` | Passed: **76 tests** |
+| Backend | Unchanged |
+
 ## Known gaps and defects
 
 Security and platform:

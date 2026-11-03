@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { Permission, TenantSummary } from '../api/types';
@@ -48,6 +48,12 @@ function routeApi(url: string, init?: { method?: string }) {
   if (url.endsWith('/stock/units')) return Promise.resolve([{ code: 'kg', dimension: 'MASS', factor: 1 }, { code: 'quintal', dimension: 'MASS', factor: 100 }]);
   if (url.endsWith('/finance/categories')) return Promise.resolve([{ id: 8, code: 'LABOUR', name: null, kind: 'EXPENSE', accountCode: '5100', system: true, active: true }]);
   if (url.endsWith('/finance/accounts')) return Promise.resolve([{ id: 5, name: 'Cash in hand', kind: 'CASH', active: true, balance: 0 }]);
+  if (url.endsWith('/farms')) {
+    return Promise.resolve([{ id: 1, tenantId: 9, name: 'Yerpathi', farmType: 'CROP', country: 'IN', active: true },
+      { id: 2, tenantId: 9, name: 'Poultry', farmType: 'POULTRY', country: 'IN', active: true }]);
+  }
+  if (url.endsWith('/farms/1/land-parcels')) return Promise.resolve([{ id: 3, tenantId: 9, farmId: 1, name: 'North field', area: 1.7, areaUnit: 'ACRE', active: true }]);
+  if (url.endsWith('/crops')) return Promise.resolve([{ id: 6, name: 'GroundNut' }]);
   return Promise.resolve([]);
 }
 
@@ -61,6 +67,33 @@ describe('crop web', () => {
     apiMock.mockImplementation(routeApi);
     tenant.permissions = all;
     setLanguage('en');
+  });
+
+  it('names and marks the missing fields of a new cycle', async () => {
+    renderAt('/t/9/crops', <CyclesPage />, '/t/:tenantId/crops');
+    await userEvent.click(await screen.findByRole('button', { name: /New cycle/ }));
+    const form = within(screen.getByRole('button', { name: 'Save' }).closest('form')!);
+    await userEvent.type(form.getByLabelText('Cycle name'), 'Samba 2027');
+    await waitFor(() => expect(form.getAllByRole('option', { name: 'Yerpathi' }).length).toBeGreaterThan(0));
+    await userEvent.selectOptions(form.getByLabelText('Farm'), '1');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Please fill in: Field, Crop.');
+    expect(form.getByLabelText('Field')).toHaveAttribute('aria-invalid', 'true');
+    expect(form.getByLabelText('Crop')).toHaveAttribute('aria-invalid', 'true');
+    expect(form.getByLabelText('Cycle name')).toHaveAttribute('aria-invalid', 'false');
+    expect(apiMock.mock.calls.some(([, i]) => i?.method === 'POST')).toBe(false);
+  });
+
+  it('points a poultry farm to its own section instead of a crop cycle', async () => {
+    renderAt('/t/9/crops', <CyclesPage />, '/t/:tenantId/crops');
+    await userEvent.click(await screen.findByRole('button', { name: /New cycle/ }));
+    const form = within(screen.getByRole('button', { name: 'Save' }).closest('form')!);
+    await waitFor(() => expect(form.getAllByRole('option', { name: 'Poultry' }).length).toBeGreaterThan(0));
+    await userEvent.selectOptions(form.getByLabelText('Farm'), '2');
+    expect(screen.getByRole('note')).toHaveTextContent(/Poultry is not a crop farm/);
+    // The poultry module is off for this business, so the link turns it on in Settings
+    expect(screen.getByRole('link', { name: 'Turn on Poultry in Settings' })).toHaveAttribute('href', '/t/9/settings');
+    expect(screen.getByText('This farm has no fields yet.')).toBeInTheDocument();
   });
 
   it('lists cycles with their stage and warns when a field is overcommitted', async () => {

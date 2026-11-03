@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Sprout } from 'lucide-react';
+import { Bird, Plus, Sprout } from 'lucide-react';
 import { api } from '../api/client';
-import type { Farm, Page, Parcel } from '../api/types';
+import type { Farm, ModuleCode, Page, Parcel } from '../api/types';
 import { useTenant } from '../auth/useCurrentTenant';
 import { ErrorBanner, Loading } from '../components/common';
 import { currentLanguage, useNs } from '../i18n';
@@ -11,6 +11,12 @@ import { formatDate, formatNumber, today } from '../lib/format';
 import { can } from '../lib/nav';
 import type { Crop, Cycle, Season, Variety } from './types';
 import { AREA_UNITS, CYCLE_STATUSES } from './types';
+
+/** Farms of animals or fish are not crop cycles: where each is tracked instead, and the module that section needs. */
+const ANIMAL_FARMS: Record<string, { module: ModuleCode; path: string }> = {
+  POULTRY: { module: 'POULTRY', path: 'livestock/poultry' }, DAIRY: { module: 'DAIRY', path: 'livestock' },
+  GOAT_SHEEP: { module: 'GOAT_SHEEP', path: 'livestock/small-stock' }, AQUACULTURE: { module: 'AQUACULTURE', path: 'aquaculture' },
+};
 
 /** Farms with their fields, for cycle forms. */
 export function useFarmsAndParcels() {
@@ -49,7 +55,9 @@ export default function CyclesPage() {
   const [form, setForm] = useState<Record<string, string>>({ plannedSowingDate: today(), areaUnit: 'ACRE' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [tried, setTried] = useState(false);
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+  const tm = useNs('modules');
 
   const load = useCallback(async () => {
     setError('');
@@ -72,10 +80,17 @@ export default function CyclesPage() {
   }, [base, form.cropId]);
 
   const farmParcels = useMemo(() => parcels.filter(p => String(p.farmId) === form.farmId), [parcels, form.farmId]);
+  const chosenFarm = farms.find(f => String(f.id) === form.farmId);
+  const animals = chosenFarm ? ANIMAL_FARMS[chosenFarm.farmType] : undefined;
+  // The required fields still empty, in form order, with their labels
+  const missing = ([['name', t('cycleName')], ['farmId', t('farm')], ['landParcelId', t('land')], ['cropId', t('crop')]] as const)
+    .filter(([k]) => !(form[k] ?? '').trim());
+  const invalid = (k: string) => tried && missing.some(([m]) => m === k);
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.farmId || !form.landParcelId || !form.cropId || !form.name?.trim()) { setError(tc('required')); return; }
+    setTried(true);
+    if (missing.length) { setError(t('missingFields', { fields: missing.map(([, label]) => label).join(', ') })); return; }
     setBusy(true); setError('');
     try {
       await api(`${base}/cultivation-cycles`, { method: 'POST', body: {
@@ -84,7 +99,7 @@ export default function CyclesPage() {
         plannedSowingDate: form.plannedSowingDate, expectedHarvestDate: form.expectedHarvestDate || null,
         cultivatedArea: form.cultivatedArea || null, areaUnit: form.areaUnit, expectedYield: form.expectedYield || null,
       } });
-      setOpen(false); setForm({ plannedSowingDate: today(), areaUnit: 'ACRE' });
+      setOpen(false); setTried(false); setForm({ plannedSowingDate: today(), areaUnit: 'ACRE' });
       await load();
     } catch (err) {
       setError(describeError(err));
@@ -102,13 +117,24 @@ export default function CyclesPage() {
       <ErrorBanner message={error} />
       {open && (
         <form className="form-card form-grid" noValidate onSubmit={e => void create(e)}>
-          <label>{t('cycleName')}<input required maxLength={120} value={form.name ?? ''} placeholder={t('cyclePlaceholder')} onChange={e => set('name', e.target.value)} /></label>
-          <label>{t('farm')}<select value={form.farmId ?? ''} onChange={e => { set('farmId', e.target.value); set('landParcelId', ''); }}>
+          {animals && chosenFarm && (
+            <div className="farm-kind-note full" role="note">
+              <Bird size={20} aria-hidden />
+              <span>{t('animalFarm', { farm: chosenFarm.name, section: tm(animals.module) })}</span>
+              {tenant.enabledModules.includes(animals.module)
+                ? <Link className="primary" to={`/t/${tenant.id}/${animals.path}`}>{t('openSection', { section: tm(animals.module) })}</Link>
+                : <Link className="secondary" to={`/t/${tenant.id}/settings`}>{t('turnOnSection', { section: tm(animals.module) })}</Link>}
+            </div>
+          )}
+          <label className={invalid('name') ? 'field-missing' : undefined}>{t('cycleName')}<input required aria-invalid={invalid('name')} maxLength={120} value={form.name ?? ''} placeholder={t('cyclePlaceholder')} onChange={e => set('name', e.target.value)} /></label>
+          <label className={invalid('farmId') ? 'field-missing' : undefined}>{t('farm')}<select aria-invalid={invalid('farmId')} value={form.farmId ?? ''} onChange={e => { set('farmId', e.target.value); set('landParcelId', ''); }}>
             <option value="">—</option>{farms.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</select></label>
-          <label>{t('land')}<select value={form.landParcelId ?? ''} onChange={e => set('landParcelId', e.target.value)}>
-            <option value="">—</option>{farmParcels.map(p => <option key={p.id} value={p.id}>{p.name} · {formatNumber(p.area, lang)} {tu(p.areaUnit)}</option>)}</select></label>
-          <label>{t('crop')}<select value={form.cropId ?? ''} onChange={e => { set('cropId', e.target.value); set('varietyId', ''); }}>
-            <option value="">—</option>{crops.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+          <label className={invalid('landParcelId') ? 'field-missing' : undefined}>{t('land')}<select aria-invalid={invalid('landParcelId')} value={form.landParcelId ?? ''} onChange={e => set('landParcelId', e.target.value)}>
+            <option value="">—</option>{farmParcels.map(p => <option key={p.id} value={p.id}>{p.name} · {formatNumber(p.area, lang)} {tu(p.areaUnit)}</option>)}</select>
+            {chosenFarm && farmParcels.length === 0 && <small className="field-help">{t('noFieldsYet')} <Link to={`/t/${tenant.id}/farms/${chosenFarm.id}`}>{t('addField')}</Link></small>}</label>
+          <label className={invalid('cropId') ? 'field-missing' : undefined}>{t('crop')}<select aria-invalid={invalid('cropId')} value={form.cropId ?? ''} onChange={e => { set('cropId', e.target.value); set('varietyId', ''); }}>
+            <option value="">—</option>{crops.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+            {crops.length === 0 && <small className="field-help">{t('noCropsYet')} <Link to={`/t/${tenant.id}/crops/setup`}>{t('addCrop')}</Link></small>}</label>
           <label>{t('varietyLabel')}<select value={form.varietyId ?? ''} onChange={e => set('varietyId', e.target.value)}>
             <option value="">—</option>{varieties.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}</select></label>
           <label>{t('season')}<select value={form.seasonId ?? ''} onChange={e => set('seasonId', e.target.value)}>
