@@ -1,0 +1,11 @@
+* text=auto
+
+# Shell scripts must keep LF so they run on Linux CI; Windows scripts keep CRLF.
+gradlew text eol=lf
+*.sh text eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+*.jar binary
+*.png binary
+*.ico binary

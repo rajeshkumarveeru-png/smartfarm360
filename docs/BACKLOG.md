@@ -1,0 +1,114 @@
+# SmartFarm360 implementation backlog
+
+Each phase is a vertical slice (migration → domain → service → API → web/mobile UI → tests → docs) and must leave
+the build green. A phase is complete only when its acceptance checks have actually been run and recorded in
+[PROGRESS.md](PROGRESS.md).
+
+## Phase 1 — Baseline and hygiene ✅ (see PROGRESS.md)
+
+## Phase 2 — Platform foundation ✅ (see PROGRESS.md)
+
+Deferred from Phase 2 (not blocking Phase 3):
+- Email provider behind `EmailSender` (decision pending), then email verification.
+- Row-Level Security with a separate non-owner database role.
+- Shared rate-limit store before running several backend instances.
+- Drop the unused `sf_tenant_memberships.role` column (contract step).
+- Mobile registration and password reset screens.
+
+## Phase 3 — Finance core ✅ (see PROGRESS.md)
+
+Deferred from Phase 3:
+- Overhead allocation runs (P16) → Phase 5; internal transfers of produce/manure (P17) → Phases 5 and 11.
+- Asset register with depreciation schedules; worker advances and wages → done in Phase 6.
+- Recurring expenses → still open (not in the Phase 6 design); candidate for Phase 7.
+- CSV/XLSX/PDF exports of reports → Phase 7.
+- GST (D12) → with processing and trading.
+
+## Phase 4 — Inventory, purchasing and sales ✅ (see PROGRESS.md)
+
+Deferred from Phase 4:
+- Purchase orders (E8) → when traders need them.
+- Tenant setting to allow negative stock; clearing an item's default categories.
+- XLSX/PDF stock exports → Phase 7 (CSV exists).
+- Stock records from the phone (the mobile app shows stock; recording is web-only) → Phase 13.
+- Harvests as stock lots and activities consuming stock → done in Phase 5.
+
+## Phase 5 — Crop management v2 ✅ (see PROGRESS.md)
+
+Deferred from Phase 5:
+- Crop photos (attachment storage, ADR 0009); weather service integration.
+- Other allocation bases (direct cost share, fixed percentages).
+- Offline crop recording on the phone → Phase 13.
+- Internal transfers of own produce/manure (P17) → Phase 11.
+- Decide whether field supervisors may record stock inputs (open question in PROGRESS).
+
+## Phase 6 — Workforce and assets (done 2026-10-20)
+
+Approved design: [workforce and assets](workforce/workforce-and-assets.md) (G1–G15). Left for later:
+
+- PF, ESI, TDS and minimum-wage rules (G6) → before larger farms use payroll.
+- WDV depreciation and machine-hour cost allocation to crops (G9, G12).
+- Depreciation of breeding animals → livestock phases (G10).
+- Offline attendance on the phone → Phase 13.
+
+## Phase 7 — Dashboard and core reports (done 2026-10-21)
+
+Approved design: [dashboard and reports](reports/dashboard-and-reports.md) (H1–H14). Left for later:
+
+- Emailed and scheduled reports (needs a server PDF and an email provider) → after Phase 14.
+- Hide labour cost in the workforce labour report from readers without pay access, as the wages report does.
+- Recurring expenses (H14) → Phase 14 or a small follow-up.
+
+## Phases 8–12 — Farming modules
+
+8. Livestock core + dairy — done 2026-10-21 ([livestock and dairy](livestock/livestock-and-dairy.md), I1–I16). Left for later: overhead allocation to herds by animal-days (I12); depreciation by the group of each month; offline livestock on the phone (Phase 13)
+9. Poultry batches and eggs; goat/sheep herds — done 2026-10-21 ([poultry, goats and sheep](livestock/poultry-goats-sheep.md), J1–J15). Left for later: overhead allocation to batches and herds (J15); a weekly feed entry that splits across days; offline batch records on the phone (Phase 13)
+10. Aquaculture — done 2026-10-21 ([aquaculture](aquaculture/aquaculture.md), K1–K15). Left for later: overhead allocation to pond cycles (K15); fish into stock when processing and cold storage arrive (Phase 12); reversing harvest charges with the sale; offline pond records on the phone (Phase 13)
+11. Organic resources — done 2026-10-21 ([organic resources](organic/organic-resources.md), L1–L15). Left for later: certification records (L10); overhead allocation to organic batches (L15); refusing bills to finished batches; offline compost records on the phone (Phase 13)
+12. Processing and trading — done 2026-10-21 ([processing and trading](processing/processing-and-trading.md), M1–M15). Left for later: food-safety and certification records (M11); label and barcode printing (M9); direct trading costs by item and customer returns in the trading report; trace export; overhead allocation to batches (M15); offline processing on the phone (Phase 13)
+
+## Phase 13 — Mobile offline (done 2026-10-22)
+
+Approved design: [mobile offline](mobile/mobile-offline.md) (N1–N15); [ADR 0010](adr/0010-offline-sync.md). Left for later:
+
+- Show the phone's waiting records inline in the lists loaded from the server.
+- Edit a record that needs attention in its original form (today: amounts, dates and notes on the Sync screen).
+- Show who changed a day record and when, next to *On the server*.
+- Stock records, set-up work and party records offline; photos (N15, with attachment storage).
+- A browser check of the web stale-record handling, and a real-phone check of offline mode.
+
+## Phase 14 — SaaS operations and production readiness (built 2026-10-27)
+
+Approved design: [SaaS operations](platform/saas-operations.md) (O1–O15); ADRs 0011–0013. To do on the real host before the
+first paying farm business (the production-readiness review, design section 12):
+
+- Choose the provider, create staging and production from `deploy/`, configure the alerts, publish the legal texts.
+- Build the image in CI, run the restore check, the k6 load tests on staging and a real-email check; record each result.
+- Android release through Play testing tracks.
+
+Left for later: billing and payments; SMS and push notifications; recurring expenses (H14); emailed and scheduled
+reports; several application instances (needs shared storage for exports, ADR 0009); iOS; a staging seed job for the
+load tests; self-hosted web fonts (today Google Fonts, allowed by the CSP).
+
+## Phase 15 — Billing and payments (built 2026-10-27)
+
+Approved design: [billing](platform/billing.md) (P1–P15); ADRs 0014–0016. Before charging the first farm business:
+
+- The product owner sets the real prices (the seeded ones are examples), the legal entity's GSTIN and address, and
+  opens the Razorpay account; the privacy notice says invoices keep billing details for 8 years.
+- On staging: the webhook, then one subscription end to end in Razorpay test mode (checkout, renewal, failed renewal,
+  refund); record the result.
+
+Left for later: foreign customers and export invoices (LUT); e-invoicing (IRN) above the threshold; per-module or
+per-seat pricing; coupons and referrals; usage-based charges; pro-rated switches between monthly and yearly; a Tamil
+page in the invoice PDF (needs a PDF library with Tamil shaping); input-tax (GST) accounts in the farm's own books, so
+*Record in my books* can split the GST; Play billing in the phone app.
+
+## Staging readiness (2026-10-28)
+
+Rehearsed locally in production mode; see [staging](ops/staging.md). Waiting for the product owner:
+
+- choose the provider and create the staging resources (database, server, backup bucket), DNS and the email provider;
+- a Razorpay test account and the seller's name, address and GSTIN;
+- push `main` and tag `v0.15.0`, so the release workflow publishes the image;
+- then the checks in [staging](ops/staging.md), and production the same way.

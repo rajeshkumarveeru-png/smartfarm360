@@ -5,3 +5,33 @@ databaseChangeLog:
       file: db/changelog/002-smartfarm360-crop-operations.yaml
   - include:
       file: db/changelog/003-smartfarm360-finance-procurement.yaml
+  - include:
+      file: db/changelog/004-platform-foundation.yaml
+  - include:
+      file: db/changelog/005-finance-core.yaml
+  - include:
+      file: db/changelog/006-stock-core.yaml
+  - include:
+      file: db/changelog/007-crop-v2.yaml
+  - include:
+      file: db/changelog/008-workforce-assets.yaml
+  - include:
+      file: db/changelog/009-reports.yaml
+  - include:
+      file: db/changelog/010-livestock.yaml
+  - include:
+      file: db/changelog/011-poultry-goats.yaml
+  - include:
+      file: db/changelog/012-aquaculture.yaml
+  - include:
+      file: db/changelog/013-organic.yaml
+  - include:
+      file: db/changelog/014-processing.yaml
+  - include:
+      file: db/changelog/015-offline.yaml
+  - include:
+      file: db/changelog/016-saas-operations.yaml
+  - include:
+      file: db/changelog/017-billing.yaml
+  - include:
+      file: db/changelog/018-bin-and-batch-lines.yaml

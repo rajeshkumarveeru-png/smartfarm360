@@ -1,21 +1,154 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, SafeAreaView,
+  ActivityIndicator, Alert, AppState, KeyboardAvoidingView, Modal, Platform, Pressable, SafeAreaView,
   ScrollView, StatusBar, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
-import { FarmEntry, EntryKind, loadEntries, saveEntry } from './src/storage/entries';
-import { API_BASE_URL, isApiConfigured } from './src/services/api';
-import { Language, TranslationKey, translations } from './src/i18n/translations';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
+import { FarmEntry, EntryKind, claimLegacyEntries, loadEntries, newEntryId, removeEntries, saveEntry, scopeKey } from './src/storage/entries';
+import { FinanceContext, entryRecord, entryRequest, loadFinance } from './src/finance/quickEntry';
+import { loadStock, quantityLabel, type StockView } from './src/stock/stockView';
+import CropScreen from './src/crop/CropScreen';
+import DashboardPanel from './src/dashboard/DashboardPanel';
+import LivestockScreen from './src/livestock/LivestockScreen';
+import WorkforceScreen from './src/workforce/WorkforceScreen';
+import PondsScreen from './src/aquaculture/PondsScreen';
+import CompostScreen from './src/organic/CompostScreen';
+import ProcessingScreen from './src/processing/ProcessingScreen';
+import { errorText } from './src/screens/AuthScreens';
+import { API_BASE_URL, apiRequest, completeSecondStep, hasStoredSession, isApiConfigured, onSessionEnded, refreshSession, signIn, signOut, type User } from './src/services/api';
+import { adopt, closeStore, forgetTenant, getState, isSavedOnPhone, onRecordsSent, openForUser, record, records as outboxRecords, setOnline, syncNow } from './src/offline/hub';
+import { sqliteStore } from './src/offline/sqliteStore';
+import { RecordBadge, SyncScreen, SyncStatusLine, useHubState } from './src/offline/SyncViews';
+import { kindKey } from './src/offline/figures';
+import type { OutboxRecord } from './src/offline/types';
+import { billingBanner, planLine, type PlanStatus } from './src/billing/billing';
+import { Language, TranslationKey, tr, translations } from './src/i18n/translations';
+import { loadTenants, rememberSelectedTenant, restoreSelectedTenant, type TenantSummary } from './src/auth/session';
+import { ConsentScreen, LoginScreen, TenantPicker } from './src/screens/AuthScreens';
 
-type Tab = 'home' | 'records' | 'crops' | 'livestock' | 'more';
+type Tab = 'home' | 'records' | 'crops' | 'livestock' | 'more' | 'stock' | 'workforce' | 'ponds' | 'compost' | 'processing' | 'sync';
 const expenseCategories: TranslationKey[] = ['seed','fertilizer','labour','feed','veterinary','irrigation','transport','other'];
 const incomeCategories: TranslationKey[] = ['milk','cropSale','eggs','livestockSale','other'];
 const money = (n: number) => `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 const today = () => new Date().toISOString().slice(0, 10);
 
+type Session = { user: User; tenants: TenantSummary[]; tenant: TenantSummary | null };
+
+/** The last signed-in user and their farm businesses, so the app opens offline (mobile offline design, N10). No secrets. */
+const LAST_SESSION_KEY = 'sf360.lastSession';
+const SYNC_EVERY_MS = 5 * 60_000;
+type LastSession = { user: User; tenants: TenantSummary[] };
+
+async function lastSession(): Promise<LastSession | null> {
+  try { const raw = await AsyncStorage.getItem(LAST_SESSION_KEY); return raw ? (JSON.parse(raw) as LastSession) : null; } catch { return null; }
+}
+
+/** Sign-in and tenant selection gate in front of the farm screens. */
 export default function App() {
   const [language, setLanguage] = useState<Language>('ta');
+  const [status, setStatus] = useState<'loading' | 'signedOut' | 'signedIn'>('loading');
+  const [session, setSession] = useState<Session | null>(null);
+
+  /** Opens the user's store first, so the farm business list itself can come from the phone when offline. */
+  const begin = useCallback(async (user: User, offline = false) => {
+    setLanguage(user.preferredLanguage);
+    await openForUser(user.id, sqliteStore);
+    const previous = await lastSession();
+    let tenants: TenantSummary[];
+    if (offline) {
+      tenants = previous?.user.id === user.id ? previous.tenants : [];
+    } else {
+      tenants = await loadTenants();
+      // Farm businesses the user is no longer a member of: their data leaves the phone; waiting records stay locked (N12)
+      if (previous?.user.id === user.id) {
+        for (const gone of previous.tenants.filter(p => !tenants.some(t => t.id === p.id && t.active))) await forgetTenant(gone.id);
+      }
+      await AsyncStorage.setItem(LAST_SESSION_KEY, JSON.stringify({ user, tenants })).catch(() => undefined);
+    }
+    setSession({ user, tenants, tenant: await restoreSelectedTenant(user.id, tenants) });
+    setStatus('signedIn');
+    if (!offline) void syncNow();
+  }, []);
+
+  useEffect(() => {
+    // The session ended on the server: the user signs in again; their records stay on the phone (N10)
+    onSessionEnded(() => { void closeStore(false); setSession(null); setStatus('signedOut'); });
+    (async () => {
+      const restored = await refreshSession().catch(() => null);
+      if (restored) return begin(restored.user);
+      const last = await lastSession();
+      // Offline with a refresh token still kept: open with the last user, refresh when the network is back
+      if (last && (await hasStoredSession())) return begin(last.user, true);
+      setStatus('signedOut');
+    })().catch(() => setStatus('signedOut'));
+  }, [begin]);
+
+  // Sync triggers (N6): the network coming back, the app coming to the front, and every 5 minutes with records waiting
+  useEffect(() => {
+    if (status !== 'signedIn') return;
+    const net = NetInfo.addEventListener(info => {
+      const online = info.isConnected !== false && info.isInternetReachable !== false;
+      const wasOffline = !getState().online;
+      setOnline(online);
+      if (online && wasOffline) void refreshSession().then(() => syncNow()).catch(() => undefined);
+    });
+    const app = AppState.addEventListener('change', next => { if (next === 'active') void syncNow(); });
+    const timer = setInterval(() => { if (getState().waiting > 0) void syncNow(); }, SYNC_EVERY_MS);
+    return () => { net(); app.remove(); clearInterval(timer); };
+  }, [status]);
+
+  const changeLanguage = (lang: Language) => {
+    setLanguage(lang);
+    if (session) void apiRequest('/api/v1/auth/me', { method: 'PATCH', body: { preferredLanguage: lang } }).catch(() => undefined);
+  };
+  const finishSignOut = async (clear: boolean) => {
+    await closeStore(clear);
+    if (clear) await AsyncStorage.removeItem(LAST_SESSION_KEY).catch(() => undefined);
+    await signOut();
+    setSession(null); setStatus('signedOut');
+  };
+  /** With records waiting: send now, keep them for the next sign-in, or discard them (N12). */
+  const doSignOut = async () => {
+    const open = getState().waiting + getState().attention + getState().locked;
+    if (open === 0) { await finishSignOut(true); return; }
+    const t = (path: string, params?: Record<string, string>) => tr(language, path, params);
+    Alert.alert(t('mobile.syncSignOutTitle'), t('mobile.syncSignOutBody', { count: String(open) }), [
+      { text: t('mobile.syncSignOutSend'), onPress: () => void (async () => {
+        await syncNow();
+        const left = getState().waiting + getState().attention + getState().locked;
+        if (left > 0) Alert.alert(t('mobile.syncSignOutTitle'), t('mobile.syncSignOutStill'));
+        await finishSignOut(left === 0);
+      })() },
+      { text: t('mobile.syncSignOutKeep'), onPress: () => void finishSignOut(false) },
+      { text: t('mobile.syncSignOutDiscard'), style: 'destructive', onPress: () => void finishSignOut(true) },
+    ]);
+  };
+
+  if (status === 'loading') return <SafeAreaView style={styles.safe}><ActivityIndicator size="large" color="#28734A" style={{ marginTop: 80 }} /></SafeAreaView>;
+  if (status === 'signedOut' || !session) {
+    return <LoginScreen language={language} onLanguage={changeLanguage}
+                        onSubmit={async (email, password) => { const s = await signIn(email, password); if (s.secondStepChallenge) return s.secondStepChallenge; await begin(s.user); return null; }}
+                        onSecondStep={async (challenge, code, recovery) => { const s = await completeSecondStep(challenge, code, recovery); await begin(s.user); }} />;
+  }
+  if (session.user.pendingConsents?.length) {
+    return <ConsentScreen language={language} pending={session.user.pendingConsents} onSignOut={() => void doSignOut()}
+                          onAccepted={async () => { const me = await apiRequest<User>('/api/v1/auth/me'); setSession({ ...session, user: me }); }} />;
+  }
+  if (!session.tenant) {
+    return <TenantPicker language={language} tenants={session.tenants} onSignOut={() => void doSignOut()}
+                         onPick={tenant => { void rememberSelectedTenant(session.user.id, tenant.id); setSession({ ...session, tenant }); }} />;
+  }
+  return <FarmHome key={`${session.user.id}/${session.tenant.id}`} user={session.user} tenant={session.tenant} language={language}
+                   onLanguage={changeLanguage} onSignOut={() => void doSignOut()} onSwitchTenant={() => setSession({ ...session, tenant: null })} />;
+}
+
+function FarmHome({ user, tenant, language, onLanguage, onSignOut, onSwitchTenant }: {
+  user: User; tenant: TenantSummary; language: Language; onLanguage: (l: Language) => void; onSignOut: () => void; onSwitchTenant: () => void;
+}) {
+  const setLanguage = onLanguage;
+  const storageKey = scopeKey(user.id, tenant.id);
   const [tab, setTab] = useState<Tab>('home');
   const [entries, setEntries] = useState<FarmEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,23 +158,72 @@ export default function App() {
   const [category, setCategory] = useState<TranslationKey>('other');
   const [date, setDate] = useState(today());
   const [saving, setSaving] = useState(false);
+  const [finance, setFinance] = useState<FinanceContext | null>(null);
+  const [stock, setStock] = useState<StockView | null>(null);
+  const [refreshes, setRefreshes] = useState(0);
+  const [phoneEntries, setPhoneEntries] = useState<OutboxRecord[]>([]);
+  const hub = useHubState();
+  const [announcements, setAnnouncements] = useState<{ id: number; messageEn: string; messageTa: string; maintenance: boolean }[]>([]);
+  useEffect(() => { apiRequest<typeof announcements>('/api/v1/announcements').then(setAnnouncements).catch(() => setAnnouncements([])); }, []);
+  // The plan and its banner; paying happens on the web (billing design, P14)
+  const [plan, setPlan] = useState<PlanStatus | null>(null);
+  useEffect(() => { apiRequest<PlanStatus>(`/api/v1/tenants/${tenant.id}/billing`).then(setPlan).catch(() => setPlan(null)); }, [tenant.id]);
+  const planBanner = billingBanner(language, plan);
+  const canSeeStock = tenant.permissions.includes('INVENTORY_READ');
+  const canSeeWorkforce = tenant.permissions.includes('WORKFORCE_READ') && tenant.enabledModules.includes('WORKFORCE');
+  const canSeePonds = tenant.permissions.includes('AQUACULTURE_READ') && tenant.enabledModules.includes('AQUACULTURE');
+  const canSeeCompost = tenant.permissions.includes('ORGANIC_READ') && tenant.enabledModules.includes('ORGANIC');
+  const canSeeProcessing = tenant.permissions.includes('PROCESSING_READ') && tenant.enabledModules.includes('PROCESSING');
+  const canRead = tenant.permissions.includes('FINANCE_READ');
+  const canPost = tenant.permissions.includes('FINANCE_WRITE');
   const t = useCallback((key: TranslationKey) => translations[language][key], [language]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const rows = await loadEntries();
+    const claimed = await claimLegacyEntries(storageKey);
+    if (claimed > 0) Alert.alert(t('appName'), tr(language, 'mobile.claimed', { count: String(claimed) }));
+    let rows = await loadEntries(storageKey);
+    if (canRead) {
+      try {
+        const context = await loadFinance(tenant.id, today());
+        // Entries saved before the outbox existed move into it once, keeping their ids, so they are never posted twice
+        const pending = rows.filter(e => e.syncStatus === 'pending');
+        if (canPost && pending.length) {
+          const moved: string[] = [];
+          const list: OutboxRecord[] = [];
+          for (const e of pending) { try { list.push(entryRecord(user.id, tenant.id, e, context)); moved.push(e.id); } catch { /* kept until its category exists */ } }
+          await adopt(list);
+          await removeEntries(storageKey, moved);
+          rows = await loadEntries(storageKey);
+          void syncNow();
+        }
+        setFinance(context);
+      } catch {
+        setFinance(null); // offline with nothing cached: show what is on the phone
+      }
+    }
+    setPhoneEntries((await outboxRecords()).filter(r => r.tenantId === tenant.id && (r.kind === 'expense' || r.kind === 'income')));
+    if (canSeeStock) {
+      try { setStock(await loadStock(tenant.id)); } catch { setStock(null); } // offline: stock needs the server
+    }
     setEntries(rows.sort((a,b) => b.createdAt.localeCompare(a.createdAt)));
+    setRefreshes(n => n + 1);
     setLoading(false);
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per user/tenant scope
+  }, [storageKey]);
   useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => onRecordsSent(() => { void refresh(); }), [refresh]);
+  useEffect(() => { void outboxRecords().then(list => setPhoneEntries(list.filter(r => r.tenantId === tenant.id && (r.kind === 'expense' || r.kind === 'income')))); },
+    [hub.waiting, hub.attention, hub.sent, hub.discarded, tenant.id]);
 
   const totals = useMemo(() => {
     const month = today().slice(0, 7);
     const rows = entries.filter(e => e.date.startsWith(month));
     const income = rows.filter(e => e.kind === 'income').reduce((s,e) => s + e.amount, 0);
     const expenses = rows.filter(e => e.kind === 'expense').reduce((s,e) => s + e.amount, 0);
+    if (finance) return { income: Number(finance.summary.monthRevenue), expenses: Number(finance.summary.monthCosts), net: Number(finance.summary.cashTotal) };
     return { income, expenses, net: income - expenses };
-  }, [entries]);
+  }, [entries, finance]);
 
   const openEntry = (kind: EntryKind) => {
     setModal(kind); setAmount(''); setDescription(''); setDate(today());
@@ -53,19 +235,40 @@ export default function App() {
       Alert.alert(t('appName'), t('required')); return;
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      Alert.alert(t('appName'), 'Use YYYY-MM-DD for the date.'); return;
+      Alert.alert(t('appName'), t('dateFormat')); return;
     }
     setSaving(true);
     const entry: FarmEntry = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      id: newEntryId(),
       kind: modal!, amount: Math.round(value * 100) / 100, description: description.trim(),
       category: category as string, date, createdAt: new Date().toISOString(), syncStatus: 'local-only',
     };
     try {
-      await saveEntry(entry); setModal(null); await refresh();
+      if (canPost && finance) {
+        try {
+          const { path, body } = entryRequest(tenant.id, entry, finance);
+          await record({ kind: entry.kind, target: `entry:${entry.id}`, summary: `${entry.date} · ${entry.description} · ${entry.amount.toFixed(2)}`,
+            method: 'POST', path, body, id: entry.id });
+          setModal(null); await refresh();
+          Alert.alert(t('appName'), t('postedToAccounts'));
+          return;
+        } catch (e) {
+          if (!isSavedOnPhone(e)) { Alert.alert(t('appName'), errorText(language, e)); return; }
+          setModal(null); await refresh();
+          Alert.alert(t('appName'), t('savedOffline'));
+          return;
+        }
+      }
+      if (canPost) {
+        // Offline before the accounts were ever loaded on this phone: kept, and moved into the outbox once they are
+        await saveEntry(storageKey, { ...entry, syncStatus: 'pending' }); setModal(null); await refresh();
+        Alert.alert(t('appName'), t('savedOffline'));
+        return;
+      }
+      await saveEntry(storageKey, entry); setModal(null); await refresh();
       Alert.alert(t('appName'), t('saved'));
     } catch {
-      Alert.alert(t('appName'), 'Could not save this entry. Please try again.');
+      Alert.alert(t('appName'), t('saveFailed'));
     } finally { setSaving(false); }
   };
 
@@ -81,20 +284,29 @@ export default function App() {
   const renderHome = () => (
     <>
       <View style={styles.hero}><View style={styles.heroTop}><Text style={styles.brand}>{t('appName')}</Text><Pressable onPress={() => setLanguage(language === 'ta' ? 'en' : 'ta')} style={styles.languagePill}><Text style={styles.languageText}>{language === 'ta' ? 'EN' : 'தமிழ்'}</Text></Pressable></View><Text style={styles.heroTitle}>{t('greeting')}</Text><Text style={styles.heroSub}>{t('subtitle')}</Text><View style={styles.leafBadge}><Text style={styles.leafEmoji}>🌱</Text><Text style={styles.leafText}>{t('month')}</Text></View></View>
-      <View style={styles.metricsGrid}><Metric label={t('revenue')} value={money(totals.income)} tone="green"/><Metric label={t('expenses')} value={money(totals.expenses)} tone="red"/><Metric label={t('net')} value={money(totals.net)} tone={totals.net < 0 ? 'red' : 'dark'}/></View>
+      <View style={styles.metricsGrid}><Metric label={t('revenue')} value={money(totals.income)} tone="green"/><Metric label={t('expenses')} value={money(totals.expenses)} tone="red"/><Metric label={finance ? tr(language, 'fin.cashAndBank') : t('net')} value={money(totals.net)} tone={totals.net < 0 ? 'red' : 'dark'}/></View>
+      <DashboardPanel tenant={tenant} language={language} scope={storageKey} pending={hub.waiting + entries.filter(e => e.syncStatus === 'pending').length} refreshKey={refreshes}/>
       <Text style={styles.sectionTitle}>{t('quickActions')}</Text><View style={styles.actionsRow}><Pressable style={styles.actionCard} onPress={() => openEntry('expense')}><Text style={styles.actionIcon}>↘</Text><Text style={styles.actionTitle}>{t('addExpense')}</Text></Pressable><Pressable style={[styles.actionCard, styles.incomeAction]} onPress={() => openEntry('income')}><Text style={[styles.actionIcon, styles.incomeIcon]}>↗</Text><Text style={styles.actionTitle}>{t('addIncome')}</Text></Pressable></View>
-      <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>{t('recent')}</Text><Pressable onPress={() => setTab('records')}><Text style={styles.seeAll}>View all →</Text></Pressable></View>
+      {stock && (stock.lowStock.length > 0 || stock.expiringLots.length > 0) && <Pressable onPress={() => setTab('stock')} style={styles.noteCard}><Text style={styles.noteTitle}>📦 {tr(language, 'stock.title')}</Text>{stock.lowStock.slice(0, 3).map(i => <Text key={i.id} style={styles.noteText}>{tr(language, 'stock.lowStock')}: {i.name} · {quantityLabel(language, i)}</Text>)}{stock.expiringLots.slice(0, 3).map(l => <Text key={l.lotId} style={styles.noteText}>{tr(language, l.expired ? 'stock.expired' : 'stock.expiringSoon')}: {l.itemName} · {l.lotNo} · {l.expiryDate}</Text>)}</Pressable>}
+      <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>{t('recent')}</Text><Pressable onPress={() => setTab('records')}><Text style={styles.seeAll}>{t('viewAll')}</Text></Pressable></View>
       {entries.length === 0 ? <View style={styles.emptyCard}><Text style={styles.emptyEmoji}>🧾</Text><Text style={styles.emptyText}>{t('noEntries')}</Text></View> : entries.slice(0,5).map(e => <EntryRow key={e.id} entry={e} language={language} />)}
       <View style={styles.noteCard}><Text style={styles.noteTitle}>ℹ️ {t('localMode')}</Text><Text style={styles.noteText}>{t('safety')}</Text></View>
     </>
   );
-  const renderRecords = () => <><ScreenTitle title={t('records')} subtitle={`${entries.length} · ${t('totalEntries')}`}/><View style={styles.actionsRow}><View style={{flex:1}}><Button title={`＋ ${t('expense')}`} onPress={() => openEntry('expense')}/></View><View style={{flex:1}}><Button title={`＋ ${t('income')}`} onPress={() => openEntry('income')} variant="secondary"/></View></View>{entries.length === 0 ? <View style={styles.emptyCard}><Text style={styles.emptyEmoji}>📒</Text><Text style={styles.emptyText}>{t('noEntries')}</Text></View> : entries.map(e => <EntryRow key={e.id} entry={e} language={language}/>)}</>;
-  const renderCrops = () => <><ScreenTitle title={t('cropOverview')} subtitle={t('cropHelp')}/><View style={styles.featureHero}><Text style={styles.featureEmoji}>🌾</Text><Text style={styles.featureHeading}>{t('crops')}</Text><Text style={styles.featureCopy}>{t('comingSoon')}</Text></View><View style={styles.infoCard}><Text style={styles.infoLabel}>{t('land')}</Text><Text style={styles.infoValue}>—</Text></View><View style={styles.infoCard}><Text style={styles.infoLabel}>{t('activeCycles')}</Text><Text style={styles.infoValue}>—</Text></View><View style={styles.infoCard}><Text style={styles.infoLabel}>{t('planned')}</Text><Text style={styles.infoValue}>—</Text></View><Text style={styles.smallNote}>{t('noFarmData')}</Text></>;
-  const renderLivestock = () => <><ScreenTitle title={t('livestockOverview')} subtitle={t('livestockHelp')}/><View style={styles.featureHero}><Text style={styles.featureEmoji}>🐄</Text><Text style={styles.featureHeading}>{t('livestock')}</Text><Text style={styles.featureCopy}>{t('comingSoon')}</Text></View><View style={styles.infoCard}><Text style={styles.infoLabel}>{t('animals')}</Text><Text style={styles.infoValue}>—</Text></View><View style={styles.infoCard}><Text style={styles.infoLabel}>{t('production')}</Text><Text style={styles.infoValue}>—</Text></View><View style={styles.infoCard}><Text style={styles.infoLabel}>{t('feedCost')}</Text><Text style={styles.infoValue}>—</Text></View><Text style={styles.smallNote}>{t('noFarmData')}</Text></>;
-  const renderMore = () => <><ScreenTitle title={t('more')} subtitle={t('modules')}/>{['🌱  '+t('crops'),'🐄  '+t('livestock'),'🐓  Poultry','🐟  Aquaculture','♻️  Organic resources','👩🏽‍🌾  Workers','🚜  Equipment','📊  Reports'].map((x,i)=><View style={styles.moduleRow} key={i}><Text style={styles.moduleText}>{x}</Text><Text style={styles.moduleStatus}>{i < 2 ? '›' : '·'}</Text></View>)}<Text style={styles.sectionTitle}>{t('settings')}</Text><View style={styles.infoCard}><Text style={styles.infoLabel}>{t('farmProfile')}</Text><Text style={styles.featureCopy}>{t('profileDesc')}</Text></View><View style={styles.infoCard}><Text style={styles.infoLabel}>{t('sync')}</Text><Text style={styles.infoValue}>{isApiConfigured ? t('apiConfigured') : t('apiMissing')}</Text><Text style={styles.smallNote}>{API_BASE_URL || t('localMode')}</Text></View><Button title={language === 'ta' ? 'Switch to English' : 'தமிழுக்கு மாற்றவும்'} onPress={() => setLanguage(language === 'ta' ? 'en' : 'ta')} variant="outline"/></>;
+  const PhoneEntry = ({ r }: { r: OutboxRecord }) => <View style={styles.entryRow}><View style={[styles.entryGlyph, r.kind === 'income' ? styles.entryGlyphIncome : styles.entryGlyphExpense]}><Text style={[styles.entryGlyphText, r.kind === 'income' ? styles.green : styles.red]}>{r.kind === 'income' ? '↗' : '↘'}</Text></View><View style={styles.entryInfo}><Text style={styles.entryDescription} numberOfLines={1}>{tr(language, kindKey(r.kind))}</Text><Text style={styles.entryMeta}>{r.summary}</Text></View><RecordBadge language={language} record={r}/></View>;
+  const renderRecords = () => <><ScreenTitle title={t('records')} subtitle={`${entries.length + phoneEntries.length} · ${t('totalEntries')}`}/>{phoneEntries.map(r => <PhoneEntry key={r.id} r={r}/>)}<View style={styles.actionsRow}><View style={{flex:1}}><Button title={`＋ ${t('expense')}`} onPress={() => openEntry('expense')}/></View><View style={{flex:1}}><Button title={`＋ ${t('income')}`} onPress={() => openEntry('income')} variant="secondary"/></View></View>{entries.length === 0 ? <View style={styles.emptyCard}><Text style={styles.emptyEmoji}>📒</Text><Text style={styles.emptyText}>{t('noEntries')}</Text></View> : entries.map(e => <EntryRow key={e.id} entry={e} language={language}/>)}</>;
+  const renderCrops = () => <CropScreen tenant={tenant} language={language} />;
+  const renderWorkforce = () => <WorkforceScreen tenant={tenant} language={language} />;
+  const renderPonds = () => <PondsScreen tenant={tenant} language={language} />;
+  const renderCompost = () => <CompostScreen tenant={tenant} language={language} />;
+  const renderProcessing = () => <ProcessingScreen tenant={tenant} language={language} />;
+  const renderLivestock = () => <LivestockScreen tenant={tenant} language={language} />;
+  const renderSync = () => <SyncScreen language={language} />;
+  const renderStock = () => <><ScreenTitle title={tr(language, 'stock.title')} subtitle={tr(language, 'stock.subtitle')}/>{!stock ? <View style={styles.emptyCard}><Text style={styles.emptyEmoji}>📦</Text><Text style={styles.emptyText}>{t('stockOffline')}</Text></View> : <><View style={styles.metricsGrid}><Metric label={tr(language, 'stock.totalValue')} value={money(stock.totalValue)} tone="dark"/></View>{stock.items.length === 0 ? <View style={styles.emptyCard}><Text style={styles.emptyText}>{tr(language, 'stock.noStock')}</Text></View> : stock.items.map(i => <View key={i.id} style={styles.infoCard}><Text style={styles.infoLabel}>{i.name}{i.lowStock ? ` · ${tr(language, 'stock.lowStock')}` : ''}</Text><Text style={styles.infoValue}>{quantityLabel(language, i)}</Text><Text style={styles.smallNote}>{Number(i.value) === 0 && Number(i.quantity) > 0 ? tr(language, 'stock.nilValue') : money(Number(i.value))}</Text></View>)}{stock.expiringLots.map(l => <View key={l.lotId} style={styles.infoCard}><Text style={styles.infoLabel}>{tr(language, l.expired ? 'stock.expired' : 'stock.expiringSoon')}</Text><Text style={styles.infoValue}>{l.itemName} · {l.lotNo}</Text><Text style={styles.smallNote}>{l.expiryDate}</Text></View>)}</>}<Button title={t('refresh')} onPress={() => void refresh()} variant="outline"/></>;
+  const renderMore = () => <><ScreenTitle title={t('more')} subtitle={t('modules')}/>{plan && <View style={styles.moduleRow}><Text style={styles.moduleText}>💳  {planLine(language, plan)}</Text></View>}<Pressable onPress={() => setTab('sync')} style={styles.moduleRow}><Text style={styles.moduleText}>🔄  {tr(language, 'mobile.syncTitle')}</Text><Text style={styles.moduleStatus}>›</Text></Pressable>{canSeeStock && <Pressable onPress={() => setTab('stock')} style={styles.moduleRow}><Text style={styles.moduleText}>📦  {tr(language, 'stock.title')}</Text><Text style={styles.moduleStatus}>›</Text></Pressable>}{canSeeWorkforce && <Pressable onPress={() => setTab('workforce')} style={styles.moduleRow}><Text style={styles.moduleText}>👩🏽‍🌾  {tr(language, 'workforce.title')}</Text><Text style={styles.moduleStatus}>›</Text></Pressable>}{canSeePonds && <Pressable onPress={() => setTab('ponds')} style={styles.moduleRow}><Text style={styles.moduleText}>🐟  {tr(language, 'mobile.pondsAndWater')}</Text><Text style={styles.moduleStatus}>›</Text></Pressable>}{canSeeProcessing && <Pressable onPress={() => setTab('processing')} style={styles.moduleRow}><Text style={styles.moduleText}>🏭  {tr(language, 'mobile.processing')}</Text><Text style={styles.moduleStatus}>›</Text></Pressable>}{canSeeCompost && <Pressable onPress={() => setTab('compost')} style={styles.moduleRow}><Text style={styles.moduleText}>♻️  {tr(language, 'mobile.compost')}</Text><Text style={styles.moduleStatus}>›</Text></Pressable>}{['🌱  '+t('crops'),'🐄  '+t('livestock'),'🐓  '+tr(language,'modules.POULTRY'),...(canSeePonds ? [] : ['🐟  '+tr(language,'modules.AQUACULTURE')]),...(canSeeCompost ? [] : ['♻️  '+tr(language,'modules.ORGANIC')]),'🚜  '+tr(language,'modules.ASSETS')].map((x,i)=><View style={styles.moduleRow} key={i}><Text style={styles.moduleText}>{x}</Text><Text style={styles.moduleStatus}>{i < 2 ? '›' : '·'}</Text></View>)}<Text style={styles.sectionTitle}>{t('settings')}</Text><View style={styles.infoCard}><Text style={styles.infoLabel}>{t('farmProfile')}</Text><Text style={styles.featureCopy}>{t('profileDesc')}</Text></View><View style={styles.infoCard}><Text style={styles.infoLabel}>{t('sync')}</Text><Text style={styles.infoValue}>{isApiConfigured ? t('apiConfigured') : t('apiMissing')}</Text><Text style={styles.smallNote}>{API_BASE_URL || t('localMode')}</Text></View><Button title={language === 'ta' ? 'Switch to English' : 'தமிழுக்கு மாற்றவும்'} onPress={() => setLanguage(language === 'ta' ? 'en' : 'ta')} variant="outline"/><View style={styles.infoCard}><Text style={styles.infoLabel}>{tr(language, 'nav.switchTenant')}</Text><Text style={styles.infoValue}>{tenant.name}</Text><Text style={styles.smallNote}>{tr(language, 'auth.signedInAs', { email: user.email })}</Text></View><View style={{gap:10}}><Button title={tr(language, 'mobileAuth.switchTenant')} onPress={onSwitchTenant} variant="secondary"/><Button title={tr(language, 'auth.signOut')} onPress={onSignOut} variant="outline"/></View></>;
 
-  const screen = tab === 'home' ? renderHome() : tab === 'records' ? renderRecords() : tab === 'crops' ? renderCrops() : tab === 'livestock' ? renderLivestock() : renderMore();
-  return <SafeAreaView style={styles.safe}><ExpoStatusBar style="dark"/><StatusBar barStyle="dark-content" backgroundColor="#F5F7F0"/><View style={styles.appBody}><ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>{loading ? <ActivityIndicator size="large" color="#28734A" style={{marginTop:60}}/> : screen}</ScrollView><View style={styles.tabBar}>{([['home','⌂',t('dashboard')],['records','▤',t('records')],['crops','♧',t('crops')],['livestock','♙',t('livestock')],['more','•••',t('more')]] as [Tab,string,string][]).map(([key,icon,label])=><Pressable key={key} onPress={() => setTab(key)} style={styles.tabItem}><Text style={[styles.tabIcon,tab===key && styles.activeTabIcon]}>{icon}</Text><Text numberOfLines={1} style={[styles.tabLabel,tab===key && styles.activeTabLabel]}>{label}</Text>{tab===key && <View style={styles.activeDot}/>}</Pressable>)}</View></View>
+  const screen = tab === 'home' ? renderHome() : tab === 'records' ? renderRecords() : tab === 'crops' ? renderCrops() : tab === 'livestock' ? renderLivestock() : tab === 'stock' ? renderStock() : tab === 'workforce' ? renderWorkforce() : tab === 'ponds' ? renderPonds() : tab === 'compost' ? renderCompost() : tab === 'processing' ? renderProcessing() : tab === 'sync' ? renderSync() : renderMore();
+  return <SafeAreaView style={styles.safe}><ExpoStatusBar style="dark"/><StatusBar barStyle="dark-content" backgroundColor="#F5F7F0"/><View style={styles.appBody}><ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}><SyncStatusLine language={language} onPress={() => setTab('sync')}/>{announcements.map(a => <View key={a.id} style={[styles.noteCard, { marginTop: 0, marginBottom: 12 }]}><Text style={styles.noteText}>{language === 'ta' ? a.messageTa : a.messageEn}</Text></View>)}{planBanner && <View style={[styles.noteCard, { marginTop: 0, marginBottom: 12 }]}><Text style={styles.noteText}>{planBanner}</Text></View>}{loading ? <ActivityIndicator size="large" color="#28734A" style={{marginTop:60}}/> : screen}</ScrollView><View style={styles.tabBar}>{([['home','⌂',t('dashboard')],['records','▤',t('records')],['crops','♧',t('crops')],['livestock','♙',t('livestock')],['more','•••',t('more')]] as [Tab,string,string][]).map(([key,icon,label])=><Pressable key={key} onPress={() => setTab(key)} style={styles.tabItem}><Text style={[styles.tabIcon,tab===key && styles.activeTabIcon]}>{icon}</Text><Text numberOfLines={1} style={[styles.tabLabel,tab===key && styles.activeTabLabel]}>{label}</Text>{tab===key && <View style={styles.activeDot}/>}</Pressable>)}</View></View>
     <Modal visible={modal !== null} animationType="slide" transparent onRequestClose={() => setModal(null)}><KeyboardAvoidingView style={styles.modalShade} behavior={Platform.OS === 'ios' ? 'padding' : undefined}><View style={styles.modalCard}><View style={styles.modalHandle}/><Text style={styles.modalTitle}>{modal === 'expense' ? t('addExpense') : t('addIncome')}</Text><Text style={styles.fieldLabel}>{t('amount')}</Text><TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" style={styles.input} placeholderTextColor="#9AA59B"/><Text style={styles.fieldLabel}>{t('description')}</Text><TextInput value={description} onChangeText={setDescription} placeholder={t('description')} style={styles.input} placeholderTextColor="#9AA59B"/><Text style={styles.fieldLabel}>{t('category')}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>{(modal === 'expense' ? expenseCategories : incomeCategories).map(c=><Pressable key={c} onPress={() => setCategory(c)} style={[styles.categoryChip,category===c && styles.categorySelected]}><Text style={[styles.categoryText,category===c && styles.categorySelectedText]}>{t(c)}</Text></Pressable>)}</ScrollView><Text style={styles.fieldLabel}>{t('date')}</Text><TextInput value={date} onChangeText={setDate} style={styles.input} placeholder="YYYY-MM-DD"/><View style={styles.modalButtons}><View style={{flex:1}}><Button title={t('cancel')} variant="outline" onPress={() => setModal(null)}/></View><View style={{flex:1}}><Pressable disabled={saving} onPress={() => void submitEntry()} style={[styles.button,saving && {opacity:0.6}]}><Text style={styles.buttonText}>{saving ? '…' : t('save')}</Text></Pressable></View></View></View></KeyboardAvoidingView></Modal>
   </SafeAreaView>;
 }
@@ -102,7 +314,7 @@ export default function App() {
 function EntryRow({entry,language}:{entry:FarmEntry;language:Language}) {
   const tr = translations[language]; const isIncome = entry.kind === 'income';
   const categoryLabel = (tr as Record<string,string>)[entry.category] || entry.category;
-  return <View style={styles.entryRow}><View style={[styles.entryGlyph,isIncome ? styles.entryGlyphIncome : styles.entryGlyphExpense]}><Text style={[styles.entryGlyphText,isIncome ? styles.green : styles.red]}>{isIncome ? '↗' : '↘'}</Text></View><View style={styles.entryInfo}><Text style={styles.entryDescription} numberOfLines={1}>{entry.description}</Text><Text style={styles.entryMeta}>{categoryLabel} · {entry.date}</Text></View><View style={styles.entryAmountWrap}><Text style={[styles.entryAmount,isIncome ? styles.green : styles.red]}>{isIncome ? '+' : '−'}{money(entry.amount)}</Text><Text style={styles.entrySync}>{entry.syncStatus === 'local-only' ? '● Local' : '✓ Synced'}</Text></View></View>;
+  return <View style={styles.entryRow}><View style={[styles.entryGlyph,isIncome ? styles.entryGlyphIncome : styles.entryGlyphExpense]}><Text style={[styles.entryGlyphText,isIncome ? styles.green : styles.red]}>{isIncome ? '↗' : '↘'}</Text></View><View style={styles.entryInfo}><Text style={styles.entryDescription} numberOfLines={1}>{entry.description}</Text><Text style={styles.entryMeta}>{categoryLabel} · {entry.date}</Text></View><View style={styles.entryAmountWrap}><Text style={[styles.entryAmount,isIncome ? styles.green : styles.red]}>{isIncome ? '+' : '−'}{money(entry.amount)}</Text><Text style={styles.entrySync}>{entry.syncStatus === 'pending' ? tr.pendingBadge : entry.syncStatus === 'local-only' ? tr.localBadge : tr.syncedBadge}</Text></View></View>;
 }
 
 const styles = StyleSheet.create({

@@ -1,0 +1,35 @@
+# TLS, HTTPS redirect, compression and headers in front of the app (SaaS operations design, O2).
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	# Metrics and probes are never served to the internet
+	@management path /actuator* /v3/api-docs* /swagger-ui*
+	respond @management 404
+
+	# Uploads and exports stay small; large bodies are refused before they reach the app
+	request_body {
+		max_size 5MB
+	}
+
+	reverse_proxy app:8080 {
+		header_up X-Forwarded-Proto {scheme}
+		health_uri /api/v1/announcements
+		health_interval 30s
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}
