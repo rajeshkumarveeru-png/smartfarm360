@@ -122,8 +122,13 @@ describe('poultry, goats and sheep web', () => {
     expect(screen.getByText('Enter the number of heads.')).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Number counted'), '990');
     await userEvent.click(screen.getByRole('button', { name: 'Record change' }));
+    // A count correction needs a reason; the message says so (it used to show the milk screen's message)
+    expect(screen.getByText(/Say why the count changed/)).toBeInTheDocument();
+    expect(calls((u, i) => u.endsWith('/flocks/1/movements') && i?.method === 'POST')).toHaveLength(0);
+    await userEvent.type(screen.getByLabelText('Why the number changed'), 'Recounted the shed');
+    await userEvent.click(screen.getByRole('button', { name: 'Record change' }));
     await waitFor(() => expect(calls((u, i) => u.endsWith('/flocks/1/movements') && i?.method === 'POST')).toHaveLength(1));
-    expect(calls((u, i) => u.endsWith('/movements') && i?.method === 'POST')[0][1]!.body).toMatchObject({ kind: 'COUNT', heads: null, countedHeads: 990 });
+    expect(calls((u, i) => u.endsWith('/movements') && i?.method === 'POST')[0][1]!.body).toMatchObject({ kind: 'COUNT', heads: null, countedHeads: 990, cause: 'Recounted the shed' });
   });
 
   it('offers kidding for a goat herd but no daily batch record', async () => {

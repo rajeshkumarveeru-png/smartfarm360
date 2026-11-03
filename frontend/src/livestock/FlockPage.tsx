@@ -136,6 +136,8 @@ export default function FlockPage() {
     const counting = move.kind === 'COUNT';
     if (counting ? !/^\d{1,7}$/.test(move.countedHeads) : !/^\d{1,7}$/.test(move.heads) || Number(move.heads) <= 0) { setError(t('errors.heads')); return; }
     if (move.kind === 'MOVED' && !move.toGroupId) { setError(t('errors.toGroup')); return; }
+    // A count correction keeps a note of why the number changed
+    if (counting && !move.cause.trim()) { setError(t('errors.countReason')); return; }
     void send<Movement[]>(`${flock}/movements`, 'POST', { date: move.date, kind: move.kind, heads: counting ? null : Number(move.heads),
       countedHeads: counting ? Number(move.countedHeads) : null, toGroupId: move.kind === 'MOVED' ? Number(move.toGroupId) : null, cause: move.cause || null }, null,
     () => { setMove({ ...move, heads: '', countedHeads: '', cause: '' }); return t('headsRecorded'); });
@@ -214,7 +216,8 @@ export default function FlockPage() {
             : <label>{t('heads')}<input inputMode="numeric" value={move.heads} onChange={e => setMove({ ...move, heads: e.target.value })} /></label>}
           {move.kind === 'MOVED' && <label>{t('toGroup')}<select value={move.toGroupId} onChange={e => setMove({ ...move, toGroupId: e.target.value })}>
             <option value="">—</option>{others.filter(g => !g.closed).map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></label>}
-          <label className="full">{t('cause')} <small>{tc('optional')}</small><input maxLength={300} value={move.cause} onChange={e => setMove({ ...move, cause: e.target.value })} /></label>
+          <label className="full">{move.kind === 'COUNT' ? t('countReason') : <>{t('cause')} <small>{tc('optional')}</small></>}
+            <input maxLength={300} value={move.cause} placeholder={move.kind === 'COUNT' ? t('countReasonExample') : undefined} onChange={e => setMove({ ...move, cause: e.target.value })} /></label>
           {move.kind === 'COUNT' && <p className="hint full">{t('countHelp')}</p>}
           <div className="form-actions full"><button className="secondary">{t('recordHeads')}</button></div>
         </form>

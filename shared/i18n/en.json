@@ -972,7 +972,7 @@
     "ANIMAL_NOT_IN_GROUP": "This animal was not in that group on that day.",
     "MILK_ALREADY_USED": "Some of this day's milk is already sold or used. Record the difference as discarded milk instead.",
     "GROUP_REQUIRED": "Choose the group.",
-    "REASON_REQUIRED": "Say why the milk was discarded.",
+    "REASON_REQUIRED": "Please give the reason.",
     "NOTHING_TO_RECORD": "Enter the litres.",
     "PLAN_ITEM_NOT_FOUND": "Health plan item not found.",
     "NOT_A_COUNTED_GROUP": "Head counts are kept for poultry batches and goat and sheep herds.",
@@ -2589,7 +2589,8 @@
       "heads": "Enter the number of heads.",
       "toGroup": "Choose the group they moved to.",
       "saleKg": "Enter the live weight for a price per kg.",
-      "planDescription": "Describe the vaccination or treatment."
+      "planDescription": "Describe the vaccination or treatment.",
+      "countReason": "Say why the count changed, for example \"recounted the shed\"."
     },
     "flag": {
       "WITHHELD": "milk withheld",
@@ -2732,7 +2733,9 @@
     "tabMoney": "Sales & expenses",
     "batchMoney": "Money for this batch",
     "herdMoney": "Money for this herd",
-    "tabDaily": "Daily record"
+    "tabDaily": "Daily record",
+    "countReason": "Why the number changed",
+    "countReasonExample": "e.g. recounted the shed, birds bought locally"
   },
   "aquaculture": {
     "title": "Fish farming",
