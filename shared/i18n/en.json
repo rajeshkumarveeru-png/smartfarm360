@@ -378,8 +378,9 @@
     "assets": "Assets",
     "dashboard": "Dashboard",
     "reports": "Reports",
-    "livestock": "Livestock",
+    "livestock": "Cows & dairy",
     "poultry": "Poultry",
+    "smallStock": "Goats & sheep",
     "aquaculture": "Fish farming",
     "organic": "Organic manure",
     "processing": "Processing",
@@ -2722,7 +2723,9 @@
     "planCopied": "Plan items added: {{count}}.",
     "feedPerDozen": "kg feed per dozen",
     "costPerHeadMonth": "Cost per head per month",
-    "flocksHelpReport": "Each batch's or herd's own revenue and costs in the period. Hen-day % is eggs per bird per day."
+    "flocksHelpReport": "Each batch's or herd's own revenue and costs in the period. Hen-day % is eggs per bird per day.",
+    "batchesTab": "Batches",
+    "herdsTab": "Herds"
   },
   "aquaculture": {
     "title": "Fish farming",

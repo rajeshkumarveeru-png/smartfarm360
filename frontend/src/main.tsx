@@ -156,7 +156,11 @@ function App() {
               <Route path="animals/:animalId" element={<AnimalPage />} />
               <Route path="milk" element={<MilkPage />} />
               <Route path="poultry" element={<FlocksPage kind="poultry" />} />
+              <Route path="poultry/reports" element={<LivestockReportsPage scope="poultry" />} />
+              <Route path="poultry/:groupId" element={<FlockPage />} />
               <Route path="small-stock" element={<FlocksPage kind="smallStock" />} />
+              <Route path="small-stock/reports" element={<LivestockReportsPage scope="smallStock" />} />
+              <Route path="small-stock/:groupId" element={<FlockPage />} />
               <Route path="flocks/:groupId" element={<FlockPage />} />
               <Route path="care" element={<CarePage />} />
               <Route path="groups" element={<GroupsPage />} />

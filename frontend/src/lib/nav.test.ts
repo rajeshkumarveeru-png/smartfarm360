@@ -18,13 +18,14 @@ describe('navigation visibility', () => {
     expect(visibleNav(owner).map(i => i.key)).not.toContain('crops');
   });
 
-  it('gives poultry its own entry, and shows livestock only for dairy, goats or sheep', () => {
+  it('gives each animal section its own entry: cows and dairy, poultry, goats and sheep', () => {
     const owner = (modules: TenantSummary['enabledModules']) => visibleNav(tenant(['TENANT_READ', 'LIVESTOCK_READ'], modules)).map(i => i.key);
     expect(owner(['POULTRY'])).toContain('poultry');
     expect(owner(['POULTRY'])).not.toContain('livestock');
     expect(owner(['DAIRY'])).toEqual(expect.arrayContaining(['livestock']));
     expect(owner(['DAIRY'])).not.toContain('poultry');
-    expect(owner(['DAIRY', 'POULTRY'])).toEqual(expect.arrayContaining(['livestock', 'poultry']));
+    expect(owner(['GOAT_SHEEP'])).toEqual(['dashboard', 'smallStock', 'reports', 'settings']);
+    expect(owner(['DAIRY', 'POULTRY', 'GOAT_SHEEP'])).toEqual(expect.arrayContaining(['livestock', 'poultry', 'smallStock']));
     expect(visibleNav(tenant(['TENANT_READ', 'LIVESTOCK_READ'], ['POULTRY'])).find(i => i.key === 'poultry')!.path).toBe('livestock/poultry');
   });
 

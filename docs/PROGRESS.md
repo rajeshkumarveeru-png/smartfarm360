@@ -1973,6 +1973,31 @@ module.
 | `frontend: npm test` | Passed: **108 tests** (1 new: poultry entry and when Livestock shows) |
 | `mobile: npm test` | Passed: **76 tests** |
 
+## Cows, poultry, goats and sheep as separate sections (2026-11-03)
+
+The owner asked for each kind of animal to be its own simple section, like fish farming: no poultry tab among the cows,
+and no herd or milk tabs in poultry.
+
+- **Menu:** one item per section, each shown only with its module: *Cows & dairy* (`DAIRY`), *Poultry* (`POULTRY`) and
+  *Goats & sheep* (`GOAT_SHEEP`). On a poultry or goat page, that section's item is the highlighted one.
+- **Tabs per section** (`LivestockLayout`, by path):
+  - *Cows & dairy:* Herd, Milk, Breeding and health, Groups, Reports.
+  - *Poultry:* Batches and Reports.
+  - *Goats & sheep:* Herds and Reports.
+- **Pages stay in their section:** batch and herd pages are now at `livestock/poultry/{id}` and
+  `livestock/small-stock/{id}`. The old `livestock/flocks/{id}` still works, and lists and reports link to the new paths.
+- **Reports per section:**
+  - `livestock/poultry/reports` lists poultry batches only, and `livestock/small-stock/reports` goat and sheep herds only.
+  - The cows' reports show milk and herd profitability without the poultry and goat groups. The herd rows carry no
+    species, so the batch report's group ids are used to leave those groups out.
+- No backend change.
+
+| Command | Result |
+|---|---|
+| `frontend: npm run lint`, `npx tsc --noEmit`, `npm run build` | Passed |
+| `frontend: npm test` | Passed: **109 tests**. Updated: batch links; the reports test now checks a section shows only its own animals; the poultry tabs test now checks Batches and Reports and no cattle tabs. New: the cows section shows no poultry or goat tabs; a menu item per section |
+| `mobile: npm test` | Passed: **76 tests** |
+
 ## Known gaps and defects
 
 Security and platform:

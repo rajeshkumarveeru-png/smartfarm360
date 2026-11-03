@@ -107,7 +107,7 @@ export default function FlocksPage({ kind }: { kind: 'poultry' | 'smallStock' })
           <thead><tr><th>{t('groupName')}</th><th>{t('purposeLabel')}</th><th>{t(kind === 'poultry' ? 'placedOn' : 'startedOn')}</th><th className="num">{t('heads')}</th></tr></thead>
           <tbody>{visible.map(g => (
             <tr key={g.id}>
-              <td><Link to={`/t/${tenant.id}/livestock/flocks/${g.id}`}>{g.name}</Link>{g.closed && <small> · {t('closed')}</small>}
+              <td><Link to={`/t/${tenant.id}/livestock/${kind === 'poultry' ? 'poultry' : 'small-stock'}/${g.id}`}>{g.name}</Link>{g.closed && <small> · {t('closed')}</small>}
                 {kind === 'smallStock' && <small> · {t(`species.${g.species}`)}</small>}</td>
               <td>{t(`purpose.${g.purpose}`)}</td><td>{g.placedOn ? formatDate(g.placedOn, lang) : '—'}</td>
               <td className="num">{formatNumber(g.animals, lang, 0)}</td>

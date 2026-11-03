@@ -8,9 +8,10 @@ export const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard', path: 'dashboard', permission: 'TENANT_READ' },
   { key: 'farms', path: 'farms', permission: 'FARM_READ' },
   { key: 'crops', path: 'crops', permission: 'CROP_READ', module: 'CROP' },
-  // Poultry has its own entry; Livestock covers dairy, goats and sheep (and still holds the poultry tab when both are on)
-  { key: 'livestock', path: 'livestock', permission: 'LIVESTOCK_READ', anyModule: ['DAIRY', 'GOAT_SHEEP'] },
+  // One entry per animal section: cows and dairy, poultry, and goats and sheep are kept apart
+  { key: 'livestock', path: 'livestock', permission: 'LIVESTOCK_READ', module: 'DAIRY' },
   { key: 'poultry', path: 'livestock/poultry', permission: 'LIVESTOCK_READ', module: 'POULTRY' },
+  { key: 'smallStock', path: 'livestock/small-stock', permission: 'LIVESTOCK_READ', module: 'GOAT_SHEEP' },
   { key: 'aquaculture', path: 'aquaculture', permission: 'AQUACULTURE_READ', module: 'AQUACULTURE' },
   { key: 'organic', path: 'organic', permission: 'ORGANIC_READ', module: 'ORGANIC' },
   { key: 'processing', path: 'processing', permission: 'PROCESSING_READ', module: 'PROCESSING' },

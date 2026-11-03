@@ -70,7 +70,7 @@ describe('poultry, goats and sheep web', () => {
 
   it('lists open poultry batches only and starts a bought batch with its bill', async () => {
     renderAt('/t/9/livestock/poultry', <FlocksPage kind="poultry" />, '/t/:tenantId/livestock/poultry');
-    expect(await screen.findByRole('link', { name: 'Layer shed 1' })).toHaveAttribute('href', '/t/9/livestock/flocks/1');
+    expect(await screen.findByRole('link', { name: 'Layer shed 1' })).toHaveAttribute('href', '/t/9/livestock/poultry/1');
     expect(screen.queryByText('Broilers May')).not.toBeInTheDocument();
     expect(screen.queryByText('Goat herd')).not.toBeInTheDocument();
     await userEvent.click(screen.getByLabelText('Show closed batches'));
@@ -139,13 +139,26 @@ describe('poultry, goats and sheep web', () => {
     expect(calls(u => u.endsWith('/finance/parties'))).toHaveLength(0);
   });
 
-  it('shows batches and herds on the reports page without asking for the milk report', async () => {
-    renderAt('/t/9/livestock/reports', <LivestockReportsPage />, '/t/:tenantId/livestock/reports');
-    expect(await screen.findByRole('link', { name: 'Goat herd' })).toHaveAttribute('href', '/t/9/livestock/flocks/3');
+  it('each section reports only its own animals, without asking for the milk report', async () => {
+    renderAt('/t/9/livestock/small-stock/reports', <LivestockReportsPage scope="smallStock" />, '/t/:tenantId/livestock/small-stock/reports');
+    expect(await screen.findByRole('link', { name: 'Goat herd' })).toHaveAttribute('href', '/t/9/livestock/small-stock/3');
+    expect(screen.queryByRole('link', { name: 'Layer shed 1' })).not.toBeInTheDocument();
     expect(calls(u => u.includes('/reports/milk'))).toHaveLength(0);
   });
 
-  it('shows only the parts of livestock whose modules are on, and opens on poultry without dairy', async () => {
+  it('the cows and dairy section shows no poultry or goat tabs, even with those modules on', async () => {
+    tenant.enabledModules = ['DAIRY', 'POULTRY', 'GOAT_SHEEP'];
+    render(<MemoryRouter initialEntries={['/t/9/livestock/care']}><Routes>
+      <Route path="/t/:tenantId/livestock" element={<LivestockLayout />}><Route path="care" element={<p>care page</p>} /></Route></Routes></MemoryRouter>);
+    const tabs = await screen.findByRole('navigation', { name: 'Livestock' });
+    expect(tabs).toHaveTextContent('Herd');
+    expect(tabs).toHaveTextContent('Milk');
+    expect(tabs).not.toHaveTextContent('Poultry');
+    expect(tabs).not.toHaveTextContent('Batches');
+    expect(tabs).not.toHaveTextContent('Goats and sheep');
+  });
+
+  it('opens on poultry without dairy, and the poultry section shows only poultry', async () => {
     tenant.enabledModules = ['POULTRY'];
     render(<MemoryRouter initialEntries={['/t/9/livestock']}><Routes>
       <Route path="/t/:tenantId/livestock" element={<LivestockLayout />}>
@@ -154,9 +167,12 @@ describe('poultry, goats and sheep web', () => {
       </Route></Routes></MemoryRouter>);
     expect(await screen.findByRole('heading', { name: 'Poultry' })).toBeInTheDocument();
     const tabs = screen.getByRole('navigation', { name: 'Livestock' });
-    expect(tabs).toHaveTextContent('Poultry');
+    // The poultry section shows only poultry: its batches and its reports
+    expect(tabs).toHaveTextContent('Batches');
+    expect(tabs).toHaveTextContent('Reports');
     expect(tabs).not.toHaveTextContent('Herd');
     expect(tabs).not.toHaveTextContent('Milk');
+    expect(tabs).not.toHaveTextContent('Breeding and health');
     expect(tabs).not.toHaveTextContent('Goats and sheep');
   });
 });
