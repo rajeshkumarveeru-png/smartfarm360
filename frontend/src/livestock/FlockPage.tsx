@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { RotateCcw, Trash2 } from 'lucide-react';
 import { api } from '../api/client';
@@ -6,6 +6,7 @@ import { useTenant } from '../auth/useCurrentTenant';
 import { ErrorBanner, Loading } from '../components/common';
 import type { FinancialAccount, Party } from '../finance/types';
 import RecordsPanel from '../finance/RecordsPanel';
+import VarietyLines, { BIRD_SPECIES, emptyVariety, type VarietyRow, varietyLines, varietyProblem } from './VarietyLines';
 import { newIdempotencyKey } from '../finance/useFinanceData';
 import { currentLanguage, useNs } from '../i18n';
 import { describeError, isStale } from '../lib/errors';
@@ -13,7 +14,7 @@ import { formatDate, formatMoney, formatNumber, today } from '../lib/format';
 import { can } from '../lib/nav';
 import type { Item } from '../stock/types';
 import type { RecordRefLike } from './milkTypes';
-import type { BatchDay, Figures, FlockGroup, FlockReport, Movement, PlanItem } from './types';
+import type { BatchDay, DayLineView, Figures, FlockGroup, FlockLine, FlockReport, Movement, PlanItem } from './types';
 import { HEALTH_KINDS } from './types';
 
 const whole = (v: string) => v === '' || /^\d{1,7}$/.test(v.trim());
@@ -22,11 +23,14 @@ const money = (v: string) => /^\d{1,12}(\.\d{1,2})?$/.test(v.trim());
 const num = (v: string) => (v.trim() === '' ? null : Number(v));
 const str = (v: number | null | undefined) => (v == null || v === 0 ? '' : String(v));
 const monthStart = () => `${today().slice(0, 7)}-01`;
+/** A variety on the day's form: deaths, culls, eggs laid and the rate for an egg (bin and batch varieties design, V5). */
+type DayLineForm = { lineId: number; label: string; heads: number; deaths: string; culls: string; eggs: string; rate: string };
 type DayForm = { deaths: string; deathCause: string; culls: string; eggsGood: string; eggsCracked: string; eggsBroken: string; feedItemId: string; feedKg: string;
-  weightBirds: string; weightKg: string; notes: string };
-const toForm = (d: BatchDay): DayForm => ({ deaths: str(d.deaths), deathCause: d.deathCause ?? '', culls: str(d.culls), eggsGood: str(d.eggsGood),
+  weightBirds: string; weightKg: string; notes: string; lines: DayLineForm[] };
+const toForm = (d: BatchDay, label: (l: DayLineView) => string): DayForm => ({ deaths: str(d.deaths), deathCause: d.deathCause ?? '', culls: str(d.culls), eggsGood: str(d.eggsGood),
   eggsCracked: str(d.eggsCracked), eggsBroken: str(d.eggsBroken), feedItemId: d.feedItemId ? String(d.feedItemId) : '', feedKg: str(d.feedKg),
-  weightBirds: str(d.weightBirds), weightKg: str(d.weightKg), notes: d.notes ?? '' });
+  weightBirds: str(d.weightBirds), weightKg: str(d.weightKg), notes: d.notes ?? '',
+  lines: (d.lines ?? []).map(l => ({ lineId: l.lineId, label: label(l), heads: l.heads, deaths: str(l.deaths), culls: str(l.culls), eggs: str(l.eggs), rate: str(l.eggRate) })) });
 
 /** One poultry batch or goat and sheep herd: figures (J8), the daily record (J4), head movements (J7), sales (J6), eggs (J5) and the health plan (J9). */
 type FlockTab = 'summary' | 'daily' | 'heads' | 'money' | 'health';
@@ -44,6 +48,10 @@ export default function FlockPage() {
   const canMoney = canWrite && can(tenant, 'FINANCE_WRITE');
   const showMoney = can(tenant, 'FINANCE_READ');
   const canReverse = canWrite && can(tenant, 'FINANCE_REVERSE');
+  const varietyLabel = useCallback((l: { variety: string | null; species: string }) => (l.variety ? `${l.variety} · ${t(`species.${l.species}`)}` : t(`species.${l.species}`)), [t]);
+  // The day loads with the latest labels, without reloading when the translator changes
+  const labelRef = useRef(varietyLabel);
+  labelRef.current = varietyLabel;
   const [range, setRange] = useState({ from: monthStart(), to: today() });
   const [report, setReport] = useState<FlockReport | null>(null);
   const [moves, setMoves] = useState<Movement[]>([]);
@@ -59,9 +67,10 @@ export default function FlockPage() {
   const [dayForm, setDayForm] = useState<DayForm | null>(null);
   const [dayLoads, setDayLoads] = useState(0);
   const [stale, setStale] = useState(false);
-  const [move, setMove] = useState({ date: today(), kind: 'DIED', heads: '', toGroupId: '', countedHeads: '', cause: '' });
-  const [buy, setBuy] = useState({ date: today(), heads: '', amount: '', partyId: '', financialAccountId: '' });
-  const [sale, setSale] = useState({ date: today(), heads: '', kg: '', rateBasis: 'KG', rate: '', partyId: '', financialAccountId: '' });
+  const [move, setMove] = useState({ date: today(), kind: 'DIED', heads: '', toGroupId: '', countedHeads: '', cause: '', lineId: '', newSpecies: 'CHICKEN', newVariety: '' });
+  const [buy, setBuy] = useState({ date: today(), partyId: '', financialAccountId: '', rows: [emptyVariety('CHICKEN')] as VarietyRow[] });
+  const [sale, setSale] = useState({ date: today(), heads: '', kg: '', rateBasis: 'KG', rate: '', partyId: '', financialAccountId: '', lineId: '' });
+  const [lines, setLines] = useState<FlockLine[]>([]);
   const [birth, setBirth] = useState({ date: today(), alive: '', dead: '' });
   const [eggUse, setEggUse] = useState({ date: today(), homeUse: '', damaged: '', reason: '' });
   const [eggSale, setEggSale] = useState({ date: today(), quantity: '', unit: 'tray', amount: '', partyId: '', financialAccountId: '' });
@@ -71,15 +80,16 @@ export default function FlockPage() {
   const [error, setError] = useState('');
 
   const group = report?.group;
+  const several = lines.length > 1;
   const poultry = group?.species === 'CHICKEN';
   const layers = poultry && group?.purpose !== 'BROILER';
 
   const load = useCallback(async () => {
     setError(''); setMessage('');
     try {
-      const [r, m, p, all] = await Promise.all([api<FlockReport>(`${flock}/report?from=${range.from}&to=${range.to}`), api<Movement[]>(`${flock}/movements`),
-        api<PlanItem[]>(`${flock}/plan`), api<FlockGroup[]>(`${base}/flocks`)]);
-      setReport(r); setMoves(m); setPlan(p); setOthers(all.filter(g => g.id !== r.group.id && g.species === r.group.species));
+      const [r, m, p, all, ls] = await Promise.all([api<FlockReport>(`${flock}/report?from=${range.from}&to=${range.to}`), api<Movement[]>(`${flock}/movements`),
+        api<PlanItem[]>(`${flock}/plan`), api<FlockGroup[]>(`${base}/flocks`), api<FlockLine[]>(`${flock}/lines`)]);
+      setReport(r); setMoves(m); setPlan(p); setOthers(all.filter(g => g.id !== r.group.id && g.species === r.group.species)); setLines(ls ?? []);
     } catch (e) {
       setError(describeError(e));
     }
@@ -88,7 +98,7 @@ export default function FlockPage() {
   useEffect(() => {
     if (!poultry) return;
     setStale(false);
-    api<BatchDay>(`${flock}/days/${date}`).then(d => { setDay(d); setDayForm(toForm(d)); }).catch(e => setError(describeError(e)));
+    api<BatchDay>(`${flock}/days/${date}`).then(d => { setDay(d); setDayForm(toForm(d, labelRef.current)); }).catch(e => setError(describeError(e)));
   }, [flock, date, poultry, dayLoads]);
   useEffect(() => {
     if (poultry && can(tenant, 'INVENTORY_READ')) api<Item[]>(`/api/v1/tenants/${tenant.id}/stock/items`)
@@ -125,12 +135,17 @@ export default function FlockPage() {
     e.preventDefault();
     if (!dayForm) return;
     const f = dayForm;
-    if (![f.deaths, f.culls, f.eggsGood, f.eggsCracked, f.eggsBroken, f.weightBirds].every(whole) || ![f.feedKg, f.weightKg].every(decimal)) { setError(t('errors.wholeNumbers')); return; }
+    const byLine = f.lines.length > 0;
+    if (![f.deaths, f.culls, f.eggsGood, f.eggsCracked, f.eggsBroken, f.weightBirds, ...f.lines.flatMap(l => [l.deaths, l.culls, l.eggs])].every(whole)
+        || ![f.feedKg, f.weightKg].every(decimal)) { setError(t('errors.wholeNumbers')); return; }
+    if (!f.lines.every(l => !l.rate || /^\d{1,8}(\.\d{1,2})?$/.test(l.rate))) { setError(t('errors.eggRate')); return; }
     if (Boolean(f.feedItemId) !== Boolean(f.feedKg)) { setError(t('errors.feed')); return; }
-    void send<BatchDay>(`${flock}/days/${date}`, 'PUT', { deaths: num(f.deaths), deathCause: f.deathCause || null, culls: num(f.culls), eggsGood: num(f.eggsGood),
-      eggsCracked: num(f.eggsCracked), eggsBroken: num(f.eggsBroken), feedItemId: f.feedItemId ? Number(f.feedItemId) : null, feedKg: f.feedKg || null,
-      weightBirds: num(f.weightBirds), weightKg: f.weightKg || null, notes: f.notes || null, baseVersion: day?.version ?? null }, null,
-    d => { setDay(d); setDayForm(toForm(d)); return t('dayRecordSaved', { date: formatDate(date, lang) }); });
+    // By variety, the server adds up deaths, culls and eggs; good eggs are those laid less the cracked and broken
+    void send<BatchDay>(`${flock}/days/${date}`, 'PUT', { deaths: byLine ? null : num(f.deaths), deathCause: f.deathCause || null, culls: byLine ? null : num(f.culls),
+      eggsGood: byLine ? null : num(f.eggsGood), eggsCracked: num(f.eggsCracked), eggsBroken: num(f.eggsBroken), feedItemId: f.feedItemId ? Number(f.feedItemId) : null,
+      feedKg: f.feedKg || null, weightBirds: num(f.weightBirds), weightKg: f.weightKg || null, notes: f.notes || null, baseVersion: day?.version ?? null,
+      lines: byLine ? f.lines.map(l => ({ lineId: l.lineId, deaths: num(l.deaths), culls: num(l.culls), eggs: layers ? num(l.eggs) : 0, eggRate: layers && l.rate ? l.rate : null })) : null }, null,
+    d => { setDay(d); setDayForm(toForm(d, varietyLabel)); return t('dayRecordSaved', { date: formatDate(date, lang) }); });
   }
 
   function saveMove(e: React.FormEvent) {
@@ -140,9 +155,13 @@ export default function FlockPage() {
     if (move.kind === 'MOVED' && !move.toGroupId) { setError(t('errors.toGroup')); return; }
     // A count correction keeps a note of why the number changed
     if (counting && !move.cause.trim()) { setError(t('errors.countReason')); return; }
+    const newVariety = move.kind === 'RECEIVED' && move.lineId === 'new';
+    if (newVariety && !move.newVariety.trim()) { setError(t('errors.varietyName')); return; }
+    if (several && !move.lineId) { setError(t('errors.chooseVariety')); return; }
     void send<Movement[]>(`${flock}/movements`, 'POST', { date: move.date, kind: move.kind, heads: counting ? null : Number(move.heads),
-      countedHeads: counting ? Number(move.countedHeads) : null, toGroupId: move.kind === 'MOVED' ? Number(move.toGroupId) : null, cause: move.cause || null }, null,
-    () => { setMove({ ...move, heads: '', countedHeads: '', cause: '' }); return t('headsRecorded'); });
+      countedHeads: counting ? Number(move.countedHeads) : null, toGroupId: move.kind === 'MOVED' ? Number(move.toGroupId) : null, cause: move.cause || null,
+      lineId: move.lineId && !newVariety ? Number(move.lineId) : null, species: newVariety ? move.newSpecies : null, variety: newVariety ? move.newVariety.trim() : null }, null,
+    () => { setMove({ ...move, heads: '', countedHeads: '', cause: '', newVariety: '' }); return t('headsRecorded'); });
   }
 
   /** Moves the batch to the Bin; money already recorded for it stays in the accounts. */
@@ -198,11 +217,34 @@ export default function FlockPage() {
             <label>{tf('date')}<input type="date" max={today()} value={date} onChange={e => setDate(e.target.value)} /></label>
             <p className="hint">{t('headsAtEnd', { count: formatNumber(day.headsAtEnd, lang, 0) })}</p>
             {day.warnings.map(w => <p key={w} className="error-banner full" role="alert">{t(`warning.${w}`)}</p>)}
-            <label>{t('deaths')}<input inputMode="numeric" disabled={!open} value={dayForm.deaths} onChange={e => setDayForm({ ...dayForm, deaths: e.target.value })} /></label>
+            {dayForm.lines.length > 0 ? (
+              <div className="full day-lines">
+                <div className={`day-line day-line-head${layers ? ' with-eggs' : ''}`} aria-hidden>
+                  <span>{t('variety')}</span><span>{t('deaths')}</span><span>{t('culls')}</span>{layers && <><span>{t('eggsLaid')}</span><span>{t('eggRate')}</span></>}
+                </div>
+                {dayForm.lines.map((l, i) => {
+                  const put = (patch: Partial<DayLineForm>) => setDayForm({ ...dayForm, lines: dayForm.lines.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
+                  return (
+                    <div key={l.lineId} className={`day-line${layers ? ' with-eggs' : ''}`} role="group" aria-label={l.label}>
+                      <span className="day-line-name"><strong>{l.label}</strong><small>{t('headsAtEnd', { count: formatNumber(l.heads, lang, 0) })}</small></span>
+                      <label><span className="sr-only">{t('deaths')}</span><input inputMode="numeric" disabled={!open} aria-label={`${t('deaths')} ${l.label}`} value={l.deaths} onChange={e => put({ deaths: e.target.value })} /></label>
+                      <label><span className="sr-only">{t('culls')}</span><input inputMode="numeric" disabled={!open} aria-label={`${t('culls')} ${l.label}`} value={l.culls} onChange={e => put({ culls: e.target.value })} /></label>
+                      {layers && <>
+                        <label><span className="sr-only">{t('eggsLaid')}</span><input inputMode="numeric" disabled={!open} aria-label={`${t('eggsLaid')} ${l.label}`} value={l.eggs} onChange={e => put({ eggs: e.target.value })} /></label>
+                        <label><span className="sr-only">{t('eggRate')}</span><input inputMode="decimal" disabled={!open} aria-label={`${t('eggRate')} ${l.label}`} placeholder="₹" value={l.rate} onChange={e => put({ rate: e.target.value })} /></label>
+                      </>}
+                    </div>
+                  );
+                })}
+                {layers && <p className="hint">{t('eggRateHelp')}</p>}
+              </div>
+            ) : <>
+              <label>{t('deaths')}<input inputMode="numeric" disabled={!open} value={dayForm.deaths} onChange={e => setDayForm({ ...dayForm, deaths: e.target.value })} /></label>
+              <label>{t('culls')}<input inputMode="numeric" disabled={!open} value={dayForm.culls} onChange={e => setDayForm({ ...dayForm, culls: e.target.value })} /></label>
+            </>}
             <label>{t('deathCause')} <small>{tc('optional')}</small><input maxLength={120} disabled={!open} value={dayForm.deathCause} onChange={e => setDayForm({ ...dayForm, deathCause: e.target.value })} /></label>
-            <label>{t('culls')}<input inputMode="numeric" disabled={!open} value={dayForm.culls} onChange={e => setDayForm({ ...dayForm, culls: e.target.value })} /></label>
             {layers && <>
-              <label>{t('eggsGood')}<input inputMode="numeric" disabled={!open} value={dayForm.eggsGood} onChange={e => setDayForm({ ...dayForm, eggsGood: e.target.value })} /></label>
+              {dayForm.lines.length === 0 && <label>{t('eggsGood')}<input inputMode="numeric" disabled={!open} value={dayForm.eggsGood} onChange={e => setDayForm({ ...dayForm, eggsGood: e.target.value })} /></label>}
               <label>{t('eggsCracked')}<input inputMode="numeric" disabled={!open} value={dayForm.eggsCracked} onChange={e => setDayForm({ ...dayForm, eggsCracked: e.target.value })} /></label>
               <label>{t('eggsBroken')}<input inputMode="numeric" disabled={!open} value={dayForm.eggsBroken} onChange={e => setDayForm({ ...dayForm, eggsBroken: e.target.value })} /></label>
             </>}
@@ -219,12 +261,27 @@ export default function FlockPage() {
       )}
 
       {tab === 'heads' && <>
+      {lines.length > 0 && <>
+        <h3 className="section-space">{t('varieties')}</h3>
+        <div className="variety-cards">
+          {lines.map(l => <div key={l.id} className="variety-card"><span>{t(`species.${l.species}`)}</span><strong>{l.variety ?? t(`species.${l.species}`)}</strong>
+            <b>{formatNumber(l.heads, lang, 0)}</b><small>{t('headsNowShort')}</small></div>)}
+        </div>
+      </>}
       <h3 className="section-space">{t('headMovements')}</h3>
       {open && (
         <form className="form-card form-grid" noValidate onSubmit={saveMove}>
           <label>{tf('date')}<input type="date" max={today()} value={move.date} onChange={e => setMove({ ...move, date: e.target.value })} /></label>
           <label>{t('whatHappened')}<select value={move.kind} onChange={e => setMove({ ...move, kind: e.target.value })}>
             {kinds.map(k => <option key={k} value={k}>{t(`moveKind.${k}`)}</option>)}</select></label>
+          {(several || move.kind === 'RECEIVED') && <label>{t('variety')}<select value={move.lineId} onChange={e => setMove({ ...move, lineId: e.target.value })}>
+            <option value="">—</option>{lines.map(l => <option key={l.id} value={l.id}>{varietyLabel(l)} ({formatNumber(l.heads, lang, 0)})</option>)}
+            {move.kind === 'RECEIVED' && <option value="new">{t('newVariety')}</option>}</select></label>}
+          {move.kind === 'RECEIVED' && move.lineId === 'new' && <>
+            {poultry && <label>{t('birdType')}<select value={move.newSpecies} onChange={e => setMove({ ...move, newSpecies: e.target.value })}>
+              {BIRD_SPECIES.map(x => <option key={x} value={x}>{t(`species.${x}`)}</option>)}</select></label>}
+            <label>{t('varietyName')}<input maxLength={120} placeholder={t('varietyExample')} value={move.newVariety} onChange={e => setMove({ ...move, newVariety: e.target.value })} /></label>
+          </>}
           {move.kind === 'COUNT'
             ? <label>{t('countedHeads')}<input inputMode="numeric" value={move.countedHeads} onChange={e => setMove({ ...move, countedHeads: e.target.value })} /></label>
             : <label>{t('heads')}<input inputMode="numeric" value={move.heads} onChange={e => setMove({ ...move, heads: e.target.value })} /></label>}
@@ -242,7 +299,7 @@ export default function FlockPage() {
           <tbody>{moves.map(m => (
             <tr key={m.id} className={m.reversed ? 'muted' : undefined}>
               <td>{formatDate(m.date, lang)}</td>
-              <td>{t(`movement.${m.kind}`)}{m.pairGroupName && <small> · {m.pairGroupName}</small>}{m.reversed && <small> · {t('reversed')}</small>}
+              <td>{t(`movement.${m.kind}`)}{m.lineVariety && <small className="move-variety"> · {m.lineVariety}</small>}{m.pairGroupName && <small> · {m.pairGroupName}</small>}{m.reversed && <small> · {t('reversed')}</small>}
                 {m.documentId && <small> · <Link to={`/t/${tenant.id}/finance/records/${m.documentId}`}>{t('record')}</Link></small>}</td>
               <td className="num">{formatNumber(m.heads, lang, 0)}{m.kg != null && <small> · {formatNumber(m.kg, lang, 2)} kg</small>}</td>
               <td>{m.cause ?? ''}</td>
@@ -286,13 +343,15 @@ export default function FlockPage() {
           <h3 className="section-space">{t('buyMore')}</h3>
           <form className="form-card form-grid" noValidate onSubmit={e => {
             e.preventDefault();
-            if (!/^\d{1,7}$/.test(buy.heads) || Number(buy.heads) <= 0 || !money(buy.amount) || !payerOk(buy)) { setError(t('errors.purchase')); return; }
-            void send(`${flock}/purchases`, 'POST', { date: buy.date, heads: Number(buy.heads), bill: { amount: buy.amount, ...payer(buy) } }, 'buy',
-              () => { setBuy({ ...buy, heads: '', amount: '' }); return t('purchaseRecorded'); });
+            const problem = varietyProblem(buy.rows, true, t);
+            if (problem) { setError(problem); return; }
+            if (!payerOk(buy)) { setError(t('errors.purchase')); return; }
+            const total = buy.rows.reduce((sum, row) => sum + Number(row.amount), 0).toFixed(2);
+            void send(`${flock}/purchases`, 'POST', { date: buy.date, bill: { amount: total, ...payer(buy) }, lines: varietyLines(buy.rows, true) }, 'buy',
+              () => { setBuy({ ...buy, rows: [emptyVariety(poultry ? 'CHICKEN' : group.species)] }); return t('purchaseRecorded'); });
           }}>
             <label>{tf('date')}<input type="date" max={today()} value={buy.date} onChange={e => setBuy({ ...buy, date: e.target.value })} /></label>
-            <label>{t('heads')}<input inputMode="numeric" value={buy.heads} onChange={e => setBuy({ ...buy, heads: e.target.value })} /></label>
-            <label>{t('billAmountTotal')}<input inputMode="decimal" value={buy.amount} onChange={e => setBuy({ ...buy, amount: e.target.value })} /></label>
+            <VarietyLines kind={poultry ? 'poultry' : 'smallStock'} rows={buy.rows} priced existing={lines} onChange={rows => setBuy({ ...buy, rows })} />
             <PayerFields parties={parties} accounts={accounts} f={buy} set={p => setBuy({ ...buy, ...p })} partyLabel={t('boughtFrom')} accountLabel={tf('paidFrom')} />
             <div className="form-actions full"><button className="secondary">{t('recordPurchase')}</button></div>
           </form>
@@ -306,10 +365,14 @@ export default function FlockPage() {
             e.preventDefault();
             if (!/^\d{1,7}$/.test(sale.heads) || Number(sale.heads) <= 0 || !decimal(sale.kg) || !money(sale.rate) || !payerOk(sale)) { setError(t('errors.sale')); return; }
             if (sale.rateBasis === 'KG' && !sale.kg) { setError(t('errors.saleKg')); return; }
-            void send<Movement>(`${flock}/sales`, 'POST', { date: sale.date, heads: Number(sale.heads), kg: sale.kg || null, rateBasis: sale.rateBasis, rate: sale.rate, ...payer(sale) }, 'sale',
+            if (several && !sale.lineId) { setError(t('errors.chooseVariety')); return; }
+            void send<Movement>(`${flock}/sales`, 'POST', { date: sale.date, heads: Number(sale.heads), kg: sale.kg || null, rateBasis: sale.rateBasis, rate: sale.rate, ...payer(sale),
+              lineId: sale.lineId ? Number(sale.lineId) : null }, 'sale',
               () => { setSale({ ...sale, heads: '', kg: '', rate: '' }); return t('saleOfHeadsRecorded'); });
           }}>
             <label>{tf('date')}<input type="date" max={today()} value={sale.date} onChange={e => setSale({ ...sale, date: e.target.value })} /></label>
+            {several && <label>{t('variety')}<select value={sale.lineId} onChange={e => setSale({ ...sale, lineId: e.target.value })}>
+              <option value="">—</option>{lines.map(l => <option key={l.id} value={l.id}>{varietyLabel(l)} ({formatNumber(l.heads, lang, 0)})</option>)}</select></label>}
             <label>{t('heads')}<input inputMode="numeric" value={sale.heads} onChange={e => setSale({ ...sale, heads: e.target.value })} /></label>
             <label>{t('liveWeightKg')}<input inputMode="decimal" value={sale.kg} onChange={e => setSale({ ...sale, kg: e.target.value })} /></label>
             <label>{t('rateBasis')}<select value={sale.rateBasis} onChange={e => setSale({ ...sale, rateBasis: e.target.value })}>
@@ -430,6 +493,9 @@ function FigureCards({ title, f, poultry, layers, showMoney }: { title: string; 
           <small>{tf('revenue')} {m(f.revenue)} · {tf('costs')} {m(f.costs)}</small></div>}
         {showMoney && <div className="finance-stat"><span>{t(layers ? 'costPerEgg' : poultry ? 'costPerKg' : 'costPerHeadMonth')}</span>
           <b>{m(layers ? f.costPerEgg : poultry ? f.costPerKg : f.costPerHeadMonth)}</b></div>}
+        {showMoney && f.eggValue != null && <div className="finance-stat"><span>{t('eggValue')}</span><b>{m(f.eggValue)}</b><small>{t('eggValueHelp')}</small></div>}
+        {showMoney && f.profitWithEggs != null && <div className={`finance-stat${f.profitWithEggs > 0 ? ' positive' : f.profitWithEggs < 0 ? ' negative' : ''}`}>
+          <span>{t('profitWithEggs')}</span><b>{m(f.profitWithEggs)}</b><small>{t('profitWithEggsHelp')}</small></div>}
       </div>
     </>
   );

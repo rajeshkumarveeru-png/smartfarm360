@@ -56,6 +56,11 @@ public class FlockController {
         return flocks.place(ctx, r, key);
     }
 
+    /** The batch's or herd's varieties with their heads today (bin and batch varieties design, V2). */
+    @GetMapping("/flocks/{groupId}/lines")
+    @RequiresPermission(Permission.LIVESTOCK_READ)
+    public List<FlockLine> lines(TenantContext ctx, @PathVariable long groupId) { return flocks.lines(ctx, groupId); }
+
     @GetMapping("/flocks/{groupId}/movements")
     @RequiresPermission(Permission.LIVESTOCK_READ)
     public List<Movement> movements(TenantContext ctx, @PathVariable long groupId) { return flocks.movements(ctx, groupId); }

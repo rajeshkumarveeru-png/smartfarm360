@@ -93,16 +93,96 @@ public class FlockService {
                 throw ApiException.conflict("HEADS_NEGATIVE", g.name() + " would have fewer than none on " + list.get(i).date() + ".");
             }
         }
+        requireLinesNonNegative(ctx, g);
     }
 
     private long insertMove(TenantContext ctx, long groupId, LocalDate date, String kind, int heads, BigDecimal kg, String cause, Long documentId,
-                            Long batchDayId, Long pairId) {
+                            Long batchDayId, Long pairId, long lineId) {
         return jdbc.sql("""
-                        insert into sf_head_movements (tenant_id, group_id, move_date, kind, heads, kg, cause, document_id, batch_day_id, pair_id, created_by)
-                        values (:t, :g, :d, :k, :h, :kg, :c, :doc, :day, :pair, :u) returning id""")
+                        insert into sf_head_movements (tenant_id, group_id, move_date, kind, heads, kg, cause, document_id, batch_day_id, pair_id, created_by, line_id)
+                        values (:t, :g, :d, :k, :h, :kg, :c, :doc, :day, :pair, :u, :line) returning id""")
                 .param("t", ctx.tenantId()).param("g", groupId).param("d", date).param("k", kind).param("h", heads).param("kg", kg)
                 .param("c", HerdService.trim(cause)).param("doc", documentId).param("day", batchDayId).param("pair", pairId).param("u", ctx.userId())
-                .query(Long.class).single();
+                .param("line", lineId).query(Long.class).single();
+    }
+
+    // ---- Varieties (bin and batch varieties design, V1-V7) ----
+
+    private static final Set<String> BIRDS = Set.of("CHICKEN", "DUCK", "QUAIL", "TURKEY");
+
+    /** The group's varieties with their heads on {@code date}; movements of reversed bills do not count. */
+    List<FlockLine> lines(long tenantId, long groupId, LocalDate date) {
+        return jdbc.sql("""
+                        select l.id, l.species, l.variety,
+                          coalesce((select sum(case when hm.kind in ('PLACED', 'BOUGHT', 'BORN', 'MOVED_IN', 'COUNT_GAIN') then hm.heads else -hm.heads end)
+                             from sf_head_movements hm left join sf_finance_documents hd on hd.id = hm.document_id and hd.tenant_id = hm.tenant_id
+                             where hm.tenant_id = l.tenant_id and hm.line_id = l.id and hm.move_date <= :d and (hm.document_id is null or hd.status = 'POSTED')), 0)
+                        from sf_flock_lines l where l.tenant_id = :t and l.group_id = :g order by l.id""")
+                .param("t", tenantId).param("g", groupId).param("d", date)
+                .query((rs, i) -> new FlockLine(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getInt(4))).list();
+    }
+
+    public List<FlockLine> lines(TenantContext ctx, long groupId) {
+        Group g = counted(ctx, groupId);
+        return lines(ctx.tenantId(), g.id(), LocalDate.now());
+    }
+
+    private long newLine(TenantContext ctx, Group g, String species, String variety) {
+        String sp = species != null ? species : "CHICKEN".equals(g.species()) ? "CHICKEN" : g.species();
+        boolean fits = "CHICKEN".equals(g.species()) ? BIRDS.contains(sp) : Set.of("GOAT", "SHEEP").contains(sp);
+        if (!fits) throw ApiException.badRequest("SPECIES_MISMATCH", "This kind of animal does not belong in this group.");
+        return jdbc.sql("insert into sf_flock_lines (tenant_id, group_id, species, variety) values (:t, :g, :s, :v) returning id")
+                .param("t", ctx.tenantId()).param("g", g.id()).param("s", sp).param("v", HerdService.trim(variety)).query(Long.class).single();
+    }
+
+    /** The variety a change happens to: the one named, or the group's only one. */
+    private long line(TenantContext ctx, Group g, Long lineId) {
+        List<Long> ids = jdbc.sql("select id from sf_flock_lines where tenant_id = :t and group_id = :g order by id")
+                .param("t", ctx.tenantId()).param("g", g.id()).query(Long.class).list();
+        if (lineId != null) {
+            if (!ids.contains(lineId)) throw ApiException.notFound("LINE_NOT_FOUND", "That variety is not in this batch.");
+            return lineId;
+        }
+        if (ids.isEmpty()) return newLine(ctx, g, null, g.strain());
+        if (ids.size() > 1) throw ApiException.badRequest("LINE_REQUIRED", "Choose the variety.");
+        return ids.get(0);
+    }
+
+    /** A named line, a new variety (the same species and name again is the same line), or the group's only line. */
+    private long line(TenantContext ctx, Group g, Long lineId, String species, String variety) {
+        String name = HerdService.trim(variety);
+        if (lineId == null && (name != null || species != null)) {
+            String sp = species != null ? species : "CHICKEN".equals(g.species()) ? "CHICKEN" : g.species();
+            return jdbc.sql("""
+                            select id from sf_flock_lines where tenant_id = :t and group_id = :g and species = :s
+                              and coalesce(lower(variety), '') = coalesce(lower(cast(:v as varchar)), '') order by id limit 1""")
+                    .param("t", ctx.tenantId()).param("g", g.id()).param("s", sp).param("v", name).query(Long.class).optional()
+                    .orElseGet(() -> newLine(ctx, g, sp, name));
+        }
+        return line(ctx, g, lineId);
+    }
+
+    private int lineHeads(TenantContext ctx, Group g, long lineId, LocalDate date) {
+        return lines(ctx.tenantId(), g.id(), date).stream().filter(l -> l.id() == lineId).mapToInt(FlockLine::heads).findFirst().orElse(0);
+    }
+
+    /** Refuses a change that would leave any variety with fewer than none on some day. */
+    private void requireLinesNonNegative(TenantContext ctx, Group g) {
+        jdbc.sql("""
+                        select l.species, l.variety, x.d from (
+                          select hm.line_id, hm.move_date as d,
+                                 sum(sum(case when hm.kind in ('PLACED', 'BOUGHT', 'BORN', 'MOVED_IN', 'COUNT_GAIN') then hm.heads else -hm.heads end))
+                                   over (partition by hm.line_id order by hm.move_date) as running
+                          from sf_head_movements hm left join sf_finance_documents hd on hd.id = hm.document_id and hd.tenant_id = hm.tenant_id
+                          where hm.tenant_id = :t and hm.group_id = :g and hm.line_id is not null and (hm.document_id is null or hd.status = 'POSTED')
+                          group by hm.line_id, hm.move_date) x
+                        join sf_flock_lines l on l.id = x.line_id and l.tenant_id = :t
+                        where x.running < 0 order by x.d limit 1""")
+                .param("t", ctx.tenantId()).param("g", g.id())
+                .query((rs, i) -> {
+                    String label = rs.getString(2) != null ? rs.getString(2) : rs.getString(1);
+                    throw ApiException.conflict("HEADS_NEGATIVE", label + " in " + g.name() + " would have fewer than none on " + rs.getObject(3, LocalDate.class) + ".");
+                }).list();
     }
 
     /** A closed poultry batch takes no new birds; reversing its sale reopens it (J2, J14). */
@@ -115,23 +195,43 @@ public class FlockService {
     @Transactional
     public Group place(TenantContext ctx, PlacementRequest r, String key) {
         notFuture(r.placedOn());
+        boolean several = r.lines() != null && !r.lines().isEmpty();
+        if (!several && r.heads() == null) throw ApiException.badRequest("HEADS_REQUIRED", "Enter the number of heads.");
         Group g = herd.createGroup(ctx, new GroupRequest(r.name(), r.purpose(), r.farmId(), r.notes(), r.species()), r.placedOn(), r.ageAtPlacementDays(), r.strain());
+        List<VarietyLine> wanted = several ? r.lines()
+                : List.of(new VarietyLine(null, null, r.strain(), r.heads(), r.bill() == null ? null : r.bill().amount()));
+        List<Long> ids = new ArrayList<>();
+        for (VarietyLine l : wanted) ids.add(line(ctx, g, null, l.species() != null ? l.species() : "CHICKEN".equals(r.species()) ? "CHICKEN" : r.species(), l.variety()));
         if (r.bill() != null) {
-            long doc = bill(ctx, g, r.placedOn(), r.heads(), r.bill(), key);
-            insertMove(ctx, g.id(), r.placedOn(), "CHICKEN".equals(r.species()) ? "PLACED" : "BOUGHT", r.heads(), null, null, doc, null, null);
+            long doc = bill(ctx, g, r.placedOn(), wanted, ids, r.bill(), key);
+            for (int i = 0; i < wanted.size(); i++) {
+                insertMove(ctx, g.id(), r.placedOn(), "CHICKEN".equals(r.species()) ? "PLACED" : "BOUGHT", wanted.get(i).heads(), null, null, doc, null, null, ids.get(i));
+            }
         } else {
-            insertMove(ctx, g.id(), r.placedOn(), "PLACED", r.heads(), null, "Received", null, null, null);
+            for (int i = 0; i < wanted.size(); i++) insertMove(ctx, g.id(), r.placedOn(), "PLACED", wanted.get(i).heads(), null, "Received", null, null, null, ids.get(i));
         }
-        audit.record(ctx.tenantId(), ctx.userId(), "FLOCK_PLACED", "ANIMAL_GROUP", g.id(), Map.of("heads", r.heads(), "species", r.species()));
+        audit.record(ctx.tenantId(), ctx.userId(), "FLOCK_PLACED", "ANIMAL_GROUP", g.id(),
+                Map.of("heads", wanted.stream().mapToInt(VarietyLine::heads).sum(), "species", r.species(), "varieties", wanted.size()));
         return herd.group(ctx, g.id());
     }
 
-    private long bill(TenantContext ctx, Group g, LocalDate date, int heads, Bill b, String key) {
+    /** One bill for the heads bought, a line per variety; with one variety and no price of its own, the bill's amount. */
+    private long bill(TenantContext ctx, Group g, LocalDate date, List<VarietyLine> wanted, List<Long> ids, Bill b, String key) {
         if (!ctx.has(Permission.FINANCE_WRITE)) throw ApiException.forbidden("FINANCE_PERMISSION_REQUIRED", "Recording a bill needs permission to record money.");
         if (b.partyId() == null && b.financialAccountId() == null) throw ApiException.badRequest("PAYER_REQUIRED", "Choose who sold them or the account it was paid from.");
+        List<FlockLine> known = lines(ctx.tenantId(), g.id(), date);
+        List<LineRequest> billLines = new ArrayList<>();
+        for (int i = 0; i < wanted.size(); i++) {
+            VarietyLine l = wanted.get(i);
+            BigDecimal amount = l.amount() != null ? l.amount() : wanted.size() == 1 ? b.amount() : null;
+            if (amount == null) throw ApiException.badRequest("LINE_PRICE_REQUIRED", "Enter the price for each variety.");
+            long id = ids.get(i);
+            String variety = known.stream().filter(k -> k.id() == id).map(k -> k.variety() != null ? k.variety() : k.species().toLowerCase()).findFirst().orElse("");
+            billLines.add(new LineRequest(herd.systemCategory("YOUNG_STOCK"), l.heads() + " " + variety + " for " + g.name(), BigDecimal.valueOf(l.heads()), null, null,
+                    amount, g.costObjectId(), g.farmId()));
+        }
         Document doc = documents.createInvoice(ctx, DocType.BILL, new InvoiceRequest(date, null, b.partyId(), g.farmId(), b.partyId() == null ? b.financialAccountId() : null,
-                List.of(new LineRequest(herd.systemCategory("YOUNG_STOCK"), heads + " for " + g.name(), BigDecimal.valueOf(heads), null, null, b.amount(),
-                        g.costObjectId(), g.farmId())), null, b.referenceNo(), true, b.paidNow()), key);
+                billLines, null, b.referenceNo(), true, b.paidNow()), key);
         return doc.summary().id();
     }
 
@@ -140,10 +240,19 @@ public class FlockService {
         notFuture(r.date());
         Group g = counted(ctx, groupId);
         requireOpen(g, "BOUGHT");
-        long doc = bill(ctx, g, r.date(), r.heads(), r.bill(), key);
-        long id = insertMove(ctx, g.id(), r.date(), "BOUGHT", r.heads(), null, null, doc, null, null);
-        audit.record(ctx.tenantId(), ctx.userId(), "HEADS_RECORDED", "ANIMAL_GROUP", g.id(), Map.of("kind", "BOUGHT", "heads", r.heads()));
-        return movement(ctx, id);
+        boolean several = r.lines() != null && !r.lines().isEmpty();
+        List<VarietyLine> wanted = several ? r.lines() : List.of(new VarietyLine(null, null, null, need(r.heads()), r.bill().amount()));
+        List<Long> ids = new ArrayList<>();
+        for (VarietyLine l : wanted) ids.add(several ? line(ctx, g, l.lineId(), l.species(), l.variety()) : line(ctx, g, null));
+        long doc = bill(ctx, g, r.date(), wanted, ids, r.bill(), key);
+        long first = 0;
+        for (int i = 0; i < wanted.size(); i++) {
+            long id = insertMove(ctx, g.id(), r.date(), "BOUGHT", wanted.get(i).heads(), null, null, doc, null, null, ids.get(i));
+            if (i == 0) first = id;
+        }
+        audit.record(ctx.tenantId(), ctx.userId(), "HEADS_RECORDED", "ANIMAL_GROUP", g.id(),
+                Map.of("kind", "BOUGHT", "heads", wanted.stream().mapToInt(VarietyLine::heads).sum()));
+        return movement(ctx, first);
     }
 
     @Transactional
@@ -156,9 +265,10 @@ public class FlockService {
             case "COUNT" -> {
                 if (r.countedHeads() == null) throw ApiException.badRequest("COUNT_REQUIRED", "Enter the number counted.");
                 if (HerdService.trim(r.cause()) == null) throw ApiException.badRequest("REASON_REQUIRED", "Say why the count differs.");
-                int diff = r.countedHeads() - heads(ctx.tenantId(), g.id(), r.date());
+                long lineId = line(ctx, g, r.lineId());
+                int diff = r.countedHeads() - lineHeads(ctx, g, lineId, r.date());
                 if (diff == 0) throw ApiException.badRequest("COUNT_MATCHES", "The count matches the record; nothing to change.");
-                ids.add(insertMove(ctx, g.id(), r.date(), diff > 0 ? "COUNT_GAIN" : "COUNT_LOSS", Math.abs(diff), null, r.cause(), null, null, null));
+                ids.add(insertMove(ctx, g.id(), r.date(), diff > 0 ? "COUNT_GAIN" : "COUNT_LOSS", Math.abs(diff), null, r.cause(), null, null, null, lineId));
             }
             case "MOVED" -> {
                 if (r.toGroupId() == null || r.toGroupId() == g.id()) throw ApiException.badRequest("GROUP_REQUIRED", "Choose the group they moved to.");
@@ -166,15 +276,19 @@ public class FlockService {
                 if (!to.species().equals(g.species())) throw ApiException.badRequest("SPECIES_MISMATCH", "Animals can only move to a group of the same species.");
                 requireOpen(to, "MOVED_IN");
                 int heads = need(r.heads());
-                long out = insertMove(ctx, g.id(), r.date(), "MOVED_OUT", heads, r.kg(), r.cause(), null, null, null);
-                long in = insertMove(ctx, to.id(), r.date(), "MOVED_IN", heads, r.kg(), r.cause(), null, null, out);
+                long fromLine = line(ctx, g, r.lineId());
+                FlockLine from = lines(ctx.tenantId(), g.id(), r.date()).stream().filter(l -> l.id() == fromLine).findFirst().orElseThrow();
+                // They arrive as the same variety in the other group
+                long toLine = line(ctx, to, null, from.species(), from.variety() != null ? from.variety() : "");
+                long out = insertMove(ctx, g.id(), r.date(), "MOVED_OUT", heads, r.kg(), r.cause(), null, null, null, fromLine);
+                long in = insertMove(ctx, to.id(), r.date(), "MOVED_IN", heads, r.kg(), r.cause(), null, null, out, toLine);
                 jdbc.sql("update sf_head_movements set pair_id = :in where id = :out and tenant_id = :t").param("in", in).param("out", out).param("t", ctx.tenantId()).update();
                 ids.add(out);
             }
             default -> {
                 String kind = "RECEIVED".equals(r.kind()) ? "PLACED" : r.kind();
                 requireOpen(g, kind);
-                ids.add(insertMove(ctx, g.id(), r.date(), kind, need(r.heads()), r.kg(), r.cause(), null, null, null));
+                ids.add(insertMove(ctx, g.id(), r.date(), kind, need(r.heads()), r.kg(), r.cause(), null, null, null, line(ctx, g, r.lineId(), r.species(), r.variety())));
             }
         }
         requireNonNegative(ctx, g);
@@ -210,17 +324,19 @@ public class FlockService {
 
     private static final String MOVE_SELECT = """
             select m.id, m.move_date, m.kind, m.heads, m.kg, m.cause, m.document_id, m.batch_day_id, p.group_id, pco.name,
-                   m.document_id is not null and d.status <> 'POSTED' as reversed
+                   m.document_id is not null and d.status <> 'POSTED' as reversed, m.line_id, fl.species, fl.variety
             from sf_head_movements m
             left join sf_finance_documents d on d.id = m.document_id and d.tenant_id = m.tenant_id
             left join sf_head_movements p on p.id = m.pair_id and p.tenant_id = m.tenant_id
             left join sf_animal_groups pg on pg.id = p.group_id and pg.tenant_id = m.tenant_id
             left join sf_cost_objects pco on pco.id = pg.cost_object_id and pco.tenant_id = m.tenant_id
+            left join sf_flock_lines fl on fl.id = m.line_id and fl.tenant_id = m.tenant_id
             where m.tenant_id = :t""";
 
     private static Movement movement(java.sql.ResultSet rs) throws java.sql.SQLException {
         return new Movement(rs.getLong(1), rs.getObject(2, LocalDate.class), rs.getString(3), rs.getInt(4), rs.getBigDecimal(5), rs.getString(6),
-                (Long) rs.getObject(7), (Long) rs.getObject(8), (Long) rs.getObject(9), rs.getString(10), rs.getBoolean(11));
+                (Long) rs.getObject(7), (Long) rs.getObject(8), (Long) rs.getObject(9), rs.getString(10), rs.getBoolean(11), (Long) rs.getObject(12),
+                rs.getString(13), rs.getString(14));
     }
 
     @Transactional(readOnly = true)
@@ -246,7 +362,7 @@ public class FlockService {
                 r.partyId() == null ? r.financialAccountId() : null,
                 List.of(new LineRequest(herd.systemCategory("LIVESTOCK_SALE"), description, quantity, null, null, amount, g.costObjectId(), g.farmId())),
                 null, r.referenceNo(), true, r.paidNow()), key);
-        long id = insertMove(ctx, g.id(), r.date(), "SOLD", r.heads(), r.kg(), null, sale.summary().id(), null, null);
+        long id = insertMove(ctx, g.id(), r.date(), "SOLD", r.heads(), r.kg(), null, sale.summary().id(), null, null, line(ctx, g, r.lineId()));
         requireNonNegative(ctx, g);
         audit.record(ctx.tenantId(), ctx.userId(), "HEADS_RECORDED", "ANIMAL_GROUP", g.id(), Map.of("kind", "SOLD", "heads", r.heads()));
         return movement(ctx, id);
@@ -265,7 +381,7 @@ public class FlockService {
             if (!"FEMALE".equals(dam.sex()) || !dam.species().equals(g.species())) throw ApiException.badRequest("INVALID_DAM", "The dam must be a female of the same species.");
             damId = dam.id();
         }
-        if (r.alive() > 0) insertMove(ctx, g.id(), r.date(), "BORN", r.alive(), null, null, null, null, null);
+        if (r.alive() > 0) insertMove(ctx, g.id(), r.date(), "BORN", r.alive(), null, null, null, null, null, line(ctx, g, null));
         LivestockDtos.Event e = events.insert(ctx, damId, g.id(), "KIDDING", r.date(), r.notes(), null, null);
         jdbc.sql("update sf_animal_events set born_alive = :a, born_dead = :d where id = :id and tenant_id = :t")
                 .param("a", r.alive()).param("d", dead).param("id", e.id()).param("t", ctx.tenantId()).update();
@@ -289,16 +405,38 @@ public class FlockService {
         if (withheld(ctx.tenantId(), g.id(), date)) warnings.add("EGGS_WITHHELD");
         int deaths = intOf(row.get("deaths"));
         if (deaths > 0 && deaths * 100 > (heads + deaths + intOf(row.get("culls")))) warnings.add("HIGH_MORTALITY");
+        Long dayId = longOf(row.get("id"));
+        List<DayLineView> byLine = dayLines(ctx.tenantId(), g, dayId, date);
         return new BatchDay(date, deaths, (String) row.get("death_cause"), intOf(row.get("culls")), intOf(row.get("eggs_good")), intOf(row.get("eggs_cracked")),
                 intOf(row.get("eggs_broken")), longOf(row.get("feed_item_id")), (BigDecimal) row.get("feed_kg"), longOf(row.get("feed_document_id")),
-                (Integer) row.get("weight_birds"), (BigDecimal) row.get("weight_kg"), (String) row.get("notes"), heads, warnings, dayVersion(row));
+                (Integer) row.get("weight_birds"), (BigDecimal) row.get("weight_kg"), (String) row.get("notes"), heads, warnings, dayVersion(row, byLine), byLine);
+    }
+
+    /** Every variety of the group on a day, with what was recorded for it (zeros when nothing was). */
+    private List<DayLineView> dayLines(long tenantId, Group g, Long dayId, LocalDate date) {
+        Map<Long, Map<String, Object>> saved = new HashMap<>();
+        if (dayId != null) {
+            jdbc.sql("select line_id, deaths, culls, eggs, egg_rate from sf_batch_day_lines where tenant_id = :t and batch_day_id = :d")
+                    .param("t", tenantId).param("d", dayId).query().listOfRows().forEach(m -> saved.put(((Number) m.get("line_id")).longValue(), m));
+        }
+        return lines(tenantId, g.id(), date).stream().map(l -> {
+            Map<String, Object> m = saved.getOrDefault(l.id(), Map.of());
+            return new DayLineView(l.id(), l.species(), l.variety(), l.heads(), intOf(m.get("deaths")), intOf(m.get("culls")), intOf(m.get("eggs")), (BigDecimal) m.get("egg_rate"));
+        }).toList();
     }
 
     /** The version of a batch day: a hash of what the user recorded, not of derived figures (mobile offline design, N7). */
-    private static String dayVersion(Map<String, Object> row) {
+    private static String dayVersion(Map<String, Object> row, List<DayLineView> byLine) {
         if (row.isEmpty()) return Versions.NONE;
-        return Versions.token(row.get("deaths"), row.get("death_cause"), row.get("culls"), row.get("eggs_good"), row.get("eggs_cracked"), row.get("eggs_broken"),
-                row.get("feed_item_id"), row.get("feed_kg"), row.get("weight_birds"), row.get("weight_kg"), row.get("notes"));
+        // A day recorded by variety also changes with its varieties' figures; a day without them keeps its earlier version
+        String varieties = byLine.stream().filter(l -> l.deaths() > 0 || l.culls() > 0 || l.eggs() > 0 || l.eggRate() != null)
+                .map(l -> l.lineId() + ":" + l.deaths() + ":" + l.culls() + ":" + l.eggs() + ":" + (l.eggRate() == null ? "" : l.eggRate().stripTrailingZeros().toPlainString()))
+                .reduce((a, b) -> a + "," + b).orElse(null);
+        return varieties == null
+                ? Versions.token(row.get("deaths"), row.get("death_cause"), row.get("culls"), row.get("eggs_good"), row.get("eggs_cracked"), row.get("eggs_broken"),
+                        row.get("feed_item_id"), row.get("feed_kg"), row.get("weight_birds"), row.get("weight_kg"), row.get("notes"))
+                : Versions.token(row.get("deaths"), row.get("death_cause"), row.get("culls"), row.get("eggs_good"), row.get("eggs_cracked"), row.get("eggs_broken"),
+                        row.get("feed_item_id"), row.get("feed_kg"), row.get("weight_birds"), row.get("weight_kg"), row.get("notes"), varieties);
     }
 
     private static int intOf(Object o) { return o == null ? 0 : ((Number) o).intValue(); }
@@ -321,13 +459,27 @@ public class FlockService {
             jdbc.sql("select pg_advisory_xact_lock(hashtext(:k))").param("k", "batchday:" + ctx.tenantId() + ":" + g.id() + ":" + date).query().listOfRows();
             Map<String, Object> stored = jdbc.sql("select * from sf_batch_days where tenant_id = :t and group_id = :g and day = :d")
                     .param("t", ctx.tenantId()).param("g", g.id()).param("d", date).query().listOfRows().stream().findFirst().orElse(Map.of());
-            Versions.requireCurrent(r.baseVersion(), dayVersion(stored));
+            Versions.requireCurrent(r.baseVersion(), dayVersion(stored, dayLines(ctx.tenantId(), g, longOf(stored.get("id")), date)));
         }
         if (g.placedOn() != null && date.isBefore(g.placedOn())) throw ApiException.badRequest("BEFORE_PLACEMENT", "The batch was placed after this date.");
         if ((r.feedItemId() == null) != (r.feedKg() == null)) throw ApiException.badRequest("FEED_ITEM_AND_KG", "Choose the feed and enter the kg.");
         if ((r.weightBirds() == null) != (r.weightKg() == null)) throw ApiException.badRequest("WEIGHT_SAMPLE", "Enter the birds weighed and their total kg.");
         int deaths = r.deaths() == null ? 0 : r.deaths(), culls = r.culls() == null ? 0 : r.culls();
         int good = nz(r.eggsGood()), cracked = nz(r.eggsCracked()), broken = nz(r.eggsBroken());
+        List<DayLine> byLine = r.lines() == null ? List.of() : r.lines();
+        Set<Long> seen = new HashSet<>();
+        for (DayLine l : byLine) {
+            line(ctx, g, l.lineId());
+            if (!seen.add(l.lineId())) throw ApiException.badRequest("LINE_TWICE", "Each variety appears once in a day.");
+        }
+        if (!byLine.isEmpty()) {
+            // By variety, the day's deaths, culls and eggs are the varieties' sums; good eggs are those laid less the cracked and broken
+            deaths = byLine.stream().mapToInt(l -> nz(l.deaths())).sum();
+            culls = byLine.stream().mapToInt(l -> nz(l.culls())).sum();
+            int laid = byLine.stream().mapToInt(l -> nz(l.eggs())).sum();
+            good = laid - cracked - broken;
+            if (good < 0) throw ApiException.badRequest("EGGS_SPLIT", "Cracked and broken eggs cannot be more than the eggs laid.");
+        }
         if ("BROILER".equals(g.purpose()) && good + cracked + broken > 0) throw ApiException.badRequest("NO_EGGS_FOR_BROILERS", "Broiler batches do not lay eggs.");
         Optional<Map<String, Object>> existing = jdbc.sql("select id, feed_item_id, feed_kg, feed_document_id from sf_batch_days where tenant_id = :t and group_id = :g and day = :d")
                 .param("t", ctx.tenantId()).param("g", g.id()).param("d", date).query().listOfRows().stream().findFirst();
@@ -342,8 +494,23 @@ public class FlockService {
                 .param("id", dayId).param("t", ctx.tenantId()).update();
         // Deaths and culls are the day's head movements (J7)
         jdbc.sql("delete from sf_head_movements where tenant_id = :t and batch_day_id = :d").param("t", ctx.tenantId()).param("d", dayId).update();
-        if (deaths > 0) insertMove(ctx, g.id(), date, "DIED", deaths, null, r.deathCause(), null, dayId, null);
-        if (culls > 0) insertMove(ctx, g.id(), date, "CULLED", culls, null, null, null, dayId, null);
+        jdbc.sql("delete from sf_batch_day_lines where tenant_id = :t and batch_day_id = :d").param("t", ctx.tenantId()).param("d", dayId).update();
+        if (byLine.isEmpty()) {
+            if (deaths > 0) insertMove(ctx, g.id(), date, "DIED", deaths, null, r.deathCause(), null, dayId, null, line(ctx, g, null));
+            if (culls > 0) insertMove(ctx, g.id(), date, "CULLED", culls, null, null, null, dayId, null, line(ctx, g, null));
+        } else {
+            for (DayLine l : byLine) {
+                if (nz(l.deaths()) > 0) insertMove(ctx, g.id(), date, "DIED", l.deaths(), null, r.deathCause(), null, dayId, null, l.lineId());
+                if (nz(l.culls()) > 0) insertMove(ctx, g.id(), date, "CULLED", l.culls(), null, null, null, dayId, null, l.lineId());
+                if (nz(l.deaths()) + nz(l.culls()) + nz(l.eggs()) > 0 || l.eggRate() != null) {
+                    jdbc.sql("""
+                                    insert into sf_batch_day_lines (tenant_id, batch_day_id, line_id, deaths, culls, eggs, egg_rate)
+                                    values (:t, :d, :l, :deaths, :culls, :eggs, :rate)""")
+                            .param("t", ctx.tenantId()).param("d", dayId).param("l", l.lineId()).param("deaths", nz(l.deaths())).param("culls", nz(l.culls()))
+                            .param("eggs", nz(l.eggs())).param("rate", l.eggRate()).update();
+                }
+            }
+        }
         requireNonNegative(ctx, g);
         // Feed: one stock use to the batch for the day (J13); a change reverses the earlier use
         Long oldItem = existing.map(m -> longOf(m.get("feed_item_id"))).orElse(null);

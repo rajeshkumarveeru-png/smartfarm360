@@ -62,7 +62,7 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
                 "041-workforce-assets-seed", "042-report-indexes", "043-livestock-schema", "044-livestock-seed",
                 "045-poultry-goats-schema", "046-poultry-goats-seed", "047-aquaculture-schema", "048-aquaculture-seed", "049-organic-schema", "050-organic-seed", "051-processing-schema", "052-processing-seed", "053-idempotent-requests",
                 "054-saas-operations-schema", "055-saas-operations-seed", "056-row-level-security", "057-guards-allow-tenant-deletion",
-                "058-billing-schema", "059-billing-seed", "060-recycle-bin", "061-flock-lines");
+                "058-billing-schema", "059-billing-seed", "060-recycle-bin", "061-flock-lines", "062-batch-day-lines");
     }
 
     @Test
@@ -95,7 +95,7 @@ class LiquibaseMigrationIntegrationTest extends EmbeddedPostgresSupport {
                 "sf_user_mfa", "sf_user_recovery_codes", "sf_legal_documents", "sf_consents", "sf_email_verification_tokens",
                 "sf_rate_limit_counters", "sf_announcements", "sf_ops_checks",
                 "sf_plan_prices", "sf_tax_rates", "sf_subscriptions", "sf_subscription_events", "sf_billing_profiles", "sf_trials_used", "sf_gateway_plans",
-                "sf_gateway_events", "sf_payments", "sf_document_counters", "sf_invoices", "sf_invoice_lines", "sf_credit_notes", "sf_billing_reconciliations", "sf_flock_lines");
+                "sf_gateway_events", "sf_payments", "sf_document_counters", "sf_invoices", "sf_invoice_lines", "sf_credit_notes", "sf_billing_reconciliations", "sf_flock_lines", "sf_batch_day_lines");
     }
 
     @Test

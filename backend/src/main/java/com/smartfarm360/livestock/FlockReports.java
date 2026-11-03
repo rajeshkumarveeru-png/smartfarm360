@@ -107,9 +107,23 @@ public class FlockReports {
         int sold = byKind.getOrDefault("SOLD", 0), movedOut = byKind.getOrDefault("MOVED_OUT", 0);
         int exposed = opening + arrived + born;
 
-        BigDecimal revenue = null, costs = null, profit = null, costPerEgg = null, costPerKg = null, costPerHeadMonth = null;
+        BigDecimal revenue = null, costs = null, profit = null, costPerEgg = null, costPerKg = null, costPerHeadMonth = null, eggValue = null, profitWithEggs = null;
         if (ctx.has(Permission.FINANCE_READ)) {
             ReportService.IncomeStatement s = reports.incomeStatement(ctx, from, to, null, g.costObjectId(), "ACCRUAL");
+            // Eggs laid at the owner's rates for each day (bin and batch varieties design, V5): an estimate, not in the accounts
+            eggValue = jdbc.sql("""
+                            select sum(dl.eggs * dl.egg_rate) from sf_batch_day_lines dl
+                            join sf_batch_days d on d.id = dl.batch_day_id and d.tenant_id = dl.tenant_id
+                            where dl.tenant_id = :t and d.group_id = :g and d.day between :from and :to and dl.egg_rate is not null""")
+                    .param("t", ctx.tenantId()).param("g", g.id()).param("from", from).param("to", to).query(BigDecimal.class).optional().orElse(null);
+            if (eggValue != null) {
+                eggValue = eggValue.setScale(2, RoundingMode.HALF_UP);
+                BigDecimal eggSales = s.operatingRevenue().stream().filter(x -> "EGG_SALE".equals(x.categoryCode())).map(ReportService.AmountRow::amount)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                // Every egg at the owner's rate instead of what egg sales brought in, so no egg is counted twice
+                profitWithEggs = s.operatingRevenueTotal().add(s.otherIncomeTotal()).subtract(eggSales).add(eggValue)
+                        .subtract(s.operatingCostTotal().add(s.interest()).add(s.losses()));
+            }
             revenue = s.operatingRevenueTotal().add(s.otherIncomeTotal());
             costs = s.operatingCostTotal().add(s.interest()).add(s.losses());
             profit = revenue.subtract(costs);
@@ -123,7 +137,7 @@ public class FlockReports {
                 exposed == 0 ? null : BigDecimal.valueOf(died).multiply(HUNDRED).divide(BigDecimal.valueOf(exposed), 2, RoundingMode.HALF_UP),
                 sold == 0 || soldKg.signum() == 0 ? null : soldKg.divide(BigDecimal.valueOf(sold), 2, RoundingMode.HALF_UP),
                 soldKg.signum() == 0 || feedKg.signum() == 0 ? null : feedKg.divide(soldKg, 2, RoundingMode.HALF_UP),
-                revenue, costs, profit, costPerEgg, costPerKg, costPerHeadMonth);
+                revenue, costs, profit, costPerEgg, costPerKg, costPerHeadMonth, eggValue, profitWithEggs);
     }
 
     /** For the dashboard: open poultry batches with no daily record for a date. */

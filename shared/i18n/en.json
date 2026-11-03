@@ -1112,7 +1112,12 @@
     "BIN_ALREADY": "This item is already in the Bin.",
     "BIN_NOT_IN_BIN": "Move the item to the Bin before deleting it forever.",
     "BIN_KEPT": "Money or stock records still refer to this item, so it is kept in the Bin.",
-    "BIN_PARENT_DELETED": "Restore what it belongs to first: it is in the Bin."
+    "BIN_PARENT_DELETED": "Restore what it belongs to first: it is in the Bin.",
+    "LINE_NOT_FOUND": "That variety is not in this batch.",
+    "LINE_REQUIRED": "Choose the variety.",
+    "LINE_PRICE_REQUIRED": "Enter the price for each variety.",
+    "LINE_TWICE": "Each variety appears once in a day.",
+    "EGGS_SPLIT": "Cracked and broken eggs cannot be more than the eggs laid."
   },
   "mobileAuth": {
     "chooseTenant": "Choose a farm business",
@@ -2377,7 +2382,10 @@
       "GOAT": "Goat",
       "SHEEP": "Sheep",
       "CHICKEN": "Chicken",
-      "CATTLE": "Cattle"
+      "CATTLE": "Cattle",
+      "DUCK": "Duck",
+      "QUAIL": "Quail",
+      "TURKEY": "Turkey"
     },
     "breed": "Breed",
     "sexLabel": "Sex",
@@ -2602,7 +2610,12 @@
       "toGroup": "Choose the group they moved to.",
       "saleKg": "Enter the live weight for a price per kg.",
       "planDescription": "Describe the vaccination or treatment.",
-      "countReason": "Say why the count changed, for example \"recounted the shed\"."
+      "countReason": "Say why the count changed, for example \"recounted the shed\".",
+      "varietyHeads": "Enter the number of heads for each variety.",
+      "varietyName": "Name each new variety, for example Sonali or Kadaknath.",
+      "varietyPrice": "Enter the price for each variety.",
+      "chooseVariety": "Choose the variety.",
+      "eggRate": "Enter the egg rate in rupees, with up to two decimals."
     },
     "flag": {
       "WITHHELD": "milk withheld",
@@ -2753,7 +2766,25 @@
     "confirmDeleteGroup": "Move {{name}} to the Bin? You can restore it from Settings → Bin. Money already recorded for it stays in your accounts.",
     "undoMovement": "Undo (reverse its bill)",
     "confirmUndoMovement": "Undo this entry? Its bill is reversed: the money comes back out of your accounts and the birds are taken back out of the count.",
-    "movementUndone": "Undone: the bill was reversed."
+    "movementUndone": "Undone: the bill was reversed.",
+    "varieties": "Varieties",
+    "variety": "Variety",
+    "newVariety": "New variety…",
+    "birdType": "Bird",
+    "varietyName": "Variety name",
+    "varietyExample": "e.g. Sonali, Kadaknath, Peruvidai",
+    "priceTotal": "Price (₹, total)",
+    "removeVariety": "Remove this variety",
+    "addVariety": "Add another variety",
+    "varietyTotals": "{{heads}} in all",
+    "headsNowShort": "now",
+    "eggsLaid": "Eggs laid",
+    "eggRate": "Rate per egg (₹)",
+    "eggRateHelp": "Enter today's approximate rate per egg for each variety. The eggs laid are valued at it in the figures (an estimate, not in the accounts).",
+    "eggValue": "Eggs laid, at your rates",
+    "eggValueHelp": "estimate, not in the accounts",
+    "profitWithEggs": "Profit counting eggs at your rates",
+    "profitWithEggsHelp": "every egg laid at your rate instead of what egg sales brought in"
   },
   "aquaculture": {
     "title": "Fish farming",

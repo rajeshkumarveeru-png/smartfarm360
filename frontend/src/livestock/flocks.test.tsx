@@ -79,15 +79,18 @@ describe('poultry, goats and sheep web', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Start batch' }));
     await userEvent.type(screen.getByLabelText('Group'), 'Layer shed 2');
+    await userEvent.type(screen.getByLabelText('Variety name'), 'Sonali');
     await userEvent.type(screen.getByLabelText('Heads'), '500');
     await userEvent.click(screen.getByLabelText(/Bought them/));
-    await userEvent.type(screen.getByLabelText('Bill amount'), '17500');
+    // Each variety has its price; the bill is their total
+    await userEvent.type(screen.getByLabelText('Price (₹, total)'), '17500');
     await userEvent.selectOptions(await screen.findByLabelText(/Bought from/), '3');
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(calls((u, i) => u.endsWith('/livestock/flocks') && i?.method === 'POST')).toHaveLength(1));
     const [, init] = calls((u, i) => u.endsWith('/livestock/flocks') && i?.method === 'POST')[0];
-    expect(init!.body).toMatchObject({ name: 'Layer shed 2', species: 'CHICKEN', purpose: 'LAYER', heads: 500, ageAtPlacementDays: null,
-      bill: { amount: '17500', partyId: 3, financialAccountId: null } });
+    expect(init!.body).toMatchObject({ name: 'Layer shed 2', species: 'CHICKEN', purpose: 'LAYER', ageAtPlacementDays: null,
+      lines: [{ lineId: null, species: 'CHICKEN', variety: 'Sonali', heads: 500, amount: '17500' }],
+      bill: { amount: '17500.00', partyId: 3, financialAccountId: null } });
     expect(init!.headers!['Idempotency-Key']).toBeTruthy();
   });
 
@@ -110,6 +113,29 @@ describe('poultry, goats and sheep web', () => {
     expect(calls((u, i) => u.includes('/days/') && i?.method === 'PUT')[0][1]!.body).toMatchObject({ deaths: 3, eggsGood: 850, eggsCracked: 10,
       eggsBroken: null, feedItemId: 8, feedKg: '110' });
     expect(await screen.findByText(/Record for .* saved\./)).toBeInTheDocument();
+  });
+
+  it('takes eggs laid and a rate for each variety of a mixed batch', async () => {
+    const mixed: BatchDay = { ...day, eggsGood: 0, lines: [
+      { lineId: 21, species: 'CHICKEN', variety: 'Sonali', heads: 600, deaths: 0, culls: 0, eggs: 0, eggRate: null },
+      { lineId: 22, species: 'DUCK', variety: 'Khaki Campbell', heads: 394, deaths: 0, culls: 0, eggs: 0, eggRate: null }] };
+    apiMock.mockImplementation((url: string, init?: { method?: string; body?: unknown }) =>
+      (url.includes('/days/') && init?.method !== 'PUT' ? Promise.resolve(mixed) : routeApi(url, init)));
+    renderAt('/t/9/livestock/flocks/1', <FlockPage />, '/t/:tenantId/livestock/flocks/:groupId');
+    await screen.findByRole('heading', { name: 'Layer shed 1' });
+    await userEvent.click(screen.getByRole('tab', { name: 'Daily record' }));
+    await userEvent.type(await screen.findByLabelText('Eggs laid Sonali · Chicken'), '400');
+    await userEvent.type(screen.getByLabelText('Rate per egg (₹) Sonali · Chicken'), '6.50');
+    await userEvent.type(screen.getByLabelText('Eggs laid Khaki Campbell · Duck'), '300');
+    await userEvent.type(screen.getByLabelText('Rate per egg (₹) Khaki Campbell · Duck'), '9');
+    await userEvent.type(screen.getByLabelText('Deaths Khaki Campbell · Duck'), '1');
+    // One total for good eggs is not asked: it comes from the varieties
+    expect(screen.queryByLabelText('Good eggs')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Save the day' }));
+    await waitFor(() => expect(calls((u, i) => u.includes('/days/') && i?.method === 'PUT')).toHaveLength(1));
+    expect(calls((u, i) => u.includes('/days/') && i?.method === 'PUT')[0][1]!.body).toMatchObject({ lines: [
+      // Empty boxes are sent as nothing, which the server takes as none
+      { lineId: 21, deaths: null, culls: null, eggs: 400, eggRate: '6.50' }, { lineId: 22, deaths: 1, culls: null, eggs: 300, eggRate: '9' }] });
   });
 
   it('lets only hand-entered head changes be removed, and checks a count before sending', async () => {

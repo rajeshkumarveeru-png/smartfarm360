@@ -2020,6 +2020,80 @@ home use. No backend change.
 | `frontend: npm test` | Passed: **109 tests**. The batch tests open the tab they need and keep all their checks. The layer batch test checks the tab list. The permissions test now opens *Birds* and *Sales & expenses* to check the money buttons are absent there |
 | `mobile: npm test` | Passed: **76 tests** |
 
+## Recycle bin and batch varieties (2026-11-03)
+
+Built from the approved design [docs/platform/bin-and-batch-varieties.md](platform/bin-and-batch-varieties.md); its
+section 5 says what is built and what changed.
+
+### Recycle bin (two-level delete)
+
+- Deleting a farm, field, crop cycle, poultry batch, goat or sheep herd, or work note moves it to **Settings → Bin**. It
+  leaves every list, and *Restore* brings it back.
+- *Delete forever* (owner only, new permission `DATA_PURGE`) erases it and what belongs only to it. It is refused, and
+  the item stays in the Bin, while money or stock records refer to it. Every step goes into the activity history.
+- The other kinds in B9 (workers, assets, parties, stock items and locations, observations, weather, health-plan items,
+  crops, varieties and seasons, draft money records) are **not done yet**.
+
+### Batch varieties and the daily record
+
+- A batch holds several varieties (chicken, duck, quail, turkey; goat and sheep for herds), each with its own name and
+  heads. *Start batch* and *Buy more birds* take several rows, with a price each and one bill for the total. Common
+  names are offered as you type (Sonali, Kadaknath, Peruvidai, Aseel, Muscovy and others).
+- Deaths, culls, counts, moves and sales choose the variety when there is more than one. Existing batches became one
+  variety each.
+- The daily record takes, for each variety, deaths, culls, **eggs laid and a rate per egg**. Cracked and broken eggs
+  are for the whole batch. The figures add *Eggs laid, at your rates* and *Profit counting eggs at your rates*, which
+  counts eggs at those rates in place of egg sales, so they are not counted twice.
+- Head changes: any hand-entered entry can be removed. A bought or sold entry is undone by reversing its bill.
+- Adding an expense on a farm, crop cycle or batch happens in place, on the same screen. *More options* opens the full
+  form.
+
+### Database migrations
+
+- `018-bin-and-batch-lines.yaml`:
+  - changeset `060-recycle-bin`: `deleted_at` and `deleted_by` on the first kinds; inactive farms and fields go to the
+    Bin; `DATA_PURGE` for the owner.
+  - changeset `061-flock-lines`: `sf_flock_lines`, `sf_head_movements.line_id`, and one line per existing batch.
+- `019-batch-day-lines.yaml`, changeset `062-batch-day-lines`: `sf_batch_day_lines` with its RLS policy.
+  - It is a new changeset, not part of 061, because 061 had already been applied to the local database at 10:30
+    when the IDE backend started.
+
+### APIs
+
+- `GET /bin`, `POST /bin/{kind}/{id}`, `POST /bin/{kind}/{id}/restore` and `DELETE /bin/{kind}/{id}`.
+- The batch API:
+  - `DELETE /livestock/groups/{groupId}` and `DELETE /cultivation-cycles/{id}` move the item to the Bin.
+  - `GET /livestock/flocks/{groupId}/lines`.
+  - `lines` on start, purchase and the day record; `lineId` on movements and sales.
+
+### Tests and evidence
+
+| Command | Result |
+|---|---|
+| `backend: gradlew test bootJar` | **858 passed, 1 failed:** `DashboardPerformanceTest` took 1,056 ms against its 1,000 ms budget while the machine had 0.7 GB of 7.8 GB RAM free. Run alone it passed, together with `bootJar`. The budget was not changed. An earlier run stopped on a corrupt test-results file in `build/`, which was deleted |
+| `frontend: npm run lint`, `npx tsc --noEmit`, `npm run build` | Passed |
+| `frontend: npm test` | Passed: **110 tests**. *Start batch* now enters a variety with its price, and the bill is the total. A new test enters eggs and a rate for each variety of a mixed batch |
+| `mobile: npx tsc --noEmit`, `npm test` | Passed: **76 tests** |
+| Local database | Backed up first with `pg_dump --enable-row-security`. Changeset 062 applied by starting the new jar on port 8081: no errors, health 200, the 060–061 checksums accepted. `sf_batch_day_lines` has the forced policy, every table with `tenant_id` has a policy, and every batch has a variety line |
+| Manual browser check | **Not done** |
+
+New backend tests:
+
+- `BinTest` (5).
+- `FlockVarietiesTest` (3), covering:
+  - a mixed batch with one bill;
+  - a variety required when there are several;
+  - heads per variety;
+  - buying more;
+  - a count;
+  - eggs and rates in the profit;
+  - `EGGS_SPLIT`;
+  - a variety of another batch refused.
+- The migration test lists changesets 060–062 and the new tables.
+
+Found and fixed on the way: the batch page loaded the day again on every render once the variety labels became a
+dependency, which hung the web tests; it now reads the latest labels through a ref.
+
 ## Known gaps and defects
 
 Security and platform:
