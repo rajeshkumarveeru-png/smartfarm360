@@ -5,6 +5,7 @@ import { api } from '../api/client';
 import { useTenant } from '../auth/useCurrentTenant';
 import { ErrorBanner, Loading } from '../components/common';
 import type { FinancialAccount, Party } from '../finance/types';
+import RecordsPanel from '../finance/RecordsPanel';
 import { newIdempotencyKey } from '../finance/useFinanceData';
 import { currentLanguage, useNs } from '../i18n';
 import { describeError, isStale } from '../lib/errors';
@@ -28,6 +29,8 @@ const toForm = (d: BatchDay): DayForm => ({ deaths: str(d.deaths), deathCause: d
   weightBirds: str(d.weightBirds), weightKg: str(d.weightKg), notes: d.notes ?? '' });
 
 /** One poultry batch or goat and sheep herd: figures (J8), the daily record (J4), head movements (J7), sales (J6), eggs (J5) and the health plan (J9). */
+type FlockTab = 'summary' | 'daily' | 'heads' | 'money' | 'health';
+
 export default function FlockPage() {
   const { groupId } = useParams();
   const tenant = useTenant();
@@ -50,6 +53,7 @@ export default function FlockPage() {
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
   const [date, setDate] = useState(today());
   const [day, setDay] = useState<BatchDay | null>(null);
+  const [tab, setTab] = useState<FlockTab>('summary');
   const [dayForm, setDayForm] = useState<DayForm | null>(null);
   const [dayLoads, setDayLoads] = useState(0);
   const [stale, setStale] = useState(false);
@@ -138,6 +142,10 @@ export default function FlockPage() {
   }
 
   const kinds = ['DIED', 'CULLED', 'RECEIVED', 'MOVED', 'COUNT', ...(poultry ? [] : ['BORN'])];
+  // One part of the batch per tab, so the page stays short
+  const tabs: FlockTab[] = ['summary', ...(poultry ? ['daily' as const] : []), 'heads', ...(canMoney || (layers && canWrite) ? ['money' as const] : []), 'health'];
+  const tabLabel = (x: FlockTab) => ({ summary: t('tabSummary'), daily: t('tabDaily'), heads: t(poultry ? 'tabBirds' : 'tabAnimals'),
+    money: t('tabMoney'), health: t('healthPlan') })[x];
   return (
     <>
       <div className="crop-page-head">
@@ -151,6 +159,13 @@ export default function FlockPage() {
       <ErrorBanner message={error} onRetry={stale ? () => { setError(''); setDayLoads(n => n + 1); } : undefined} retryLabel={tc('loadLatest')} />
       {message && <p className="hint" role="status">{message}</p>}
 
+      <div className="crop-tabs section-space" role="tablist" aria-label={group.name}>
+        {tabs.map(x => (
+          <button key={x} type="button" role="tab" aria-selected={tab === x} className={tab === x ? 'active' : ''} onClick={() => setTab(x)}>{tabLabel(x)}</button>
+        ))}
+      </div>
+
+      {tab === 'summary' && <>
       <div className="form-card form-grid filters">
         <label>{tf('from')}<input type="date" value={range.from} onChange={e => setRange({ ...range, from: e.target.value })} /></label>
         <label>{tf('to')}<input type="date" value={range.to} onChange={e => setRange({ ...range, to: e.target.value })} /></label>
@@ -158,8 +173,9 @@ export default function FlockPage() {
       <FigureCards title={tf('rangeLabel', { from: formatDate(report.period.from, lang), to: formatDate(report.period.to, lang) })} f={report.period}
                    poultry={poultry} layers={layers} showMoney={showMoney} />
       {report.sincePlacement && <FigureCards title={t('sincePlacement')} f={report.sincePlacement} poultry={poultry} layers={layers} showMoney={showMoney} />}
+      </>}
 
-      {poultry && dayForm && day && (
+      {tab === 'daily' && poultry && dayForm && day && (
         <>
           <h3 className="section-space">{t('dailyRecord')}</h3>
           <form className="form-card form-grid" noValidate onSubmit={saveDay}>
@@ -186,6 +202,7 @@ export default function FlockPage() {
         </>
       )}
 
+      {tab === 'heads' && <>
       <h3 className="section-space">{t('headMovements')}</h3>
       {open && (
         <form className="form-card form-grid" noValidate onSubmit={saveMove}>
@@ -220,8 +237,9 @@ export default function FlockPage() {
           ))}</tbody>
         </table>
       )}
+      </>}
 
-      {open && !poultry && (
+      {tab === 'heads' && open && !poultry && (
         <>
           <h3 className="section-space">{t('births')}</h3>
           <form className="form-card form-grid" noValidate onSubmit={e => {
@@ -238,7 +256,7 @@ export default function FlockPage() {
         </>
       )}
 
-      {open && canMoney && (
+      {tab === 'heads' && open && canMoney && (
         <>
           <h3 className="section-space">{t('buyMore')}</h3>
           <form className="form-card form-grid" noValidate onSubmit={e => {
@@ -253,7 +271,11 @@ export default function FlockPage() {
             <PayerFields parties={parties} accounts={accounts} f={buy} set={p => setBuy({ ...buy, ...p })} partyLabel={t('boughtFrom')} accountLabel={tf('paidFrom')} />
             <div className="form-actions full"><button className="secondary">{t('recordPurchase')}</button></div>
           </form>
+        </>
+      )}
 
+      {tab === 'money' && open && canMoney && (
+        <>
           <h3 className="section-space">{t(poultry ? 'sellBirds' : 'sellAnimals')}</h3>
           <form className="form-card form-grid" noValidate onSubmit={e => {
             e.preventDefault();
@@ -274,7 +296,7 @@ export default function FlockPage() {
         </>
       )}
 
-      {layers && canWrite && (
+      {tab === 'money' && layers && canWrite && (
         <>
           <h3 className="section-space">{t('eggsOut')}</h3>
           <form className="form-card form-grid" noValidate onSubmit={e => {
@@ -310,6 +332,14 @@ export default function FlockPage() {
         </>
       )}
 
+      {tab === 'money' && canMoney && group.costObjectId && (
+        <div className="section-space">
+          <RecordsPanel filter={`costObjectId=${group.costObjectId}`} prefill={`${group.farmId ? `farm=${group.farmId}&` : ''}activity=${group.costObjectId}`}
+            title={t(poultry ? 'batchMoney' : 'herdMoney')} />
+        </div>
+      )}
+
+      {tab === 'health' && <>
       <h3 className="section-space">{t('healthPlan')}</h3>
       <p className="hint">{t('healthPlanHelp')}</p>
       {plan.length === 0 ? <p className="hint">{t('noPlan')}</p> : (
@@ -348,6 +378,7 @@ export default function FlockPage() {
           </>}
         </form>
       )}
+      </>}
     </>
   );
 }

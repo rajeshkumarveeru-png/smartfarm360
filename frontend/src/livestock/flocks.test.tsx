@@ -96,6 +96,9 @@ describe('poultry, goats and sheep web', () => {
     expect(screen.getAllByText(/Hen-day % 85/).length).toBeGreaterThan(0);
     expect(screen.getAllByText('₹4.24').length).toBeGreaterThan(0);
     expect(screen.getByText('Since the batch started')).toBeInTheDocument();
+    // Each part of the batch is on its own tab
+    expect(screen.getAllByRole('tab').map(x => x.textContent)).toEqual(['Summary', 'Daily record', 'Birds', 'Sales & expenses', 'Health plan']);
+    await userEvent.click(screen.getByRole('tab', { name: 'Daily record' }));
     expect(await screen.findByText(/Eggs withheld after treatment/)).toBeInTheDocument();
 
     const deaths = screen.getByLabelText('Deaths');
@@ -110,6 +113,8 @@ describe('poultry, goats and sheep web', () => {
 
   it('lets only hand-entered head changes be removed, and checks a count before sending', async () => {
     renderAt('/t/9/livestock/flocks/1', <FlockPage />, '/t/:tenantId/livestock/flocks/:groupId');
+    await screen.findByRole('heading', { name: 'Layer shed 1' });
+    await userEvent.click(screen.getByRole('tab', { name: 'Birds' }));
     expect(await screen.findByText('Not laying')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Remove this change' })).toHaveLength(1);
     await userEvent.selectOptions(screen.getByLabelText('What happened'), 'COUNT');
@@ -124,8 +129,11 @@ describe('poultry, goats and sheep web', () => {
   it('offers kidding for a goat herd but no daily batch record', async () => {
     renderAt('/t/9/livestock/flocks/3', <FlockPage />, '/t/:tenantId/livestock/flocks/:groupId');
     expect(await screen.findByRole('heading', { name: 'Goat herd' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Daily record' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('tab', { name: 'Animals' }));
     expect(screen.getByRole('button', { name: 'Record births' })).toBeInTheDocument();
     expect(screen.queryByText('Daily batch record')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('tab', { name: 'Sales & expenses' }));
     expect(screen.getByRole('heading', { name: 'Sell animals' })).toBeInTheDocument();
   });
 
@@ -134,8 +142,12 @@ describe('poultry, goats and sheep web', () => {
     renderAt('/t/9/livestock/flocks/1', <FlockPage />, '/t/:tenantId/livestock/flocks/:groupId');
     expect(await screen.findByRole('heading', { name: 'Layer shed 1' })).toBeInTheDocument();
     expect(screen.queryByText('₹4.24')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Record sale' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('tab', { name: 'Birds' }));
     expect(screen.queryByRole('button', { name: 'Record purchase' })).not.toBeInTheDocument();
+    // Egg uses are not money, so the tab is there for a layer batch, but without sales or the money list
+    await userEvent.click(screen.getByRole('tab', { name: 'Sales & expenses' }));
+    expect(screen.queryByRole('button', { name: 'Record sale' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Money for this batch')).not.toBeInTheDocument();
     expect(calls(u => u.endsWith('/finance/parties'))).toHaveLength(0);
   });
 

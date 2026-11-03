@@ -1998,6 +1998,28 @@ and no herd or milk tabs in poultry.
 | `frontend: npm test` | Passed: **109 tests**. Updated: batch links; the reports test now checks a section shows only its own animals; the poultry tabs test now checks Batches and Reports and no cattle tabs. New: the cows section shows no poultry or goat tabs; a menu item per section |
 | `mobile: npm test` | Passed: **76 tests** |
 
+## Batch page in tabs (2026-11-03)
+
+The owner asked not to keep everything on one page. The poultry batch page (and the goat and sheep herd page) put the
+figures, the daily record, head changes, buying, selling, eggs and the health plan one under another. It is now in tabs:
+
+- **Summary:** the date range, the period's figures, and the figures since the batch started.
+- **Daily record** (poultry only): deaths, culls, eggs, feed, weights and notes for a day.
+- **Birds** (or **Animals** for goats and sheep): head changes and their list, births (goats and sheep) and buying more.
+- **Sales & expenses:** selling birds or animals, egg home use and damage, selling eggs, and a new list of the batch's
+  money records (the same panel as crops: category bar, tags, add expense, and edit, discard, correct or reverse). Feed
+  and other bills booked to the batch show there.
+- **Health plan:** the plan and adding to it.
+
+Tabs follow permissions as before: no sales or money list without finance access. A layer batch keeps the tab for egg
+home use. No backend change.
+
+| Command | Result |
+|---|---|
+| `frontend: npm run lint`, `npx tsc --noEmit`, `npm run build` | Passed |
+| `frontend: npm test` | Passed: **109 tests**. The batch tests open the tab they need and keep all their checks. The layer batch test checks the tab list. The permissions test now opens *Birds* and *Sales & expenses* to check the money buttons are absent there |
+| `mobile: npm test` | Passed: **76 tests** |
+
 ## Known gaps and defects
 
 Security and platform:
