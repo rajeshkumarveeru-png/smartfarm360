@@ -870,6 +870,15 @@ button.im-row:focus-visible, a.im-row:focus-visible { outline: 2px solid var(--t
 }
 @keyframes im-sheet { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
 
+/* ---- Work diary: money is entered under Expenses & sales ---- */
+.money-elsewhere {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 14px; border-radius: 14px; font-size: 13px; color: #0369a1;
+  background: linear-gradient(120deg, rgb(14 165 233 / 10%), rgb(255 255 255 / 80%)); border: 1px solid rgb(14 165 233 / 25%);
+}
+.money-elsewhere span { flex: 1 1 260px; color: var(--sf-text-2); line-height: 1.5; }
+.money-elsewhere > svg { flex: 0 0 auto; color: #0284c7; }
+.money-elsewhere .secondary { min-height: 36px; padding: 6px 12px; font-size: 12.5px; }
+
 /* ---- Motion and print ----------------------------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }

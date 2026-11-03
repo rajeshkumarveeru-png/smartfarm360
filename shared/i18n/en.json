@@ -1726,7 +1726,7 @@
     "unsold": "Unsold produce",
     "estimateLabel": "Estimate {{amount}}, not in the accounts",
     "memoHelp": "Recorded before the accounts (not in profit): activity costs {{cost}}, harvest value {{value}}.",
-    "activities": "Field work",
+    "activities": "Work diary",
     "harvests": "Harvests",
     "observations": "Observations",
     "logActivity": "Record field work",
@@ -1825,7 +1825,9 @@
     },
     "estimatePriceNoHarvest": "Price for unsold produce (₹, estimate)",
     "money": "Expenses & sales",
-    "moneyTitle": "Money for this cycle"
+    "moneyTitle": "Money for this cycle",
+    "moneyElsewhere": "The diary records the work and any stock used. Money for it (labour, machine hire, anything bought) goes under Expenses & sales, so it is entered once and counts in the profit.",
+    "goToMoney": "Add an expense"
   },
   "workforce": {
     "title": "Workers & wages",

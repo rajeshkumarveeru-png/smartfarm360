@@ -70,7 +70,7 @@ describe('crop web', () => {
     expect(screen.getByText(/need more area than it has/)).toBeInTheDocument();
   });
 
-  it('shows the cycle figures and records field work with stock inputs and paid work once', async () => {
+  it('shows the cycle figures and records work with stock inputs; money for the work goes under Expenses & sales', async () => {
     renderAt('/t/9/crops/cycles/4', <CyclePage />, '/t/:tenantId/crops/cycles/:cycleId');
     expect((await screen.findAllByText('₹50,333.33')).length).toBeGreaterThan(0);
     expect(screen.getByText('₹7,833.34')).toBeInTheDocument();
@@ -80,16 +80,23 @@ describe('crop web', () => {
     await waitFor(() => expect(screen.getByLabelText('Stock item')).toBeInTheDocument());
     await userEvent.selectOptions(screen.getByLabelText('Stock item'), '5');
     await userEvent.type(screen.getAllByLabelText('Quantity')[0], '30');
-    await userEvent.click(screen.getByLabelText(/Labour or machine hire was paid/));
-    await userEvent.selectOptions(screen.getByLabelText('Paid for'), '8');
-    await userEvent.type(screen.getByLabelText('Amount (₹)'), '500');
-    await userEvent.selectOptions(screen.getByLabelText('Paid from'), '5');
+    // The diary takes no money: there is one place for it, under Expenses & sales
+    expect(screen.queryByLabelText(/Labour or machine hire was paid/)).not.toBeInTheDocument();
+    expect(screen.getByRole('note')).toHaveTextContent(/goes under Expenses & sales/);
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(apiMock.mock.calls.some(([u, i]) => u === '/api/v1/tenants/9/activities' && i?.method === 'POST')).toBe(true));
     const [, init] = apiMock.mock.calls.find(([u, i]) => u === '/api/v1/tenants/9/activities' && i?.method === 'POST')!;
     expect(init.headers['Idempotency-Key']).toMatch(/.{8,}/);
-    expect(init.body).toMatchObject({ cycleId: 4, activityType: 'FERTILIZER', inputs: [{ itemId: 5, quantity: '30', unit: 'kg', lotNo: null }],
-      paidWork: { categoryId: 8, amount: '500', partyId: null, financialAccountId: 5 } });
+    expect(init.body).toMatchObject({ cycleId: 4, activityType: 'FERTILIZER', inputs: [{ itemId: 5, quantity: '30', unit: 'kg', lotNo: null }], paidWork: null });
+    expect(screen.queryByText(/Recorded before the accounts/)).not.toBeInTheDocument();
+  });
+
+  it('the work diary sends money to the Expenses & sales tab', async () => {
+    renderAt('/t/9/crops/cycles/4', <CyclePage />, '/t/:tenantId/crops/cycles/:cycleId');
+    expect(await screen.findByRole('tab', { name: 'Work diary' })).toHaveAttribute('aria-selected', 'true');
+    await userEvent.click(screen.getByRole('button', { name: /Record field work/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Add an expense' }));
+    expect(screen.getByRole('tab', { name: 'Expenses & sales' })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('hides stock inputs and paid work from people who cannot record stock or money', async () => {

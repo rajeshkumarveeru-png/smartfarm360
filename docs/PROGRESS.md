@@ -1883,6 +1883,30 @@ details behind any card (like BizManager and SmartBill360), and a more professio
 | `mobile: npm test` | Passed: **76 tests** |
 | Backend | Unchanged since the previous entry (836 of 837; see the dashboard timing note there) |
 
+## Simpler crop page: one place for money (2026-11-03)
+
+The owner asked what the difference is between *Field work* and *Expenses & sales*, and to keep the system simple.
+Field work is a diary of what was done and the stock used; Expenses & sales is the money. They overlapped: the work form
+could also book paid labour or machine hire, so money could be entered in two places.
+
+- The first tab is now **Work diary**. Its form records the work and any stock used, and no longer has the *"Labour or
+  machine hire was paid"* option. A note explains that money goes under *Expenses & sales*, and its *Add an expense*
+  button opens that tab, where new expenses are booked to the cycle.
+- The line *"Recorded before the accounts (not in profit): activity costs …"* (pre-accounts memo costs) is no longer shown
+  on the cycle page.
+- No data changes. Existing paid-work bills stay, with their link on the diary entry. The API still accepts `paidWork`
+  (for example from the phone app, which has no such form today); the web no longer offers it.
+- Poultry, as asked: batches (bird count, purchase price and bill), the daily record (eggs, deaths, feed), egg and bird
+  sales, cost per egg, and profit per batch are already built in the livestock module. They appear once *Poultry* is
+  turned on in *Settings → Farming modules*.
+
+| Command | Result |
+|---|---|
+| `frontend: npm run lint`, `npx tsc --noEmit`, `npm run build` | Passed |
+| `frontend: npm test` | Passed: **102 tests**. The crop test now checks the diary has no money option and sends money to the Expenses tab (1 new). One earlier full run timed out five unrelated tests at just over vitest's 5 seconds while the machine was loaded; those files passed alone (29 tests) and the next full run passed |
+| `mobile: npx tsc --noEmit`, `npm test` | Passed: **76 tests** |
+| Backend | Unchanged |
+
 ## Known gaps and defects
 
 Security and platform:

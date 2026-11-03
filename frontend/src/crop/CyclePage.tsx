@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, CalendarDays, MapPin, Plus, Ruler, Sprout, Trash2 } from 'lucide-react';
+import { ArrowLeft, CalendarDays, MapPin, Plus, Ruler, Sprout, Trash2, Wallet } from 'lucide-react';
 import { api } from '../api/client';
 import type { Page } from '../api/types';
 import { useTenant } from '../auth/useCurrentTenant';
 import { ErrorBanner, Loading } from '../components/common';
-import type { Category, FinancialAccount, Party } from '../finance/types';
 import { newIdempotencyKey, useCategoryLabel } from '../finance/useFinanceData';
 import { currentLanguage, useNs } from '../i18n';
 import { describeError } from '../lib/errors';
@@ -153,9 +152,6 @@ export default function CyclePage() {
               <tr className="total"><td>{t('profit')}</td><td className="num">{formatMoney(report.profit, lang)}</td></tr>
             </tbody>
           </table>
-          {(report.memo.activityCost > 0 || report.memo.harvestCount > 0) && (
-            <p className="hint">{t('memoHelp', { cost: formatMoney(report.memo.activityCost, lang), value: formatMoney(report.memo.harvestValue, lang) })}</p>
-          )}
         </>
       )}
 
@@ -172,7 +168,8 @@ export default function CyclePage() {
       {tab === 'activities' && <>
         {canRecord && form !== 'activity' && <button type="button" className="primary" onClick={() => setForm('activity')}><Plus size={16} aria-hidden />{t('logActivity')}</button>}
         {form === 'activity' && <ActivityForm cycle={cycle} onDone={warnings => { setForm(''); setNotice(warnings.length ? ts('warning.LOT_EXPIRED', { item: warnings[0].split(':')[1], lot: warnings[0].split(':')[2] }) : ''); void load(); }}
-                                              onCancel={() => setForm('')} onError={setError} />}
+                                              onCancel={() => setForm('')} onError={setError}
+                                              onAddExpense={canMoney && cycle.costObjectId ? () => { setForm(''); setTab('money'); } : undefined} />}
         {activities.length === 0 ? <p className="hint">{t('noActivities')}</p> : (
           <div className="activity-list">
             {activities.map(a => (
@@ -263,37 +260,28 @@ function StageActions({ cycle, onAction }: { cycle: Cycle; onAction: (action: st
   );
 }
 
-function ActivityForm({ cycle, onDone, onCancel, onError }: { cycle: Cycle; onDone: (warnings: string[]) => void; onCancel: () => void; onError: (m: string) => void }) {
+function ActivityForm({ cycle, onDone, onCancel, onError, onAddExpense }: { cycle: Cycle; onDone: (warnings: string[]) => void; onCancel: () => void;
+  onError: (m: string) => void; onAddExpense?: () => void }) {
   const tenant = useTenant();
   const t = useNs('crop');
   const tc = useNs('common');
-  const tf = useNs('fin');
   const ts = useNs('stock');
   const lang = currentLanguage();
-  const categoryLabel = useCategoryLabel();
   const base = `/api/v1/tenants/${tenant.id}`;
   const canUseStock = can(tenant, 'INVENTORY_WRITE');
-  const canPay = can(tenant, 'FINANCE_WRITE');
   const [key] = useState(newIdempotencyKey);
   const [form, setForm] = useState<Record<string, string>>({ activityType: 'LAND_PREPARATION', activityDate: today() });
   const [inputs, setInputs] = useState<Input[]>([]);
-  const [paid, setPaid] = useState(false);
   const [items, setItems] = useState<Item[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
   const [lots, setLots] = useState<Record<string, Lot[]>>({});
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
-  const [parties, setParties] = useState<Party[]>([]);
   const [busy, setBusy] = useState(false);
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
   useEffect(() => {
     if (canUseStock) Promise.all([api<Item[]>(`${base}/stock/items`), api<Unit[]>(`${base}/stock/units`)])
       .then(([i, u]) => { setItems(i.filter(x => x.active)); setUnits(u); }).catch(() => undefined);
-    if (canPay) Promise.all([api<Category[]>(`${base}/finance/categories`), api<FinancialAccount[]>(`${base}/finance/accounts`), api<Party[]>(`${base}/finance/parties`)])
-      .then(([c, a, p]) => { setCategories(c.filter(x => x.active && x.kind === 'EXPENSE')); setAccounts(a.filter(x => x.active)); setParties(p.filter(x => x.active)); })
-      .catch(() => undefined);
-  }, [base, canUseStock, canPay]);
+  }, [base, canUseStock]);
 
   function updateInput(i: number, patch: Partial<Input>) {
     setInputs(xs => xs.map((x, j) => (j === i ? { ...x, ...patch } : x)));
@@ -317,16 +305,14 @@ function ActivityForm({ cycle, onDone, onCancel, onError }: { cycle: Cycle; onDo
       if (!isQuantity(i.quantity)) { onError(ts('errors.quantity')); return; }
       if (item.trackLots && !i.lotNo) { onError(ts('errors.lot')); return; }
     }
-    if (paid && (!form.categoryId || !/^\d{1,12}(\.\d{1,2})?$/.test(form.amount ?? '') || Number(form.amount) <= 0)) { onError(tf('errors.amount')); return; }
-    if (paid && !form.partyId && !form.financialAccountId) { onError(tf('errors.partyOrAccount')); return; }
     setBusy(true); onError('');
     try {
       const r = await api<{ warnings: string[] }>(`${base}/activities`, { method: 'POST', headers: { 'Idempotency-Key': key }, body: {
         cycleId: cycle.id, activityType: form.activityType, activityDate: form.activityDate, notes: form.notes || null,
         workers: form.workers ? Number(form.workers) : null, hours: form.hours || null,
         inputs: inputs.map(i => ({ itemId: Number(i.itemId), quantity: i.quantity, unit: i.unit || null, lotNo: i.lotNo || null })),
-        paidWork: paid ? { categoryId: Number(form.categoryId), amount: form.amount, partyId: form.partyId ? Number(form.partyId) : null,
-          financialAccountId: !form.partyId && form.financialAccountId ? Number(form.financialAccountId) : null, description: form.description || null } : null,
+        // Money for the work is recorded once, under Expenses & sales
+        paidWork: null,
       } });
       onDone(r.warnings);
     } catch (err) {
@@ -368,17 +354,11 @@ function ActivityForm({ cycle, onDone, onCancel, onError }: { cycle: Cycle; onDo
         </fieldset>
       )}
 
-      {canPay && <label className="check full"><input type="checkbox" checked={paid} onChange={e => setPaid(e.target.checked)} />{t('paidWorkToggle')}</label>}
-      {paid && <>
-        <label>{t('paidFor')}<select value={form.categoryId ?? ''} onChange={e => set('categoryId', e.target.value)}>
-          <option value="">—</option>{categories.map(c => <option key={c.id} value={c.id}>{categoryLabel(c)}</option>)}</select></label>
-        <label>{tf('amount')}<input inputMode="decimal" value={form.amount ?? ''} onChange={e => set('amount', e.target.value)} /></label>
-        <label>{t('owedTo')} <small>{tc('optional')}</small><select value={form.partyId ?? ''} onChange={e => set('partyId', e.target.value)}>
-          <option value="">—</option>{parties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-        {!form.partyId && <label>{tf('paidFrom')}<select value={form.financialAccountId ?? ''} onChange={e => set('financialAccountId', e.target.value)}>
-          <option value="">—</option>{accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>}
-      </>}
-      <p className="hint full">{t('recordOnceHelp')}</p>
+      <div className="money-elsewhere full" role="note">
+        <Wallet size={18} aria-hidden />
+        <span>{t('moneyElsewhere')}</span>
+        {onAddExpense && <button type="button" className="secondary" onClick={onAddExpense}><Plus size={15} aria-hidden />{t('goToMoney')}</button>}
+      </div>
       <div className="form-actions full">
         <button type="button" className="secondary" onClick={onCancel}>{tc('cancel')}</button>
         <button className="primary" disabled={busy}>{busy ? tc('loading') : tc('save')}</button>
