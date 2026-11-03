@@ -20,6 +20,7 @@ const farm = { id: 2, tenantId: 9, name: 'Yerpathi', farmType: 'CROP', village: 
 
 function routeApi(url: string, init?: { method?: string }) {
   if (init?.method === 'POST') return Promise.resolve({ summary: { id: 70 } });
+  if (init?.method === 'DELETE') return Promise.resolve(undefined);
   if (url.endsWith('/farms')) return Promise.resolve([farm]);
   if (url.endsWith('/farms/2')) return Promise.resolve(farm);
   if (url.endsWith('/farms/2/land-parcels')) return Promise.resolve([{ id: 5, tenantId: 9, farmId: 2, name: 'North field', area: 1.7, areaUnit: 'ACRE', active: true }]);
@@ -102,6 +103,28 @@ describe('farm workspace', () => {
     await userEvent.click(await within(dialog).findByRole('button', { name: /Seeds/ }));
     expect(await screen.findByRole('dialog', { name: 'Seeds' })).toBeInTheDocument();
     expect(apiMock.mock.calls.some(([u]) => /documents\?farmId=2&categoryId=1&from=/.test(u))).toBe(true);
+  });
+
+  it('deletes a farm added by mistake, after asking, from the list or from its page', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderAt('/t/9/farms', <FarmsPage />, '/t/:tenantId/farms');
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete farm Yerpathi' }));
+    expect(confirm.mock.calls[0][0]).toMatch(/stays in your accounts/);
+    await waitFor(() => expect(apiMock).toHaveBeenCalledWith('/api/v1/tenants/9/farms/2', { method: 'DELETE' }));
+    await waitFor(() => expect(screen.queryByRole('link', { name: /Yerpathi/ })).not.toBeInTheDocument());
+    confirm.mockRestore();
+  });
+
+  it('the farm page deletes the farm and removes a field', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderAt('/t/9/farms/2', <FarmPage />, '/t/:tenantId/farms/:farmId');
+    await userEvent.click(await screen.findByRole('button', { name: 'Remove field North field' }));
+    await waitFor(() => expect(apiMock).toHaveBeenCalledWith('/api/v1/tenants/9/land-parcels/5', { method: 'DELETE' }));
+    await waitFor(() => expect(screen.queryByText('North field')).not.toBeInTheDocument());
+    await userEvent.click(screen.getByRole('button', { name: 'Delete farm' }));
+    await waitFor(() => expect(apiMock).toHaveBeenCalledWith('/api/v1/tenants/9/farms/2', { method: 'DELETE' }));
+    expect(await screen.findByText('navigated')).toBeInTheDocument();
+    vi.restoreAllMocks();
   });
 
   it('shows land without money to people who cannot read finance', async () => {

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, CalendarDays, MapPin, Plus, Ruler, Sprout, Trash2, Wallet } from 'lucide-react';
+import { ArrowLeft, CalendarDays, MapPin, Plus, RotateCcw, Ruler, ShoppingBag, Sprout, Trash2, Wallet } from 'lucide-react';
 import { api } from '../api/client';
 import type { Page } from '../api/types';
 import { useTenant } from '../auth/useCurrentTenant';
 import { ErrorBanner, Loading } from '../components/common';
+import type { Category, FinancialAccount, Party } from '../finance/types';
 import { newIdempotencyKey, useCategoryLabel } from '../finance/useFinanceData';
 import { currentLanguage, useNs } from '../i18n';
 import { describeError } from '../lib/errors';
@@ -18,7 +19,7 @@ import { ExportBar } from '../reports/ReportTools';
 import RecordsPanel from '../finance/RecordsPanel';
 import { FarmInsight, type Insight } from '../pages/FarmInsights';
 
-type Tab = 'activities' | 'money' | 'harvests' | 'observations';
+type Tab = 'activities' | 'harvests' | 'observations';
 type Input = { itemId: string; quantity: string; unit: string; lotNo: string };
 
 /** One cultivation cycle: stage, figures and its field records (crop design, sections 3–8). */
@@ -84,6 +85,15 @@ export default function CyclePage() {
   const canWrite = can(tenant, 'CROP_WRITE');
   const canReverse = can(tenant, 'FINANCE_REVERSE');
   const canSeeFinance = can(tenant, 'FINANCE_READ');
+  /** A work entry is deleted when it is only a note, and reversed (with its stock and money) when it moved either. */
+  const diaryActions = (a: Activity) => <>
+    {a.status === 'ACTIVE' && (a.stockDocumentId || a.billDocumentId) && canReverse &&
+      <button type="button" className="rp-btn danger-btn" title={tf('reverse')} aria-label={`${tf('reverse')} ${t(`activity.${a.activityType}`)}`}
+        onClick={() => { if (window.confirm(t('confirmReverse'))) void act(`/activities/${a.id}/reverse`, {}); }}><RotateCcw size={15} aria-hidden /></button>}
+    {a.status === 'ACTIVE' && !a.stockDocumentId && !a.billDocumentId && !a.legacyMemo && can(tenant, 'CROP_ACTIVITY_WRITE') &&
+      <button type="button" className="rp-btn danger-btn" title={tc('remove')} aria-label={`${tc('remove')} ${t(`activity.${a.activityType}`)}`}
+        onClick={() => { if (window.confirm(t('confirmDelete'))) void act(`/activities/${a.id}`, undefined, 'DELETE'); }}><Trash2 size={15} aria-hidden /></button>}
+  </>;
   return (
     <>
       <Link className="fw-back" to={`/t/${tenant.id}/crops`}><ArrowLeft size={16} aria-hidden />{tc('back')}</Link>
@@ -158,19 +168,36 @@ export default function CyclePage() {
       {insight && report && <FarmInsight insight={insight} farmId={cycle.farmId} farmName={cycle.farmName} range={{ from: report.from, to: report.to }} cycles={null}
         onOpen={setInsight} onClose={() => setInsight(null)} />}
       <div className="crop-tabs section-space" role="tablist">
-        {(['activities', 'money', 'harvests', 'observations'] as Tab[]).filter(x => x !== 'money' || (canMoney && cycle.costObjectId)).map(x => (
+        {(['activities', 'harvests', 'observations'] as Tab[]).map(x => (
           <button key={x} role="tab" aria-selected={tab === x} className={tab === x ? 'active' : ''} onClick={() => { setTab(x); setForm(''); }}>{t(x)}</button>
         ))}
       </div>
-      {tab === 'money' && cycle.costObjectId && (
-        <RecordsPanel filter={`costObjectId=${cycle.costObjectId}`} prefill={`farm=${cycle.farmId}&activity=${cycle.costObjectId}`} title={t('moneyTitle')} />
-      )}
       {tab === 'activities' && <>
-        {canRecord && form !== 'activity' && <button type="button" className="primary" onClick={() => setForm('activity')}><Plus size={16} aria-hidden />{t('logActivity')}</button>}
         {form === 'activity' && <ActivityForm cycle={cycle} onDone={warnings => { setForm(''); setNotice(warnings.length ? ts('warning.LOT_EXPIRED', { item: warnings[0].split(':')[1], lot: warnings[0].split(':')[2] }) : ''); void load(); }}
-                                              onCancel={() => setForm('')} onError={setError}
-                                              onAddExpense={canMoney && cycle.costObjectId ? () => { setForm(''); setTab('money'); } : undefined} />}
-        {activities.length === 0 ? <p className="hint">{t('noActivities')}</p> : (
+                                              onCancel={() => setForm('')} onError={setError} />}
+        {canMoney && cycle.costObjectId ? (
+          // Work and money on one list: each work entry carries its cost and stock records; other records are their own rows
+          <RecordsPanel key={activities.map(a => `${a.id}${a.status}`).join()} filter={`costObjectId=${cycle.costObjectId}`}
+            prefill={`farm=${cycle.farmId}&activity=${cycle.costObjectId}`} title={t('workAndMoney')}
+            actions={<>
+              {can(tenant, 'FINANCE_WRITE') && <Link className="secondary" to={`/t/${tenant.id}/finance/new/sale?farm=${cycle.farmId}&activity=${cycle.costObjectId}`}>
+                <ShoppingBag size={15} aria-hidden />{tf('newSale')}</Link>}
+              {canRecord && form !== 'activity' && <button type="button" className="primary" onClick={() => setForm('activity')}><Plus size={15} aria-hidden />{t('addEntry')}</button>}
+            </>}
+            timeline={activities.map(a => ({
+              key: `a${a.id}`, date: a.activityDate, title: t(`activity.${a.activityType}`), muted: a.status === 'REVERSED',
+              sub: [a.workers != null ? t('workersCount', { count: String(a.workers) }) : '', a.hours != null ? t('hoursCount', { hours: String(a.hours) }) : '',
+                a.legacyMemo ? [a.inputName, a.quantity != null ? `${a.quantity} ${a.quantityUnit ?? ''}` : null].filter(Boolean).join(' · ') : '',
+                a.legacyMemo && a.memoCost ? t('memoCost', { amount: formatMoney(a.memoCost, lang) }) : '',
+                a.status === 'REVERSED' ? tf('status.REVERSED') : ''].filter(Boolean).join(' · ') || undefined,
+              note: a.notes ?? undefined,
+              documentIds: [a.billDocumentId, a.stockDocumentId].filter((x): x is number => x != null),
+              actions: diaryActions(a),
+            }))} />
+        ) : activities.length === 0 ? <>
+          {canRecord && form !== 'activity' && <button type="button" className="primary" onClick={() => setForm('activity')}><Plus size={16} aria-hidden />{t('addEntry')}</button>}
+          <p className="hint">{t('noActivities')}</p>
+        </> : (
           <div className="activity-list">
             {activities.map(a => (
               <article className="activity-row" key={a.id}>
@@ -260,8 +287,7 @@ function StageActions({ cycle, onAction }: { cycle: Cycle; onAction: (action: st
   );
 }
 
-function ActivityForm({ cycle, onDone, onCancel, onError, onAddExpense }: { cycle: Cycle; onDone: (warnings: string[]) => void; onCancel: () => void;
-  onError: (m: string) => void; onAddExpense?: () => void }) {
+function ActivityForm({ cycle, onDone, onCancel, onError }: { cycle: Cycle; onDone: (warnings: string[]) => void; onCancel: () => void; onError: (m: string) => void }) {
   const tenant = useTenant();
   const t = useNs('crop');
   const tc = useNs('common');
@@ -269,6 +295,12 @@ function ActivityForm({ cycle, onDone, onCancel, onError, onAddExpense }: { cycl
   const lang = currentLanguage();
   const base = `/api/v1/tenants/${tenant.id}`;
   const canUseStock = can(tenant, 'INVENTORY_WRITE');
+  const canPay = can(tenant, 'FINANCE_WRITE');
+  const tf = useNs('fin');
+  const categoryLabel = useCategoryLabel();
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
+  const [parties, setParties] = useState<Party[]>([]);
   const [key] = useState(newIdempotencyKey);
   const [form, setForm] = useState<Record<string, string>>({ activityType: 'LAND_PREPARATION', activityDate: today() });
   const [inputs, setInputs] = useState<Input[]>([]);
@@ -281,7 +313,10 @@ function ActivityForm({ cycle, onDone, onCancel, onError, onAddExpense }: { cycl
   useEffect(() => {
     if (canUseStock) Promise.all([api<Item[]>(`${base}/stock/items`), api<Unit[]>(`${base}/stock/units`)])
       .then(([i, u]) => { setItems(i.filter(x => x.active)); setUnits(u); }).catch(() => undefined);
-  }, [base, canUseStock]);
+    if (canPay) Promise.all([api<Category[]>(`${base}/finance/categories`), api<FinancialAccount[]>(`${base}/finance/accounts`), api<Party[]>(`${base}/finance/parties`)])
+      .then(([c, a, p]) => { setCategories(c.filter(x => x.active && x.kind === 'EXPENSE')); setAccounts(a.filter(x => x.active)); setParties(p.filter(x => x.active)); })
+      .catch(() => undefined);
+  }, [base, canUseStock, canPay]);
 
   function updateInput(i: number, patch: Partial<Input>) {
     setInputs(xs => xs.map((x, j) => (j === i ? { ...x, ...patch } : x)));
@@ -305,14 +340,18 @@ function ActivityForm({ cycle, onDone, onCancel, onError, onAddExpense }: { cycl
       if (!isQuantity(i.quantity)) { onError(ts('errors.quantity')); return; }
       if (item.trackLots && !i.lotNo) { onError(ts('errors.lot')); return; }
     }
+    // A cost turns the entry into an expense booked to this crop; without one it is a note of the work
+    const paid = canPay && !!(form.amount ?? '').trim();
+    if (paid && (!form.categoryId || !/^\d{1,12}(\.\d{1,2})?$/.test(form.amount ?? '') || Number(form.amount) <= 0)) { onError(tf('errors.amount')); return; }
+    if (paid && !form.partyId && !form.financialAccountId) { onError(tf('errors.partyOrAccount')); return; }
     setBusy(true); onError('');
     try {
       const r = await api<{ warnings: string[] }>(`${base}/activities`, { method: 'POST', headers: { 'Idempotency-Key': key }, body: {
         cycleId: cycle.id, activityType: form.activityType, activityDate: form.activityDate, notes: form.notes || null,
         workers: form.workers ? Number(form.workers) : null, hours: form.hours || null,
         inputs: inputs.map(i => ({ itemId: Number(i.itemId), quantity: i.quantity, unit: i.unit || null, lotNo: i.lotNo || null })),
-        // Money for the work is recorded once, under Expenses & sales
-        paidWork: null,
+        paidWork: paid ? { categoryId: Number(form.categoryId), amount: form.amount, partyId: form.partyId ? Number(form.partyId) : null,
+          financialAccountId: !form.partyId && form.financialAccountId ? Number(form.financialAccountId) : null, description: form.notes || null } : null,
       } });
       onDone(r.warnings);
     } catch (err) {
@@ -354,11 +393,21 @@ function ActivityForm({ cycle, onDone, onCancel, onError, onAddExpense }: { cycl
         </fieldset>
       )}
 
-      <div className="money-elsewhere full" role="note">
-        <Wallet size={18} aria-hidden />
-        <span>{t('moneyElsewhere')}</span>
-        {onAddExpense && <button type="button" className="secondary" onClick={onAddExpense}><Plus size={15} aria-hidden />{t('goToMoney')}</button>}
-      </div>
+      {canPay && (
+        <fieldset className="full entry-cost">
+          <legend><Wallet size={16} aria-hidden />{t('entryCost')} <small>{tc('optional')}</small></legend>
+          <p className="hint">{t('entryCostHelp')}</p>
+          <div className="entry-cost-fields">
+            <label>{tf('amount')}<input inputMode="decimal" value={form.amount ?? ''} onChange={e => set('amount', e.target.value)} /></label>
+            <label>{t('paidFor')}<select value={form.categoryId ?? ''} onChange={e => set('categoryId', e.target.value)}>
+              <option value="">—</option>{categories.map(c => <option key={c.id} value={c.id}>{categoryLabel(c)}</option>)}</select></label>
+            {!form.partyId && <label>{tf('paidFrom')}<select value={form.financialAccountId ?? ''} onChange={e => set('financialAccountId', e.target.value)}>
+              <option value="">—</option>{accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>}
+            <label>{t('owedTo')} <small>{tc('optional')}</small><select value={form.partyId ?? ''} onChange={e => set('partyId', e.target.value)}>
+              <option value="">—</option>{parties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+          </div>
+        </fieldset>
+      )}
       <div className="form-actions full">
         <button type="button" className="secondary" onClick={onCancel}>{tc('cancel')}</button>
         <button className="primary" disabled={busy}>{busy ? tc('loading') : tc('save')}</button>

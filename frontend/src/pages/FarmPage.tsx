@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ChevronRight, Layers, Leaf, MapPin, MapPinned, Plus, Receipt, ShoppingBag, Sprout, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, ChevronRight, Layers, Leaf, MapPin, MapPinned, Plus, Receipt, ShoppingBag, Sprout, Trash2, TrendingDown, TrendingUp, Wallet, X } from 'lucide-react';
 import { api } from '../api/client';
 import type { Farm, Parcel } from '../api/types';
 import { useTenant } from '../auth/useCurrentTenant';
@@ -27,6 +27,7 @@ const AREA_UNITS = ['ACRE', 'HECTARE', 'CENT', 'SQFT'] as const;
 export default function FarmPage() {
   const tenant = useTenant();
   const farmId = Number(useParams().farmId);
+  const navigate = useNavigate();
   const t = useNs('farm');
   const tf = useNs('fin');
   const tc = useNs('common');
@@ -91,6 +92,30 @@ export default function FarmPage() {
     }
   }
 
+  /** Deleting archives the farm: it leaves every list, while its past records stay in the accounts. */
+  async function deleteFarm() {
+    if (!farm || !window.confirm(t('confirmDeleteFarm', { farm: farm.name }))) return;
+    setBusy(true); setError('');
+    try {
+      await api(`${base}/farms/${farm.id}`, { method: 'DELETE' });
+      navigate(`/t/${tenant.id}/farms`);
+    } catch (err) {
+      setError(describeError(err));
+      setBusy(false);
+    }
+  }
+
+  async function removeParcel(p: Parcel) {
+    if (!window.confirm(t('confirmRemoveParcel', { parcel: p.name }))) return;
+    setError('');
+    try {
+      await api(`${base}/land-parcels/${p.id}`, { method: 'DELETE' });
+      setParcels(old => old.filter(x => x.id !== p.id));
+    } catch (err) {
+      setError(describeError(err));
+    }
+  }
+
   if (!farm) return error ? <ErrorBanner message={error} onRetry={loadFarm} /> : <Loading />;
   const money = (v: number) => formatMoney(v, lang);
   const place = [farm.village, farm.district, farm.state].filter(Boolean).join(', ');
@@ -113,10 +138,11 @@ export default function FarmPage() {
             </p>
           </div>
         </div>
-        {canBook && (
+        {(canBook || canWrite) && (
           <div className="fw-actions">
-            <Link className="secondary" to={`/t/${tenant.id}/finance/new/sale?farm=${farm.id}`}><ShoppingBag size={16} aria-hidden />{t('recordSale')}</Link>
-            <Link className="primary" to={`/t/${tenant.id}/finance/new/expense?farm=${farm.id}`}><Plus size={16} aria-hidden />{t('addExpense')}</Link>
+            {canWrite && <button type="button" className="danger" disabled={busy} onClick={() => void deleteFarm()}><Trash2 size={16} aria-hidden />{t('deleteFarm')}</button>}
+            {canBook && <Link className="secondary" to={`/t/${tenant.id}/finance/new/sale?farm=${farm.id}`}><ShoppingBag size={16} aria-hidden />{t('recordSale')}</Link>}
+            {canBook && <Link className="primary" to={`/t/${tenant.id}/finance/new/expense?farm=${farm.id}`}><Plus size={16} aria-hidden />{t('addExpense')}</Link>}
           </div>
         )}
       </header>
@@ -219,6 +245,7 @@ export default function FarmPage() {
             <div className="parcel-icon"><Leaf size={20} aria-hidden /></div>
             <div className="parcel-info"><strong>{p.name}</strong><span>{[p.soilType, p.irrigationType].filter(Boolean).join(' · ')}</span></div>
             <div className="parcel-area"><strong>{formatNumber(p.area, lang)}</strong><span>{tu(p.areaUnit)}</span></div>
+            {canWrite && <button type="button" className="rp-btn danger-btn" title={t('removeParcel')} aria-label={`${t('removeParcel')} ${p.name}`} onClick={() => void removeParcel(p)}><X size={15} aria-hidden /></button>}
           </div>
         ))}
         {!parcels.length && <EmptyState><MapPinned size={18} aria-hidden /> {t('emptyLand')}</EmptyState>}

@@ -1926,6 +1926,36 @@ The owner tried to start a crop cycle for a poultry farm and got only *"This fie
 | `mobile: npm test` | Passed: **76 tests** |
 | Backend | Unchanged |
 
+## Delete a farm; work and expenses merged into one (2026-11-03)
+
+Asked for: deleting a farm added by mistake, at any time, and one function for work and expenses, because two tabs were
+ambiguous. This replaces the "Work diary" and "Expenses & sales" split of the previous entry.
+
+- **Delete a farm:**
+  - *Delete farm* on the farm page, and a bin button on each farm card, both after a question.
+  - Fields have a remove button on the farm page.
+  - The existing `DELETE /farms/{id}` and `DELETE /land-parcels/{id}` archive the record: it leaves every list, while
+    money already recorded for it stays in the accounts and reports. No business data is erased, so the books stay
+    correct. These endpoints existed but had no button.
+- **One *Work & expenses* tab on the crop page:**
+  - *Timeline:* work done and money records appear on one list, newest first. A work entry carries its own cost (amount,
+    category tags and a link to its bill) instead of a second row for the bill. Sales and other expenses are their own
+    rows. The colourful category bar still filters, and keeps work entries whose cost is in the chosen category.
+  - *One entry form (Add entry):* the work, date, workers, hours, notes, stock used, and an optional **Cost** section that
+    is always visible (amount, what it was for, paid from or owed to). With an amount, the entry is booked to the crop as
+    an expense (`paidWork`); without one, it is a note of the work. *Record sale* sits next to it.
+  - *Row actions:* work notes can be deleted; work that moved stock or money is reversed with them; other records keep
+    edit, discard, correct and reverse.
+  - People without finance access still see and add work entries, with no cost or stock sections.
+- No backend change. The records panel takes `timeline` and `actions` and reads up to 100 records when merging.
+
+| Command | Result |
+|---|---|
+| `frontend: npm run lint`, `npx tsc --noEmit`, `npm run build` | Passed |
+| `frontend: npm test` | Passed: **107 tests**. New: work with its cost in one entry; an entry without a cost; the merged list; deleting a farm from the list; deleting a farm and removing a field from the farm page. The permissions test keeps its checks: no stock or cost section without those rights |
+| `mobile: npm test` | Passed: **76 tests** |
+| Backend | Unchanged |
+
 ## Known gaps and defects
 
 Security and platform:

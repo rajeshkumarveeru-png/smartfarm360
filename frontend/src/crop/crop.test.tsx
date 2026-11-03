@@ -103,40 +103,73 @@ describe('crop web', () => {
     expect(screen.getByText(/need more area than it has/)).toBeInTheDocument();
   });
 
-  it('shows the cycle figures and records work with stock inputs; money for the work goes under Expenses & sales', async () => {
+  it('shows the cycle figures and records work with stock used and its cost in one entry', async () => {
     renderAt('/t/9/crops/cycles/4', <CyclePage />, '/t/:tenantId/crops/cycles/:cycleId');
     expect((await screen.findAllByText('₹50,333.33')).length).toBeGreaterThan(0);
     expect(screen.getByText('₹7,833.34')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /Record field work/ }));
+    await userEvent.click(await screen.findByRole('button', { name: /Add entry/ }));
     await userEvent.selectOptions(screen.getByLabelText('Work'), 'FERTILIZER');
     await userEvent.click(screen.getByRole('button', { name: /Add input/ }));
     await waitFor(() => expect(screen.getByLabelText('Stock item')).toBeInTheDocument());
     await userEvent.selectOptions(screen.getByLabelText('Stock item'), '5');
     await userEvent.type(screen.getAllByLabelText('Quantity')[0], '30');
-    // The diary takes no money: there is one place for it, under Expenses & sales
+    // The cost is part of the same entry: no tick box, no second place to enter it
     expect(screen.queryByLabelText(/Labour or machine hire was paid/)).not.toBeInTheDocument();
-    expect(screen.getByRole('note')).toHaveTextContent(/goes under Expenses & sales/);
+    await waitFor(() => expect(screen.getAllByRole('option', { name: 'Cash in hand' }).length).toBeGreaterThan(0));
+    await userEvent.type(screen.getByLabelText('Amount (₹)'), '500');
+    await userEvent.selectOptions(screen.getByLabelText('Paid for'), '8');
+    await userEvent.selectOptions(screen.getByLabelText('Paid from'), '5');
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(apiMock.mock.calls.some(([u, i]) => u === '/api/v1/tenants/9/activities' && i?.method === 'POST')).toBe(true));
     const [, init] = apiMock.mock.calls.find(([u, i]) => u === '/api/v1/tenants/9/activities' && i?.method === 'POST')!;
     expect(init.headers['Idempotency-Key']).toMatch(/.{8,}/);
-    expect(init.body).toMatchObject({ cycleId: 4, activityType: 'FERTILIZER', inputs: [{ itemId: 5, quantity: '30', unit: 'kg', lotNo: null }], paidWork: null });
+    expect(init.body).toMatchObject({ cycleId: 4, activityType: 'FERTILIZER', inputs: [{ itemId: 5, quantity: '30', unit: 'kg', lotNo: null }],
+      paidWork: { categoryId: 8, amount: '500', partyId: null, financialAccountId: 5 } });
     expect(screen.queryByText(/Recorded before the accounts/)).not.toBeInTheDocument();
   });
 
-  it('the work diary sends money to the Expenses & sales tab', async () => {
+  it('a work entry without a cost is only a note of the work', async () => {
     renderAt('/t/9/crops/cycles/4', <CyclePage />, '/t/:tenantId/crops/cycles/:cycleId');
-    expect(await screen.findByRole('tab', { name: 'Work diary' })).toHaveAttribute('aria-selected', 'true');
-    await userEvent.click(screen.getByRole('button', { name: /Record field work/ }));
-    await userEvent.click(screen.getByRole('button', { name: 'Add an expense' }));
-    expect(screen.getByRole('tab', { name: 'Expenses & sales' })).toHaveAttribute('aria-selected', 'true');
+    await userEvent.click(await screen.findByRole('button', { name: /Add entry/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(apiMock.mock.calls.some(([u, i]) => u === '/api/v1/tenants/9/activities' && i?.method === 'POST')).toBe(true));
+    const [, init] = apiMock.mock.calls.find(([u, i]) => u === '/api/v1/tenants/9/activities' && i?.method === 'POST')!;
+    expect(init.body.paidWork).toBeNull();
+  });
+
+  it('lists work and money together: a work entry carries its cost, and other records are their own rows', async () => {
+    apiMock.mockImplementation((url: string, init?: { method?: string }) => {
+      if (url.includes('/activities?')) {
+        return Promise.resolve({ items: [{ id: 3, cycleId: 4, cycleName: 'Samba 2026', activityType: 'WEEDING', activityDate: '2026-07-10', notes: 'Two rows',
+          workers: 4, hours: null, inputName: null, quantity: null, quantityUnit: null, memoCost: null, legacyMemo: false, status: 'ACTIVE',
+          stockDocumentId: null, billDocumentId: 70, createdAt: '' }], page: 0, size: 100, totalItems: 1, totalPages: 1 });
+      }
+      if (url.includes('/finance/documents?costObjectId=11')) {
+        return Promise.resolve({ items: [
+          { id: 70, type: 'BILL', status: 'POSTED', number: 'BILL/2026-27/0007', docDate: '2026-07-10', partyName: null, financialAccountName: 'Cash in hand',
+            totalAmount: 1200, paymentStatus: 'PAID', categories: [{ categoryId: 8, code: 'LABOUR', name: null, amount: 1200 }] },
+          { id: 71, type: 'SALE', status: 'POSTED', number: 'SALE/2026-27/0002', docDate: '2026-07-20', partyName: 'Mill', financialAccountName: null,
+            totalAmount: 9000, paymentStatus: 'PAID', categories: [] }], page: 0, size: 100, totalItems: 2, totalPages: 1 });
+      }
+      return routeApi(url, init);
+    });
+    renderAt('/t/9/crops/cycles/4', <CyclePage />, '/t/:tenantId/crops/cycles/:cycleId');
+    expect(await screen.findByRole('tab', { name: 'Work & expenses' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByRole('tab', { name: 'Expenses & sales' })).not.toBeInTheDocument();
+    expect(await screen.findByText('Weeding')).toBeInTheDocument();
+    expect(screen.getByText('₹1,200.00')).toBeInTheDocument();                       // the work entry's cost
+    expect(screen.getByRole('link', { name: 'BILL/2026-27/0007' })).toHaveAttribute('href', '/t/9/finance/records/70');
+    expect(screen.queryByRole('link', { name: /Expense bill · BILL\/2026-27\/0007/ })).not.toBeInTheDocument();   // not a second row
+    expect(screen.getByRole('link', { name: /Sale · SALE\/2026-27\/0002/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Reverse Weeding/ })).toBeInTheDocument();
   });
 
   it('hides stock inputs and paid work from people who cannot record stock or money', async () => {
     tenant.permissions = ['CROP_READ', 'CROP_ACTIVITY_WRITE'];
     renderAt('/t/9/crops/cycles/4', <CyclePage />, '/t/:tenantId/crops/cycles/:cycleId');
-    await userEvent.click(await screen.findByRole('button', { name: /Record field work/ }));
+    await userEvent.click(await screen.findByRole('button', { name: /Add entry/ }));
     expect(screen.queryByText('Inputs used from stock')).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: /Cost/ })).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Labour or machine hire was paid/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Close cycle' })).not.toBeInTheDocument();
   });

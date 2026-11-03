@@ -86,7 +86,11 @@
       "PROCESSING_BATCH": "Processing batch"
     },
     "clickHint": "Click for details",
-    "notInCycles": "Not booked to a cycle"
+    "notInCycles": "Not booked to a cycle",
+    "deleteFarm": "Delete farm",
+    "confirmDeleteFarm": "Delete {{farm}}? It is removed from your farms and lists. Money already recorded for it stays in your accounts and reports.",
+    "removeParcel": "Remove field",
+    "confirmRemoveParcel": "Remove {{parcel}}? It is removed from this farm. Crops already grown on it keep their records."
   },
   "mobile": {
     "appName": "SmartFarm360",
@@ -1726,7 +1730,7 @@
     "unsold": "Unsold produce",
     "estimateLabel": "Estimate {{amount}}, not in the accounts",
     "memoHelp": "Recorded before the accounts (not in profit): activity costs {{cost}}, harvest value {{value}}.",
-    "activities": "Work diary",
+    "activities": "Work & expenses",
     "harvests": "Harvests",
     "observations": "Observations",
     "logActivity": "Record field work",
@@ -1824,17 +1828,17 @@
       "rainfall": "Enter rainfall in mm (up to one decimal)."
     },
     "estimatePriceNoHarvest": "Price for unsold produce (₹, estimate)",
-    "money": "Expenses & sales",
-    "moneyTitle": "Money for this cycle",
-    "moneyElsewhere": "The diary records the work and any stock used. Money for it (labour, machine hire, anything bought) goes under Expenses & sales, so it is entered once and counts in the profit.",
-    "goToMoney": "Add an expense",
     "missingFields": "Please fill in: {{fields}}.",
     "animalFarm": "{{farm}} is not a crop farm. Its birds or animals are tracked under {{section}}: the number you have, what you paid, daily eggs or milk, sales and profit. A crop cycle needs a field and a crop.",
     "openSection": "Open {{section}}",
     "turnOnSection": "Turn on {{section}} in Settings",
     "noFieldsYet": "This farm has no fields yet.",
     "addField": "Add a field",
-    "noCropsYet": "No crops set up yet."
+    "noCropsYet": "No crops set up yet.",
+    "workAndMoney": "Work and money for this crop",
+    "addEntry": "Add entry",
+    "entryCost": "Cost",
+    "entryCostHelp": "Paid for this work or bought something for it? Enter the amount and it is booked to this crop as an expense. Leave it empty for a note of the work only."
   },
   "workforce": {
     "title": "Workers & wages",

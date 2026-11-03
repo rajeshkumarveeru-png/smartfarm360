@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Leaf, MapPin, Plus, Sprout } from 'lucide-react';
+import { ArrowRight, Leaf, MapPin, Plus, Sprout, Trash2 } from 'lucide-react';
 import { api } from '../api/client';
 import type { Farm } from '../api/types';
 import { useTenant } from '../auth/useCurrentTenant';
@@ -59,6 +59,17 @@ export default function FarmsPage() {
     }
   }
 
+  async function deleteFarm(f: Farm) {
+    if (!window.confirm(t('confirmDeleteFarm', { farm: f.name }))) return;
+    setError('');
+    try {
+      await api(`${base}/farms/${f.id}`, { method: 'DELETE' });
+      setFarms(old => old.filter(x => x.id !== f.id));
+    } catch (err) {
+      setError(describeError(err));
+    }
+  }
+
   if (loading) return <Loading />;
   return (
     <>
@@ -92,7 +103,8 @@ export default function FarmsPage() {
         {farms.map(f => {
           const place = [f.village, f.district, f.state].filter(Boolean).join(', ');
           return (
-            <Link key={f.id} className="farm-card farm-tile" to={`/t/${tenant.id}/farms/${f.id}`}>
+            <div key={f.id} className="farm-tile-wrap">
+            <Link className="farm-card farm-tile" to={`/t/${tenant.id}/farms/${f.id}`}>
               <div className="farm-icon"><Leaf size={22} aria-hidden /></div>
               <div className="farm-info">
                 <strong>{f.name}</strong>
@@ -101,6 +113,9 @@ export default function FarmsPage() {
               </div>
               <span className="farm-open">{t('open')}<ArrowRight size={16} aria-hidden /></span>
             </Link>
+            {canWrite && <button type="button" className="rp-btn danger-btn farm-delete" title={t('deleteFarm')} aria-label={`${t('deleteFarm')} ${f.name}`}
+              onClick={() => void deleteFarm(f)}><Trash2 size={15} aria-hidden /></button>}
+            </div>
           );
         })}
         {!farms.length && <EmptyState>{t('emptyFarms')}</EmptyState>}

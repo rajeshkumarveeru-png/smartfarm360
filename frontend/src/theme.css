@@ -891,6 +891,31 @@ button.im-row:focus-visible, a.im-row:focus-visible { outline: 2px solid var(--t
 .farm-kind-note span { flex: 1 1 280px; color: var(--sf-text); }
 .farm-kind-note .primary, .farm-kind-note .secondary { min-height: 38px; padding: 7px 14px; font-size: 12.5px; }
 
+/* ---- Deleting farms and fields ---- */
+.farm-tile-wrap { position: relative; }
+.farm-tile-wrap .farm-tile { height: 100%; padding-right: 58px; }
+.farm-delete { position: absolute; top: 10px; right: 10px; opacity: 0; transition: opacity var(--sf-base) var(--sf-ease); }
+.farm-tile-wrap:hover .farm-delete, .farm-delete:focus-visible { opacity: 1; }
+@media (hover: none) { .farm-delete { opacity: 1; } }
+.parcel-row .rp-btn { flex: 0 0 auto; }
+.fw-actions .danger { min-height: 40px; }
+
+/* ---- Work & expenses: one timeline, one entry form ---- */
+.fw-type.work { background: #e0f2fe; color: #0369a1; }
+.rp-work .rp-row { display: flex; align-items: center; gap: 12px; padding: 10px; flex: 1; min-width: 0; }
+.rp-note { font-style: italic; }
+.rp-doc-link { font-size: 11px; font-weight: 600; color: var(--sf-text-3); text-decoration: none; }
+.rp-doc-link:hover { color: var(--sf-brand-600); text-decoration: underline; }
+.entry-cost {
+  border: 1.5px solid rgb(14 165 233 / 25%); border-radius: var(--sf-r-lg); padding: 12px 14px 14px; margin: 0;
+  background: linear-gradient(120deg, rgb(14 165 233 / 8%), rgb(255 255 255 / 75%));
+}
+.entry-cost legend { display: inline-flex; align-items: center; gap: 6px; padding: 0 6px; font-weight: 700; font-size: 13.5px; color: #0369a1; }
+.entry-cost legend small { font-weight: 500; color: var(--sf-text-3); }
+.entry-cost .hint { margin: 0 0 10px; }
+.entry-cost-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 12px; }
+.entry-cost-fields label { display: flex; flex-direction: column; gap: 7px; font-size: var(--sf-fs-sm); font-weight: 600; color: var(--sf-text-2); }
+
 /* ---- Motion and print ----------------------------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }

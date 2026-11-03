@@ -1,6 +1,6 @@
-import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { type CSSProperties, type ReactNode, useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ChevronRight, Pencil, Plus, Receipt, RotateCcw, ShoppingBag, Tag, Trash2, TrendingDown, TrendingUp, X } from 'lucide-react';
+import { ChevronRight, Hammer, Pencil, Plus, Receipt, RotateCcw, ShoppingBag, Tag, Trash2, TrendingDown, TrendingUp, X } from 'lucide-react';
 import { api } from '../api/client';
 import type { Page } from '../api/types';
 import { useTenant } from '../auth/useCurrentTenant';
@@ -14,6 +14,12 @@ import type { DocumentSummary } from './types';
 import { useCategoryLabel } from './useFinanceData';
 
 const PAGE = 10;
+
+/**
+ * Something else that happened on the same date line as the records, such as work done on a crop. {@code documentIds}
+ * are the records it made (its paid-work bill, its stock issue): they are shown on this row, not as rows of their own.
+ */
+export type TimelineEntry = { key: string; date: string; title: string; sub?: string; note?: string; documentIds: number[]; muted?: boolean; actions?: ReactNode };
 const KIND: Partial<Record<DocumentSummary['type'], 'expense' | 'sale'>> = { BILL: 'expense', SALE: 'sale' };
 const isIn = (d: DocumentSummary) => d.type === 'SALE' || d.type === 'RECEIPT';
 /** The start of the category totals: ten years back, within the longest range the reports accept. */
@@ -27,9 +33,12 @@ const HUES = ['16 185 129', '14 165 233', '245 158 11', '139 92 246', '244 63 94
  * {@code filter} is the records query (for example "farmId=2" or "costObjectId=7"), which the cost-by-category report
  * takes too: the category bar shows what was spent on each category here, and picking one lists only its records.
  * {@code prefill} is added to the new expense and sale links so they are booked to the same farm or activity;
- * {@code newButtons} false leaves those links to the page.
+ * {@code newButtons} false leaves those links to the page, and {@code actions} replaces them. {@code timeline} merges other
+ * entries (work done) into the same list by date; then the records are read in one page.
  */
-export default function RecordsPanel({ filter, prefill, title, newButtons = true }: { filter: string; prefill: string; title: string; newButtons?: boolean }) {
+export default function RecordsPanel({ filter, prefill, title, newButtons = true, actions, timeline }: {
+  filter: string; prefill: string; title: string; newButtons?: boolean; actions?: ReactNode; timeline?: TimelineEntry[];
+}) {
   const tenant = useTenant();
   const navigate = useNavigate();
   const t = useNs('fin');
@@ -45,12 +54,13 @@ export default function RecordsPanel({ filter, prefill, title, newButtons = true
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState('');
 
+  const merged = !!timeline;
   const query = `${filter}${category != null ? `&categoryId=${category}` : ''}`;
   const load = useCallback((page: number) => {
-    api<Page<DocumentSummary>>(`${base}/documents?${query}&page=${page}&size=${PAGE}`)
+    api<Page<DocumentSummary>>(`${base}/documents?${query}&page=${page}&size=${merged ? 100 : PAGE}`)
       .then(p => { setRecords(old => (page === 0 || !old ? p.items : [...old, ...p.items])); setPaging({ page, total: p.totalItems }); })
       .catch(e => setError(describeError(e)));
-  }, [base, query]);
+  }, [base, query, merged]);
   useEffect(() => load(0), [load]);
 
   const loadCosts = useCallback(() => {
@@ -83,7 +93,7 @@ export default function RecordsPanel({ filter, prefill, title, newButtons = true
     <div className="db-card records-panel">
       <div className="db-card-head">
         <h3>{title} {paging.total > 0 && <span className="count">{paging.total}</span>}</h3>
-        {canWrite && newButtons && <div className="rp-new">
+        {actions ? <div className="rp-new">{actions}</div> : canWrite && newButtons && <div className="rp-new">
           <Link className="secondary" to={`/t/${tenant.id}/finance/new/sale?${prefill}`}><ShoppingBag size={15} aria-hidden />{t('newSale')}</Link>
           <Link className="primary" to={`/t/${tenant.id}/finance/new/expense?${prefill}`}><Plus size={15} aria-hidden />{t('newExpense')}</Link>
         </div>}
@@ -117,10 +127,42 @@ export default function RecordsPanel({ filter, prefill, title, newButtons = true
         </div>
       )}
 
-      {records && records.length === 0 && <div className="db-all-clear muted"><Receipt size={26} aria-hidden /><p className="hint">{t('noRecordsHere')}</p></div>}
-      {records && records.length > 0 && <>
+      {records && (() => {
+        const owned = new Set((timeline ?? []).flatMap(e => e.documentIds));
+        const byId = new Map(records.map(d => [d.id, d]));
+        const entries = (timeline ?? []).filter(e => category == null || e.documentIds.some(id => byId.has(id)));
+        const rowsInOrder: ({ date: string; doc: DocumentSummary } | { date: string; entry: TimelineEntry })[] = [
+          ...records.filter(d => !owned.has(d.id)).map(d => ({ date: d.docDate, doc: d })),
+          ...entries.map(e => ({ date: e.date, entry: e })),
+        ].sort((a, b) => b.date.localeCompare(a.date));
+        if (rowsInOrder.length === 0) return <div className="db-all-clear muted"><Receipt size={26} aria-hidden /><p className="hint">{t('noRecordsHere')}</p></div>;
+        return <>
         <ul className="fw-records">
-          {records.map(d => {
+          {rowsInOrder.map(row => {
+            if ('entry' in row) {
+              const e = row.entry;
+              const docs = e.documentIds.map(id => byId.get(id)).filter((d): d is DocumentSummary => !!d);
+              const money = docs.filter(d => d.type === 'BILL' || d.type === 'SALE');
+              const amount = money.reduce((sum, d) => sum + d.totalAmount, 0);
+              const cats = money.flatMap(d => d.categories ?? []);
+              return (
+                <li key={e.key} className={`rp-work${e.muted ? ' rp-void' : ''}`}>
+                  <span className="rp-row">
+                    <span className="fw-type work" aria-hidden><Hammer size={15} /></span>
+                    <span className="fw-record-main"><strong>{e.title}</strong>
+                      <small>{formatDate(e.date, lang)}{e.sub ? ` · ${e.sub}` : ''}</small>
+                      {e.note && <small className="rp-note">{e.note}</small>}
+                      {cats.length > 0 && <span className="rp-tags">{cats.map(c => (
+                        <span key={c.categoryId} className="rp-tag" style={{ '--hue': hueOf(c.categoryId) } as CSSProperties}>{categoryLabel(c)}</span>))}</span>}
+                    </span>
+                    {money.length > 0 && <span className="fw-record-side"><b>{formatMoney(amount, lang)}</b>
+                      {money.map(d => <Link key={d.id} className="rp-doc-link" to={`/t/${tenant.id}/finance/records/${d.id}`}>{d.number ?? t(`type.${d.type}`)}</Link>)}</span>}
+                  </span>
+                  {e.actions && <span className="rp-actions">{e.actions}</span>}
+                </li>
+              );
+            }
+            const d = row.doc;
             const kind = KIND[d.type];
             const posted = d.status === 'POSTED';
             return (
@@ -154,7 +196,8 @@ export default function RecordsPanel({ filter, prefill, title, newButtons = true
           })}
         </ul>
         {records.length < paging.total && <button type="button" className="secondary fw-more" onClick={() => load(paging.page + 1)}>{t('showMore')}</button>}
-      </>}
+      </>;
+      })()}
     </div>
   );
 }
