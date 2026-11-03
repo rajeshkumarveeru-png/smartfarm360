@@ -14,7 +14,7 @@ import type { BatchDay, Figures, FlockGroup, FlockReport, Movement } from './typ
 const apiMock = vi.fn();
 vi.mock('../api/client', async importOriginal => ({ ...(await importOriginal<object>()), api: (...args: unknown[]) => apiMock(...args) }));
 
-const all: Permission[] = ['TENANT_READ', 'LIVESTOCK_READ', 'LIVESTOCK_WRITE', 'FINANCE_READ', 'FINANCE_WRITE', 'INVENTORY_READ'];
+const all: Permission[] = ['TENANT_READ', 'LIVESTOCK_READ', 'LIVESTOCK_WRITE', 'FINANCE_READ', 'FINANCE_WRITE', 'FINANCE_REVERSE', 'INVENTORY_READ'];
 const tenant: TenantSummary = { id: 9, name: 'Test farm', slug: 't', preferredLanguage: 'en', active: true, roles: ['TENANT_OWNER'],
   permissions: all, enabledModules: ['POULTRY', 'GOAT_SHEEP'], createdAt: '' };
 vi.mock('../auth/useCurrentTenant', () => ({ useTenant: () => tenant, useCurrentTenant: () => tenant }));
@@ -34,7 +34,8 @@ const day: BatchDay = { day: '2026-10-21', deaths: 2, deathCause: null, culls: 0
 const moves: Movement[] = [
   { id: 1, date: '2026-03-01', kind: 'PLACED', heads: 1000, kg: null, cause: null, documentId: null, batchDayId: null, pairGroupId: null, pairGroupName: null, reversed: false },
   { id: 2, date: '2026-10-21', kind: 'DIED', heads: 2, kg: null, cause: null, documentId: null, batchDayId: 7, pairGroupId: null, pairGroupName: null, reversed: false },
-  { id: 3, date: '2026-10-10', kind: 'CULLED', heads: 4, kg: null, cause: 'Not laying', documentId: null, batchDayId: null, pairGroupId: null, pairGroupName: null, reversed: false }];
+  { id: 3, date: '2026-10-10', kind: 'CULLED', heads: 4, kg: null, cause: 'Not laying', documentId: null, batchDayId: null, pairGroupId: null, pairGroupName: null, reversed: false },
+  { id: 4, date: '2026-10-12', kind: 'BOUGHT', heads: 50, kg: null, cause: null, documentId: 61, batchDayId: null, pairGroupId: null, pairGroupName: null, reversed: false }];
 
 function routeApi(url: string, init?: { method?: string; body?: unknown }) {
   if (url.endsWith('/livestock/flocks') && init?.method === 'POST') return Promise.resolve(layers);
@@ -116,7 +117,12 @@ describe('poultry, goats and sheep web', () => {
     await screen.findByRole('heading', { name: 'Layer shed 1' });
     await userEvent.click(screen.getByRole('tab', { name: 'Birds' }));
     expect(await screen.findByText('Not laying')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Remove this change' })).toHaveLength(1);
+    // Removable: the start without a bill and the cull, entered by hand; not the death from the daily record
+    expect(screen.getAllByRole('button', { name: 'Remove this change' })).toHaveLength(2);
+    // The purchase with a bill is undone by reversing the bill, after asking
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await userEvent.click(screen.getByRole('button', { name: 'Undo (reverse its bill)' }));
+    await waitFor(() => expect(calls((u, i) => u.endsWith('/finance/documents/61/reverse') && i?.method === 'POST')).toHaveLength(1));
     await userEvent.selectOptions(screen.getByLabelText('What happened'), 'COUNT');
     await userEvent.click(screen.getByRole('button', { name: 'Record change' }));
     expect(screen.getByText('Enter the number of heads.')).toBeInTheDocument();

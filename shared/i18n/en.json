@@ -88,9 +88,9 @@
     "clickHint": "Click for details",
     "notInCycles": "Not booked to a cycle",
     "deleteFarm": "Delete farm",
-    "confirmDeleteFarm": "Delete {{farm}}? It is removed from your farms and lists. Money already recorded for it stays in your accounts and reports.",
+    "confirmDeleteFarm": "Move {{farm}} to the Bin? You can restore it from Settings → Bin. Money already recorded for it stays in your accounts and reports.",
     "removeParcel": "Remove field",
-    "confirmRemoveParcel": "Remove {{parcel}}? It is removed from this farm. Crops already grown on it keep their records."
+    "confirmRemoveParcel": "Move {{parcel}} to the Bin? You can restore it from Settings → Bin."
   },
   "mobile": {
     "appName": "SmartFarm360",
@@ -1428,7 +1428,9 @@
     "byCategory": "Filter by category",
     "allCategories": "All categories",
     "categorySpent": "Spent on {{category}}",
-    "categoryShare": "{{percent}}% of the costs here · records: {{count}}"
+    "categoryShare": "{{percent}}% of the costs here · records: {{count}}",
+    "moreOptions": "More options (stock items, several lines)",
+    "saveExpense": "Save expense"
   },
   "financeCategory": {
     "SEEDS": "Seeds",
@@ -1848,7 +1850,9 @@
     "workAndMoney": "Work and money for this crop",
     "addEntry": "Add entry",
     "entryCost": "Cost",
-    "entryCostHelp": "Paid for this work or bought something for it? Enter the amount and it is booked to this crop as an expense. Leave it empty for a note of the work only."
+    "entryCostHelp": "Paid for this work or bought something for it? Enter the amount and it is booked to this crop as an expense. Leave it empty for a note of the work only.",
+    "deleteCycle": "Delete cycle",
+    "confirmDeleteCycle": "Move {{name}} to the Bin? You can restore it from Settings → Bin. Money already recorded for it stays in your accounts."
   },
   "workforce": {
     "title": "Workers & wages",
@@ -2743,7 +2747,13 @@
     "herdMoney": "Money for this herd",
     "tabDaily": "Daily record",
     "countReason": "Why the number changed",
-    "countReasonExample": "e.g. recounted the shed, birds bought locally"
+    "countReasonExample": "e.g. recounted the shed, birds bought locally",
+    "deleteBatch": "Delete batch",
+    "deleteHerd": "Delete herd",
+    "confirmDeleteGroup": "Move {{name}} to the Bin? You can restore it from Settings → Bin. Money already recorded for it stays in your accounts.",
+    "undoMovement": "Undo (reverse its bill)",
+    "confirmUndoMovement": "Undo this entry? Its bill is reversed: the money comes back out of your accounts and the birds are taken back out of the count.",
+    "movementUndone": "Undone: the bill was reversed."
   },
   "aquaculture": {
     "title": "Fish farming",
@@ -3489,6 +3499,24 @@
       "07": "Delhi",
       "08": "Rajasthan",
       "09": "Uttar Pradesh"
+    }
+  },
+  "bin": {
+    "title": "Bin",
+    "help": "Deleted items wait here. Restore brings an item back as it was. Delete forever erases it, unless money or stock records still refer to it: then it stays here, out of sight, and your accounts stay correct.",
+    "empty": "The Bin is empty.",
+    "restore": "Restore",
+    "purge": "Delete forever",
+    "deletedOn": "deleted {{date}}",
+    "restored": "{{name}} is back.",
+    "purged": "{{name}} was deleted forever.",
+    "confirmPurge": "Delete {{name}} forever? This cannot be undone. Its daily records and history go with it.",
+    "kind": {
+      "FARM": "Farm",
+      "LAND_PARCEL": "Field",
+      "CROP_CYCLE": "Crop cycle",
+      "CROP_ACTIVITY": "Work note",
+      "ANIMAL_GROUP": "Batch or herd"
     }
   }
 }

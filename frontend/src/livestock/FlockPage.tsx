@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { Trash2 } from 'lucide-react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { RotateCcw, Trash2 } from 'lucide-react';
 import { api } from '../api/client';
 import { useTenant } from '../auth/useCurrentTenant';
 import { ErrorBanner, Loading } from '../components/common';
@@ -43,6 +43,7 @@ export default function FlockPage() {
   const canWrite = can(tenant, 'LIVESTOCK_WRITE');
   const canMoney = canWrite && can(tenant, 'FINANCE_WRITE');
   const showMoney = can(tenant, 'FINANCE_READ');
+  const canReverse = canWrite && can(tenant, 'FINANCE_REVERSE');
   const [range, setRange] = useState({ from: monthStart(), to: today() });
   const [report, setReport] = useState<FlockReport | null>(null);
   const [moves, setMoves] = useState<Movement[]>([]);
@@ -54,6 +55,7 @@ export default function FlockPage() {
   const [date, setDate] = useState(today());
   const [day, setDay] = useState<BatchDay | null>(null);
   const [tab, setTab] = useState<FlockTab>('summary');
+  const navigate = useNavigate();
   const [dayForm, setDayForm] = useState<DayForm | null>(null);
   const [dayLoads, setDayLoads] = useState(0);
   const [stale, setStale] = useState(false);
@@ -143,6 +145,17 @@ export default function FlockPage() {
     () => { setMove({ ...move, heads: '', countedHeads: '', cause: '' }); return t('headsRecorded'); });
   }
 
+  /** Moves the batch to the Bin; money already recorded for it stays in the accounts. */
+  async function deleteGroup() {
+    if (!group || !window.confirm(t('confirmDeleteGroup', { name: group.name }))) return;
+    try {
+      await api(`/api/v1/tenants/${tenant.id}/livestock/groups/${group.id}`, { method: 'DELETE' });
+      navigate(listPath);
+    } catch (e) {
+      setError(describeError(e));
+    }
+  }
+
   const kinds = ['DIED', 'CULLED', 'RECEIVED', 'MOVED', 'COUNT', ...(poultry ? [] : ['BORN'])];
   // One part of the batch per tab, so the page stays short
   const tabs: FlockTab[] = ['summary', ...(poultry ? ['daily' as const] : []), 'heads', ...(canMoney || (layers && canWrite) ? ['money' as const] : []), 'health'];
@@ -154,6 +167,7 @@ export default function FlockPage() {
         <div>
           <p><Link to={listPath}>{t(poultry ? 'poultry' : 'smallStock')}</Link></p>
           <h2>{group.name}{group.closed && <small> · {t('closed')}</small>}</h2>
+          {canWrite && <button type="button" className="danger flock-delete" onClick={() => void deleteGroup()}><Trash2 size={15} aria-hidden />{t(poultry ? 'deleteBatch' : 'deleteHerd')}</button>}
           <p>{t(`species.${group.species}`)} · {t(`purpose.${group.purpose}`)}{group.placedOn && <> · {t(poultry ? 'placedOn' : 'startedOn')} {formatDate(group.placedOn, lang)}</>}
             {group.strain && <> · {group.strain}</>} · <b>{t('headsNow', { count: formatNumber(report.heads, lang, 0) })}</b></p>
         </div>
@@ -232,10 +246,18 @@ export default function FlockPage() {
                 {m.documentId && <small> · <Link to={`/t/${tenant.id}/finance/records/${m.documentId}`}>{t('record')}</Link></small>}</td>
               <td className="num">{formatNumber(m.heads, lang, 0)}{m.kg != null && <small> · {formatNumber(m.kg, lang, 2)} kg</small>}</td>
               <td>{m.cause ?? ''}</td>
-              <td>{open && !m.documentId && !m.batchDayId && !['PLACED', 'BOUGHT'].includes(m.kind) && (
-                <button type="button" className="icon-button" aria-label={t('removeMovement')}
-                        onClick={() => { if (window.confirm(t('confirmRemoveMovement'))) void send(`${base}/flock-movements/${m.id}`, 'DELETE', undefined, null, () => t('movementRemoved')); }}>
-                  <Trash2 size={16} aria-hidden /></button>)}</td>
+              <td>
+                {/* Entered by hand: removed. Bought or sold with a bill: undone by reversing the bill, which also takes the heads back out */}
+                {open && !m.documentId && !m.batchDayId && (
+                  <button type="button" className="icon-button" aria-label={t('removeMovement')}
+                          onClick={() => { if (window.confirm(t('confirmRemoveMovement'))) void send(`${base}/flock-movements/${m.id}`, 'DELETE', undefined, null, () => t('movementRemoved')); }}>
+                    <Trash2 size={16} aria-hidden /></button>)}
+                {m.documentId && !m.reversed && canReverse && (
+                  <button type="button" className="icon-button" aria-label={t('undoMovement')} title={t('undoMovement')}
+                          onClick={() => { if (window.confirm(t('confirmUndoMovement'))) void send(`/api/v1/tenants/${tenant.id}/finance/documents/${m.documentId}/reverse`, 'POST',
+                            { reversalDate: today() }, null, () => t('movementUndone')); }}>
+                    <RotateCcw size={16} aria-hidden /></button>)}
+              </td>
             </tr>
           ))}</tbody>
         </table>

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ChevronRight, Layers, Leaf, MapPin, MapPinned, Plus, Receipt, ShoppingBag, Sprout, Trash2, TrendingDown, TrendingUp, Wallet, X } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Layers, Leaf, MapPin, MapPinned, Plus, Receipt, Sprout, Trash2, TrendingDown, TrendingUp, Wallet, X } from 'lucide-react';
 import { api } from '../api/client';
 import type { Farm, Parcel } from '../api/types';
 import { useTenant } from '../auth/useCurrentTenant';
@@ -37,7 +37,6 @@ export default function FarmPage() {
   const startMonth = useFiscalStartMonth();
   const base = `/api/v1/tenants/${tenant.id}`;
   const canMoney = can(tenant, 'FINANCE_READ');
-  const canBook = can(tenant, 'FINANCE_WRITE');
   const canWrite = can(tenant, 'FARM_WRITE');
 
   const [farm, setFarm] = useState<Farm | null>(null);
@@ -138,11 +137,9 @@ export default function FarmPage() {
             </p>
           </div>
         </div>
-        {(canBook || canWrite) && (
+        {canWrite && (
           <div className="fw-actions">
             {canWrite && <button type="button" className="danger" disabled={busy} onClick={() => void deleteFarm()}><Trash2 size={16} aria-hidden />{t('deleteFarm')}</button>}
-            {canBook && <Link className="secondary" to={`/t/${tenant.id}/finance/new/sale?farm=${farm.id}`}><ShoppingBag size={16} aria-hidden />{t('recordSale')}</Link>}
-            {canBook && <Link className="primary" to={`/t/${tenant.id}/finance/new/expense?farm=${farm.id}`}><Plus size={16} aria-hidden />{t('addExpense')}</Link>}
           </div>
         )}
       </header>
@@ -212,7 +209,7 @@ export default function FarmPage() {
             )}
           </div>
 
-          <RecordsPanel filter={`farmId=${farm.id}`} prefill={`farm=${farm.id}`} title={t('records')} newButtons={false} />
+          <RecordsPanel filter={`farmId=${farm.id}`} prefill={`farm=${farm.id}`} title={t('records')} />
         </div>
       </> : <p className="info-banner">{t('noMoneyAccess')}</p>}
 

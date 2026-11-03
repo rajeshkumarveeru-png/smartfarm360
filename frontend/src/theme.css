@@ -916,6 +916,30 @@ button.im-row:focus-visible, a.im-row:focus-visible { outline: 2px solid var(--t
 .entry-cost-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 12px; }
 .entry-cost-fields label { display: flex; flex-direction: column; gap: 7px; font-size: var(--sf-fs-sm); font-weight: 600; color: var(--sf-text-2); }
 
+/* ---- Bin ---- */
+.bin-panel h3 { display: flex; align-items: center; gap: 8px; }
+.bin-list { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+.bin-list li {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 14px; border-radius: 14px;
+  background: rgb(255 255 255 / 80%); border: 1px solid var(--sf-border);
+}
+.bin-kind { flex: 0 0 auto; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; background: var(--sf-surface-3); color: var(--sf-text-2); }
+.bin-main { flex: 1 1 220px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.bin-main small { color: var(--sf-text-3); font-size: 12px; }
+.bin-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.bin-actions .secondary, .bin-actions .danger { min-height: 36px; padding: 6px 12px; font-size: 12.5px; }
+.bin-empty { padding: 18px; text-align: center; }
+.flock-delete { margin-top: 8px; min-height: 36px; padding: 6px 12px; font-size: 12.5px; }
+
+/* ---- Expense added in place ---- */
+.quick-expense { margin: 4px 0 14px; padding: 14px; border-radius: 14px; border: 1.5px solid rgb(16 185 129 / 25%);
+  background: linear-gradient(120deg, rgb(16 185 129 / 8%), rgb(255 255 255 / 85%)); animation: sf-rise var(--sf-slow) var(--sf-ease); }
+.quick-expense-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: 12px; }
+.quick-expense-fields label { display: flex; flex-direction: column; gap: 7px; font-size: var(--sf-fs-sm); font-weight: 600; color: var(--sf-text-2); }
+.quick-expense-fields .wide { grid-column: 1 / -1; }
+.quick-expense .form-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.quick-more { margin-right: auto; font-size: 12.5px; }
+
 /* ---- Motion and print ----------------------------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
