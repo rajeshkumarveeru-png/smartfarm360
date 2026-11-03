@@ -33,3 +33,5 @@ databaseChangeLog:
       file: db/changelog/016-saas-operations.yaml
   - include:
       file: db/changelog/017-billing.yaml
+  - include:
+      file: db/changelog/018-bin-and-batch-lines.yaml

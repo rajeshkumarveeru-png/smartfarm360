@@ -1,6 +1,7 @@
 package com.smartfarm360.farm;
 
 import com.smartfarm360.farm.FarmDtos.*;
+import com.smartfarm360.platform.bin.BinService;
 import com.smartfarm360.platform.rbac.Permission;
 import com.smartfarm360.platform.security.RequiresPermission;
 import com.smartfarm360.platform.security.TenantContext;
@@ -14,8 +15,9 @@ import java.util.List;
 @RequestMapping("/api/v1/tenants/{tenantId}")
 public class FarmController {
     private final FarmService service;
+    private final BinService bin;
 
-    public FarmController(FarmService service) { this.service = service; }
+    public FarmController(FarmService service, BinService bin) { this.service = service; this.bin = bin; }
 
     @GetMapping("/farms")
     @RequiresPermission(Permission.FARM_READ)
@@ -41,7 +43,8 @@ public class FarmController {
     @DeleteMapping("/farms/{farmId}")
     @RequiresPermission(Permission.FARM_WRITE)
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deactivateFarm(TenantContext ctx, @PathVariable long farmId) { service.deactivateFarm(ctx, farmId); }
+    /** Moves the farm to the Bin (bin and batch varieties design, B1). */
+    public void deleteFarm(TenantContext ctx, @PathVariable long farmId) { bin.delete(ctx, "FARM", farmId); }
 
     @GetMapping("/farms/{farmId}/land-parcels")
     @RequiresPermission(Permission.FARM_READ)
@@ -70,5 +73,6 @@ public class FarmController {
     @DeleteMapping("/land-parcels/{parcelId}")
     @RequiresPermission(Permission.FARM_WRITE)
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deactivateParcel(TenantContext ctx, @PathVariable long parcelId) { service.deactivateParcel(ctx, parcelId); }
+    /** Moves the field to the Bin. */
+    public void deleteParcel(TenantContext ctx, @PathVariable long parcelId) { bin.delete(ctx, "LAND_PARCEL", parcelId); }
 }

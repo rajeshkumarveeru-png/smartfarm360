@@ -258,7 +258,7 @@ public class CropService {
             default -> {
                 if (!Set.of("PLANNED", "GROWING").contains(from)) throw invalidStage();
                 boolean hasRecords = jdbc.sql("""
-                                select exists (select 1 from sf_farm_activities where cycle_id = :id and tenant_id = :t and status = 'ACTIVE')
+                                select exists (select 1 from sf_farm_activities where cycle_id = :id and tenant_id = :t and status = 'ACTIVE' and deleted_at is null)
                                     or exists (select 1 from sf_harvest_records where cycle_id = :id and tenant_id = :t and status = 'ACTIVE')""")
                         .param("id", id).param("t", t).query(Boolean.class).single();
                 if (hasRecords) throw ApiException.conflict("CYCLE_HAS_RECORDS", "This cycle has field records; close it instead of cancelling.");
@@ -285,7 +285,7 @@ public class CropService {
     public PageResponse<Activity> activities(TenantContext ctx, Long cycleId, int page, int size) {
         PageResponse.check(page, size);
         if (cycleId != null) cycle(ctx, cycleId);
-        String where = " where a.tenant_id = :t and (cast(:c as bigint) is null or a.cycle_id = :c)";
+        String where = " where a.tenant_id = :t and a.deleted_at is null and (cast(:c as bigint) is null or a.cycle_id = :c)";
         long total = jdbc.sql("select count(*) from sf_farm_activities a" + where).param("t", ctx.tenantId()).param("c", cycleId).query(Long.class).single();
         List<Activity> items = jdbc.sql(ACTIVITY_SELECT + where + " order by a.activity_date desc, a.id desc limit :limit offset :offset")
                 .param("t", ctx.tenantId()).param("c", cycleId).param("limit", size).param("offset", (long) page * size)
@@ -311,16 +311,6 @@ public class CropService {
                 .param("id", id).param("t", ctx.tenantId()).update();
         audit.record(ctx.tenantId(), ctx.userId(), "CROP_ACTIVITY_UPDATED", "CROP_ACTIVITY", id, Map.of("cycleId", a.cycleId()));
         return activity(ctx, id);
-    }
-
-    @Transactional
-    public void deleteActivity(TenantContext ctx, long id) {
-        Activity a = requireNotesOnly(ctx, id);
-        if (a.legacyMemo()) throw ApiException.conflict("LEGACY_RECORD", "Records from before Phase 5 are kept as history.");
-        jdbc.sql("update sf_crop_observations set activity_id = null where activity_id = :id and tenant_id = :t").param("id", id).param("t", ctx.tenantId()).update();
-        jdbc.sql("delete from sf_farm_activities where id = :id and tenant_id = :t").param("id", id).param("t", ctx.tenantId()).update();
-        audit.record(ctx.tenantId(), ctx.userId(), "CROP_ACTIVITY_DELETED", "CROP_ACTIVITY", id,
-                Map.of("cycleId", a.cycleId(), "type", a.activityType(), "date", a.activityDate().toString()));
     }
 
     private Activity requireNotesOnly(TenantContext ctx, long id) {

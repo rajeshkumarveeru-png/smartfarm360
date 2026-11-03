@@ -35,5 +35,6 @@ public enum Permission {
     PROCESSING_READ,
     PROCESSING_WRITE,
     BILLING_VIEW,
-    BILLING_MANAGE
+    BILLING_MANAGE,
+    DATA_PURGE
 }

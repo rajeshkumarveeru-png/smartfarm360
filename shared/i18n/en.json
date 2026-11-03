@@ -612,7 +612,10 @@
     "BILLING_SUBSCRIBED": "Plan subscribed",
     "BILLING_INVOICE_RESENT": "Invoice email sent again",
     "BILLING_PRICE_SET": "Price announced",
-    "BILLING_EVENT_REPLAYED": "Gateway event applied again"
+    "BILLING_EVENT_REPLAYED": "Gateway event applied again",
+    "BIN_DELETED": "Moved to the Bin",
+    "BIN_RESTORED": "Restored from the Bin",
+    "BIN_PURGED": "Deleted forever"
   },
   "platform": {
     "title": "Platform administration",
@@ -1104,7 +1107,12 @@
     "DATE_IN_PAST": "Choose a date from today.",
     "NO_COMP": "This farm business has no free plan to end.",
     "EVENT_NOT_FOUND": "Event not found.",
-    "EVENT_ALREADY_APPLIED": "This event was already applied."
+    "EVENT_ALREADY_APPLIED": "This event was already applied.",
+    "BIN_KIND_NOT_FOUND": "There is no such kind of item.",
+    "BIN_ALREADY": "This item is already in the Bin.",
+    "BIN_NOT_IN_BIN": "Move the item to the Bin before deleting it forever.",
+    "BIN_KEPT": "Money or stock records still refer to this item, so it is kept in the Bin.",
+    "BIN_PARENT_DELETED": "Restore what it belongs to first: it is in the Bin."
   },
   "mobileAuth": {
     "chooseTenant": "Choose a farm business",

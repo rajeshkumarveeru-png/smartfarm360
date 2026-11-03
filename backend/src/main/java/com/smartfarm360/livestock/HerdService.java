@@ -69,7 +69,7 @@ public class HerdService {
                    g.species, g.placed_on, g.age_at_placement_days, g.strain, g.closed_on,
                    exists (select 1 from sf_head_movements x where x.tenant_id = g.tenant_id and x.group_id = g.id) as has_moves
             from sf_animal_groups g join sf_cost_objects co on co.id = g.cost_object_id and co.tenant_id = g.tenant_id
-            where g.tenant_id = :t""";
+            where g.tenant_id = :t and g.deleted_at is null""";
 
     private static Group group(java.sql.ResultSet rs) throws java.sql.SQLException {
         String species = rs.getString(9);

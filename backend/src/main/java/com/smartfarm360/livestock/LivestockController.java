@@ -3,6 +3,7 @@ package com.smartfarm360.livestock;
 import com.smartfarm360.livestock.LivestockDtos.*;
 import com.smartfarm360.platform.export.ExportService;
 import com.smartfarm360.platform.export.ReportLabels;
+import com.smartfarm360.platform.bin.BinService;
 import com.smartfarm360.platform.rbac.Permission;
 import com.smartfarm360.platform.security.RequiresModule;
 import com.smartfarm360.platform.security.RequiresPermission;
@@ -31,8 +32,11 @@ public class LivestockController {
     private final LivestockReports reports;
     private final LivestockExports exports;
     private final ExportService export;
+    private final BinService bin;
 
-    public LivestockController(HerdService herd, EventService events, MilkService milk, LivestockReports reports, LivestockExports exports, ExportService export) {
+    public LivestockController(HerdService herd, EventService events, MilkService milk, LivestockReports reports, LivestockExports exports, ExportService export,
+                               BinService bin) {
+        this.bin = bin;
         this.herd = herd;
         this.events = events;
         this.milk = milk;
@@ -51,6 +55,12 @@ public class LivestockController {
     @RequiresPermission(Permission.LIVESTOCK_WRITE)
     @ResponseStatus(HttpStatus.CREATED)
     public Group createGroup(TenantContext ctx, @Valid @RequestBody GroupRequest r) { return herd.createGroup(ctx, r); }
+
+    /** Moves a group, poultry batch or goat and sheep herd to the Bin (bin and batch varieties design, B1, V8). */
+    @DeleteMapping("/groups/{groupId}")
+    @RequiresPermission(Permission.LIVESTOCK_WRITE)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteGroup(TenantContext ctx, @PathVariable long groupId) { bin.delete(ctx, "ANIMAL_GROUP", groupId); }
 
     @PatchMapping("/groups/{groupId}")
     @RequiresPermission(Permission.LIVESTOCK_WRITE)

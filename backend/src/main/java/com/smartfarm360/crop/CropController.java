@@ -1,6 +1,7 @@
 package com.smartfarm360.crop;
 
 import com.smartfarm360.crop.CropDtos.*;
+import com.smartfarm360.platform.bin.BinService;
 import com.smartfarm360.platform.rbac.Permission;
 import com.smartfarm360.platform.security.RequiresModule;
 import com.smartfarm360.platform.security.RequiresPermission;
@@ -25,8 +26,9 @@ import java.util.List;
 @RequiresModule(FarmModule.CROP)
 public class CropController {
     private final CropService service;
+    private final BinService bin;
 
-    public CropController(CropService service) { this.service = service; }
+    public CropController(CropService service, BinService bin) { this.service = service; this.bin = bin; }
 
     @GetMapping("/crops")
     @RequiresPermission(Permission.CROP_READ)
@@ -76,6 +78,12 @@ public class CropController {
     @RequiresPermission(Permission.CROP_READ)
     public Cycle cycle(TenantContext ctx, @PathVariable long cycleId) { return service.cycle(ctx, cycleId); }
 
+    /** Moves the crop cycle to the Bin (bin and batch varieties design, B1). */
+    @DeleteMapping("/cultivation-cycles/{cycleId}")
+    @RequiresPermission(Permission.CROP_WRITE)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteCycle(TenantContext ctx, @PathVariable long cycleId) { bin.delete(ctx, "CROP_CYCLE", cycleId); }
+
     @PatchMapping("/cultivation-cycles/{cycleId}")
     @RequiresPermission(Permission.CROP_WRITE)
     public Cycle updateCycle(TenantContext ctx, @PathVariable long cycleId, @Valid @RequestBody CyclePatch b) { return service.updateCycle(ctx, cycleId, b); }
@@ -100,7 +108,8 @@ public class CropController {
     @DeleteMapping("/activities/{activityId}")
     @RequiresPermission(Permission.CROP_ACTIVITY_WRITE)
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteActivity(TenantContext ctx, @PathVariable long activityId) { service.deleteActivity(ctx, activityId); }
+    /** Moves a note of work to the Bin; work that moved stock or money is reversed instead. */
+    public void deleteActivity(TenantContext ctx, @PathVariable long activityId) { bin.delete(ctx, "CROP_ACTIVITY", activityId); }
 
     @GetMapping("/harvests")
     @RequiresPermission(Permission.CROP_READ)

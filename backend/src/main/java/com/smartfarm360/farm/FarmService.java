@@ -67,16 +67,6 @@ public class FarmService {
         return toResponse(farm);
     }
 
-    /** Deactivates rather than deletes: crop cycles and finance records keep referring to the farm. */
-    @Transactional
-    public void deactivateFarm(TenantContext ctx, long farmId) {
-        SfFarm farm = farmEntity(ctx, farmId);
-        if (!farm.isActive()) return;
-        farm.setActive(false);
-        farms.saveAndFlush(farm);
-        audit.record(ctx.tenantId(), ctx.userId(), "FARM_DEACTIVATED", "FARM", farmId, Map.of());
-    }
-
     @Transactional(readOnly = true)
     public List<LandParcel> parcels(TenantContext ctx, long farmId, boolean includeInactive) {
         farmEntity(ctx, farmId);
@@ -117,15 +107,6 @@ public class FarmService {
         parcels.saveAndFlush(parcel);
         audit.record(ctx.tenantId(), ctx.userId(), "LAND_PARCEL_UPDATED", "LAND_PARCEL", parcelId, Map.of("name", parcel.getName()));
         return toResponse(parcel);
-    }
-
-    @Transactional
-    public void deactivateParcel(TenantContext ctx, long parcelId) {
-        SfLandParcel parcel = parcelEntity(ctx, parcelId);
-        if (!parcel.isActive()) return;
-        parcel.setActive(false);
-        parcels.saveAndFlush(parcel);
-        audit.record(ctx.tenantId(), ctx.userId(), "LAND_PARCEL_DEACTIVATED", "LAND_PARCEL", parcelId, Map.of());
     }
 
     private SfFarm farmEntity(TenantContext ctx, long farmId) {
