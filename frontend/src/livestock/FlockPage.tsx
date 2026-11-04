@@ -27,10 +27,15 @@ const monthStart = () => `${today().slice(0, 7)}-01`;
 type DayLineForm = { lineId: number; label: string; heads: number; deaths: string; culls: string; eggs: string; rate: string };
 type DayForm = { deaths: string; deathCause: string; culls: string; eggsGood: string; eggsCracked: string; eggsBroken: string; feedItemId: string; feedKg: string;
   weightBirds: string; weightKg: string; notes: string; lines: DayLineForm[] };
+/** The varieties to ask about: those with birds or with something recorded that day (all of them if none qualifies). */
+const dayLinesToShow = (lines: DayLineView[]) => {
+  const live = lines.filter(l => l.heads > 0 || l.deaths > 0 || l.culls > 0 || l.eggs > 0 || l.eggRate != null);
+  return live.length > 0 ? live : lines;
+};
 const toForm = (d: BatchDay, label: (l: DayLineView) => string): DayForm => ({ deaths: str(d.deaths), deathCause: d.deathCause ?? '', culls: str(d.culls), eggsGood: str(d.eggsGood),
   eggsCracked: str(d.eggsCracked), eggsBroken: str(d.eggsBroken), feedItemId: d.feedItemId ? String(d.feedItemId) : '', feedKg: str(d.feedKg),
   weightBirds: str(d.weightBirds), weightKg: str(d.weightKg), notes: d.notes ?? '',
-  lines: (d.lines ?? []).map(l => ({ lineId: l.lineId, label: label(l), heads: l.heads, deaths: str(l.deaths), culls: str(l.culls), eggs: str(l.eggs), rate: str(l.eggRate) })) });
+  lines: dayLinesToShow(d.lines ?? []).map(l => ({ lineId: l.lineId, label: label(l), heads: l.heads, deaths: str(l.deaths), culls: str(l.culls), eggs: str(l.eggs), rate: str(l.eggRate) })) });
 
 /** One poultry batch or goat and sheep herd: figures (J8), the daily record (J4), head movements (J7), sales (J6), eggs (J5) and the health plan (J9). */
 type FlockTab = 'summary' | 'daily' | 'heads' | 'money' | 'health';
@@ -219,19 +224,16 @@ export default function FlockPage() {
             {day.warnings.map(w => <p key={w} className="error-banner full" role="alert">{t(`warning.${w}`)}</p>)}
             {dayForm.lines.length > 0 ? (
               <div className="full day-lines">
-                <div className={`day-line day-line-head${layers ? ' with-eggs' : ''}`} aria-hidden>
-                  <span>{t('variety')}</span><span>{t('deaths')}</span><span>{t('culls')}</span>{layers && <><span>{t('eggsLaid')}</span><span>{t('eggRate')}</span></>}
-                </div>
                 {dayForm.lines.map((l, i) => {
                   const put = (patch: Partial<DayLineForm>) => setDayForm({ ...dayForm, lines: dayForm.lines.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
                   return (
                     <div key={l.lineId} className={`day-line${layers ? ' with-eggs' : ''}`} role="group" aria-label={l.label}>
                       <span className="day-line-name"><strong>{l.label}</strong><small>{t('headsAtEnd', { count: formatNumber(l.heads, lang, 0) })}</small></span>
-                      <label><span className="sr-only">{t('deaths')}</span><input inputMode="numeric" disabled={!open} aria-label={`${t('deaths')} ${l.label}`} value={l.deaths} onChange={e => put({ deaths: e.target.value })} /></label>
-                      <label><span className="sr-only">{t('culls')}</span><input inputMode="numeric" disabled={!open} aria-label={`${t('culls')} ${l.label}`} value={l.culls} onChange={e => put({ culls: e.target.value })} /></label>
+                      <label><span>{t('deaths')}</span><input inputMode="numeric" disabled={!open} aria-label={`${t('deaths')} ${l.label}`} value={l.deaths} onChange={e => put({ deaths: e.target.value })} /></label>
+                      <label><span>{t('culls')}</span><input inputMode="numeric" disabled={!open} aria-label={`${t('culls')} ${l.label}`} value={l.culls} onChange={e => put({ culls: e.target.value })} /></label>
                       {layers && <>
-                        <label><span className="sr-only">{t('eggsLaid')}</span><input inputMode="numeric" disabled={!open} aria-label={`${t('eggsLaid')} ${l.label}`} value={l.eggs} onChange={e => put({ eggs: e.target.value })} /></label>
-                        <label><span className="sr-only">{t('eggRate')}</span><input inputMode="decimal" disabled={!open} aria-label={`${t('eggRate')} ${l.label}`} placeholder="₹" value={l.rate} onChange={e => put({ rate: e.target.value })} /></label>
+                        <label><span>{t('eggsLaid')}</span><input inputMode="numeric" disabled={!open} aria-label={`${t('eggsLaid')} ${l.label}`} value={l.eggs} onChange={e => put({ eggs: e.target.value })} /></label>
+                        <label><span>{t('eggRate')}</span><input inputMode="decimal" disabled={!open} aria-label={`${t('eggRate')} ${l.label}`} placeholder="₹" value={l.rate} onChange={e => put({ rate: e.target.value })} /></label>
                       </>}
                     </div>
                   );

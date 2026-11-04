@@ -118,7 +118,8 @@ describe('poultry, goats and sheep web', () => {
   it('takes eggs laid and a rate for each variety of a mixed batch', async () => {
     const mixed: BatchDay = { ...day, eggsGood: 0, lines: [
       { lineId: 21, species: 'CHICKEN', variety: 'Sonali', heads: 600, deaths: 0, culls: 0, eggs: 0, eggRate: null },
-      { lineId: 22, species: 'DUCK', variety: 'Khaki Campbell', heads: 394, deaths: 0, culls: 0, eggs: 0, eggRate: null }] };
+      { lineId: 22, species: 'DUCK', variety: 'Khaki Campbell', heads: 394, deaths: 0, culls: 0, eggs: 0, eggRate: null },
+      { lineId: 23, species: 'CHICKEN', variety: null, heads: 0, deaths: 0, culls: 0, eggs: 0, eggRate: null }] };
     apiMock.mockImplementation((url: string, init?: { method?: string; body?: unknown }) =>
       (url.includes('/days/') && init?.method !== 'PUT' ? Promise.resolve(mixed) : routeApi(url, init)));
     renderAt('/t/9/livestock/flocks/1', <FlockPage />, '/t/:tenantId/livestock/flocks/:groupId');
@@ -129,6 +130,8 @@ describe('poultry, goats and sheep web', () => {
     await userEvent.type(screen.getByLabelText('Eggs laid Khaki Campbell · Duck'), '300');
     await userEvent.type(screen.getByLabelText('Rate per egg (₹) Khaki Campbell · Duck'), '9');
     await userEvent.type(screen.getByLabelText('Deaths Khaki Campbell · Duck'), '1');
+    // A variety with no birds and nothing recorded that day is not asked about
+    expect(screen.queryByLabelText('Eggs laid Chicken')).not.toBeInTheDocument();
     // One total for good eggs is not asked: it comes from the varieties
     expect(screen.queryByLabelText('Good eggs')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Save the day' }));

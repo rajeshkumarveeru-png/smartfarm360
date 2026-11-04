@@ -2094,6 +2094,20 @@ New backend tests:
 Found and fixed on the way: the batch page loaded the day again on every render once the variety labels became a
 dependency, which hung the web tests; it now reads the latest labels through a ref.
 
+### Fix: variety rows had no layout (2026-11-04)
+
+The owner found the daily record by variety unclear: the boxes had no labels and ran together. The styles for the
+variety rows had never been written, which also affected *Start batch*, *Buy more birds* and the *Birds* tab cards.
+
+- Each variety on the daily record is now its own block with its name, its birds, and labelled boxes: deaths, culled,
+  eggs laid and rate per egg.
+- A variety with no birds and nothing recorded that day is no longer asked about.
+
+| Command | Result |
+|---|---|
+| `frontend: npm run lint`, `npm test`, `npm run build` | Passed: **110 tests**; the mixed-batch test also checks that an empty variety is not asked about |
+| Layout at 800 and 375 px wide | Checked with the same markup and the app's stylesheets on the sign-in page; no sideways scroll. **Not checked signed in**, which needs the owner's password |
+
 ## Known gaps and defects
 
 Security and platform:
