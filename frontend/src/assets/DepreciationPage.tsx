@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useTenant } from '../auth/useCurrentTenant';
 import { ErrorBanner, Loading } from '../components/common';
+import { Toast } from '../components/Toast';
 import { newIdempotencyKey } from '../finance/useFinanceData';
 import { currentLanguage, useNs } from '../i18n';
 import { describeError } from '../lib/errors';
@@ -46,7 +47,7 @@ export default function DepreciationPage() {
     <>
       <div className="crop-page-head"><div><h2>{t('depreciation')}</h2><p>{t('depreciationHelp')}</p></div></div>
       <ErrorBanner message={error} />
-      {message && <p className="hint" role="status">{message}</p>}
+      <Toast message={message} onClose={() => setMessage('')} />
       {canManage && (
         <>
           <form className="form-card form-grid filters" onSubmit={e => { e.preventDefault(); void run(async () => setPreview(await api<RunPreview>(`${base}/depreciation-runs/preview`, { method: 'POST', body: { month } }))); }}>

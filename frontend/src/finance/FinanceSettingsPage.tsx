@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { useTenant } from '../auth/useCurrentTenant';
 import { ErrorBanner, Loading } from '../components/common';
+import { Toast } from '../components/Toast';
 import { useNs } from '../i18n';
 import { describeError } from '../lib/errors';
 import type { FinanceSettings } from './types';
@@ -55,7 +56,7 @@ export default function FinanceSettingsPage() {
     <>
       <div className="crop-page-head"><div><h2>{t('settings')}</h2></div></div>
       <ErrorBanner message={error} />
-      {notice && <div className="info-banner" role="status">{notice}</div>}
+      <Toast message={notice} onClose={() => setNotice('')} />
       <form className="form-card form-grid" onSubmit={saveSettings}>
         <label>{t('lockDate')} <small>{tc('optional')}</small>
           <input type="date" value={settings.lockDate ?? ''} onChange={e => setSettings({ ...settings, lockDate: e.target.value || null })} /></label>

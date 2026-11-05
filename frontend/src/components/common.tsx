@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import React from 'react';
 import { CircleAlert, Languages, RefreshCw, Sprout } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -6,9 +7,15 @@ import { currentLanguage } from '../i18n';
 
 export function ErrorBanner({ message, onRetry, retryLabel }: { message: string; onRetry?: () => void; retryLabel?: string }) {
   const { t } = useTranslation();
+  const ref = useRef<HTMLDivElement>(null);
+  // A form can be far below the page's banner: bring a problem into view
+  useEffect(() => {
+    const box = message ? ref.current?.getBoundingClientRect() : null;
+    if (box && (box.top < 80 || box.bottom > window.innerHeight)) ref.current?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+  }, [message]);
   if (!message) return null;
   return (
-    <div className="error-banner" role="alert">
+    <div ref={ref} className="error-banner" role="alert">
       <CircleAlert size={18} aria-hidden />
       <span>{message}</span>
       {onRetry && <button type="button" onClick={onRetry}>{retryLabel ?? t('common.retry')}</button>}

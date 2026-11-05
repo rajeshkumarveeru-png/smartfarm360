@@ -2141,8 +2141,7 @@ BizManager, and clicking a batch's figure should show it by variety.
 The owner got no sign that a save had worked, and could not see Sonali and the ducks day by day.
 
 - **Toast:** the batch page's messages were written at the top of the page, out of sight from the Save button. Every
-  save on the batch page now shows a toast (`components/Toast.tsx`). An error scrolls its banner into view. Other pages
-  still show their messages as before, and no other page has a toast yet.
+  save on the batch page now shows a toast (`components/Toast.tsx`). The next section extends this to the whole app.
 - **Day-wise records:** the *Daily record* tab lists the days of a period under the form, a row per variety, with a
   filter by variety and totals. Clicking a date opens that day in the form to correct it. Days saved as batch totals
   show as *Whole batch*.
@@ -2156,6 +2155,28 @@ The owner got no sign that a save had worked, and could not see Sonali and the d
 | `frontend: npm test` | Passed: **116 tests**. New tests: the toast; the list, its filter and opening a day; a variety day by day in a pop-up |
 | `mobile: npx tsc --noEmit`, `npm test` | Passed: **76 tests** |
 | Browser | **Not checked signed in**, which needs the owner's password |
+
+### Save confirmation across the app (2026-11-05)
+
+About 25 pages saved with no confirmation at all, and about 20 wrote a message that could be off-screen.
+
+- **Every save to a farm business now confirms.** The API client reports successful writes (`onSaved`), and `SavedToast`,
+  mounted at the root so it outlives a page that navigates away, says *Saved.* or *Deleted.*. Several writes together give
+  one toast. It stays silent for previews, exports and billing, which either save nothing or say what happened themselves.
+- **A page's own message takes its place:** pages that said something specific (`message`, `notice`) now show it through
+  `Toast`, which replaces the general one. A longer message stays longer.
+- **Left on the page on purpose:** lot and low-stock warnings on crop cycles and stock records, invite links, and billing,
+  announcement and sign-in banners, which must not vanish. These show alongside any toast.
+- **Errors:** `ErrorBanner` scrolls itself into view when it is out of sight, on every page.
+- **Not changed:** the phone app.
+
+| Command | Result |
+|---|---|
+| `frontend: npm run lint`, `npx tsc --noEmit`, `npm run build` | Passed |
+| `frontend: npm test` | Passed: **122 tests**. New `Toast.test.tsx` (6): what counts as a save, one toast for several writes, a page's message replacing the general one, closing by itself, and an error brought into view |
+| `mobile: npx tsc --noEmit`, `npm test` | Passed: **76 tests** |
+| Backend | Not run: no backend change |
+| Browser | Toast position checked with the same markup on the sign-in page: seen at desktop width, and measured at 375 x 812 (16 px from the edges, no sideways scroll; the pane's screenshot at that size was not usable). **Not checked signed in**, which needs the owner's password |
 
 ## Known gaps and defects
 

@@ -3,6 +3,7 @@ import { RotateCcw, Trash2 } from 'lucide-react';
 import { api } from '../api/client';
 import { useTenant } from '../auth/useCurrentTenant';
 import { ErrorBanner } from '../components/common';
+import { Toast } from '../components/Toast';
 import { currentLanguage, useNs } from '../i18n';
 import { describeError } from '../lib/errors';
 import { formatDateTime } from '../lib/format';
@@ -51,7 +52,7 @@ export default function BinPanel() {
       <h3><Trash2 size={18} aria-hidden />{t('title')}</h3>
       <p className="hint">{t('help')}</p>
       <ErrorBanner message={error} />
-      {notice && <p className="info-banner" role="status">{notice}</p>}
+      <Toast message={notice} onClose={() => setNotice('')} />
       {items && items.length === 0 && <p className="hint bin-empty">{t('empty')}</p>}
       {items && items.length > 0 && (
         <ul className="bin-list">

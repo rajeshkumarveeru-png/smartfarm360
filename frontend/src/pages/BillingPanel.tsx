@@ -5,6 +5,7 @@ import type { BillingInvoice, BillingOverview, BillingPeriod, BillingPlan, Billi
 import type { FinancialAccount } from '../finance/types';
 import { useTenant } from '../auth/useCurrentTenant';
 import { ErrorBanner } from '../components/common';
+import { Toast } from '../components/Toast';
 import { currentLanguage, useNs } from '../i18n';
 import { describeError } from '../lib/errors';
 import { formatDate, formatMoney, formatNumber } from '../lib/format';
@@ -86,7 +87,7 @@ export default function BillingPanel() {
     <section className="panel" id="billing">
       <h3>{t('title')}</h3>
       <ErrorBanner message={error} />
-      {notice && <div className="info-banner" role="status">{notice}</div>}
+      <Toast message={notice} onClose={() => setNotice('')} />
       <p><strong>{planName(overview.effectivePlanCode)}</strong> · {t(`state.${overview.state}`)}</p>
       <ul className="plain-list">
         {overview.state === 'TRIAL' && overview.trialEndsAt && <li>{t('trialUntil', { date: formatDate(overview.trialEndsAt, lang) })}</li>}

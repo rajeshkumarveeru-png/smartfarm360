@@ -8,6 +8,7 @@ import type { ModuleStatus, Settings, TenantDetail } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import { useTenant } from '../auth/useCurrentTenant';
 import { ErrorBanner, Loading } from '../components/common';
+import { Toast } from '../components/Toast';
 import { useNs } from '../i18n';
 import { describeError } from '../lib/errors';
 import { can } from '../lib/nav';
@@ -92,7 +93,7 @@ export default function SettingsPage() {
     <section className="crop-page">
       <div className="crop-page-head"><div><h2>{t('title')}</h2>{!canManage && <p>{t('readOnly')}</p>}</div></div>
       <ErrorBanner message={error} />
-      {notice && <div className="info-banner" role="status">{notice}</div>}
+      <Toast message={notice} onClose={() => setNotice('')} />
 
       <h3>{t('business')}</h3>
       <form className="form-card form-grid" onSubmit={saveBusiness}>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import { useTenant } from '../auth/useCurrentTenant';
 import { ErrorBanner, Loading } from '../components/common';
+import { Toast } from '../components/Toast';
 import type { FinancialAccount, Party } from '../finance/types';
 import { newIdempotencyKey } from '../finance/useFinanceData';
 import { currentLanguage, useNs } from '../i18n';
@@ -105,7 +106,7 @@ export default function MilkPage() {
     <>
       <div className="crop-page-head"><div><h2>{t('milk')}</h2><p>{t('milkHelp')}</p></div></div>
       <ErrorBanner message={error} onRetry={stale ? () => void load() : undefined} retryLabel={tc('loadLatest')} />
-      {message && <p className="hint" role="status">{message}</p>}
+      <Toast message={message} onClose={() => setMessage('')} />
       <div className="form-card form-grid filters">
         <label>{tf('date')}<input type="date" max={today()} value={date} onChange={e => setDate(e.target.value)} /></label>
         <p className="hint">{t('dayTotal', { litres: formatNumber(day.total, lang, 2) })} · {t('inStockNow', { litres: formatNumber(day.inStock, lang, 2) })}</p>

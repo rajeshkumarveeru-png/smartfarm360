@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useTenant } from '../auth/useCurrentTenant';
 import { ErrorBanner, Loading } from '../components/common';
+import { Toast } from '../components/Toast';
 import type { CostObject } from '../finance/types';
 import { newIdempotencyKey } from '../finance/useFinanceData';
 import { currentLanguage, useNs } from '../i18n';
@@ -124,7 +125,7 @@ export default function OwnProducePage() {
     <>
       <div className="crop-page-head"><div><h2>{t('transfer.title')}</h2><p>{t('transfer.help')}</p></div></div>
       <ErrorBanner message={error} />
-      {message && <p className="hint" role="status">{message}</p>}
+      <Toast message={message} onClose={() => setMessage('')} />
       {canWrite && (
         <form className="form-card form-grid" noValidate onSubmit={e => void save(e)}>
           <label>{t('transfer.date')}<input type="date" max={today()} value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} /></label>

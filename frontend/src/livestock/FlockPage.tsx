@@ -93,7 +93,6 @@ export default function FlockPage() {
   const [keys, setKeys] = useState({ buy: newIdempotencyKey(), sale: newIdempotencyKey(), eggUse: newIdempotencyKey(), eggSale: newIdempotencyKey(), health: newIdempotencyKey() });
   const [message, setMessage] = useState('');
   const [dayRecords, setDayRecords] = useState<DayRecord[]>([]);
-  const errorRef = useRef<HTMLDivElement>(null);
   const dayFormRef = useRef<HTMLFormElement>(null);
   const [error, setError] = useState('');
 
@@ -113,8 +112,6 @@ export default function FlockPage() {
     }
   }, [base, flock, range.from, range.to]);
   useEffect(() => { void load(); }, [load]);
-  // Forms can be far below the page's error banner: bring a problem into view
-  useEffect(() => { if (error) errorRef.current?.scrollIntoView?.({ block: 'center', behavior: 'smooth' }); }, [error]);
   // Follows the report, so a saved day shows in the list at once
   useEffect(() => {
     if (!poultry || !report) return;
@@ -216,7 +213,7 @@ export default function FlockPage() {
             {group.strain && <> · {group.strain}</>} · <b>{t('headsNow', { count: formatNumber(report.heads, lang, 0) })}</b></p>
         </div>
       </div>
-      <div ref={errorRef}><ErrorBanner message={error} onRetry={stale ? () => { setError(''); setDayLoads(n => n + 1); } : undefined} retryLabel={tc('loadLatest')} /></div>
+      <ErrorBanner message={error} onRetry={stale ? () => { setError(''); setDayLoads(n => n + 1); } : undefined} retryLabel={tc('loadLatest')} />
       <Toast message={message} onClose={() => setMessage('')} />
 
       <div className="crop-tabs section-space" role="tablist" aria-label={group.name}>

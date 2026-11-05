@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import type { Farm } from '../api/types';
 import { useTenant } from '../auth/useCurrentTenant';
 import { ErrorBanner, Loading } from '../components/common';
+import { Toast } from '../components/Toast';
 import { currentLanguage, useNs } from '../i18n';
 import { describeError } from '../lib/errors';
 import { formatDate, formatNumber, today } from '../lib/format';
@@ -85,7 +86,7 @@ export default function PondPage() {
         {canWrite && !edit && <button type="button" className="secondary" onClick={() => setEdit(toForm())}>{tc('edit')}</button>}
       </div>
       <ErrorBanner message={error} />
-      {message && <p className="hint" role="status">{message}</p>}
+      <Toast message={message} onClose={() => setMessage('')} />
       {edit && (
         <form className="form-card form-grid" noValidate onSubmit={e => void savePond(e)}>
           <PondFields form={edit} set={p => setEdit(f => (f ? { ...f, ...p } : f))} farms={farms} />
