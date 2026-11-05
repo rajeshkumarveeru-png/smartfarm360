@@ -409,6 +409,28 @@ public class FlockService {
         return toDay(ctx, g, date);
     }
 
+    /** The saved days of a period, the latest first. */
+    @Transactional(readOnly = true)
+    public List<DayRecord> dayRecords(TenantContext ctx, long groupId, LocalDate from, LocalDate to) {
+        Group g = counted(ctx, groupId);
+        if (to.isBefore(from) || java.time.temporal.ChronoUnit.DAYS.between(from, to) > 3700) throw ApiException.badRequest("INVALID_DATE_RANGE", "Choose a valid date range.");
+        Map<LocalDate, List<DayRecordLine>> byDay = new HashMap<>();
+        jdbc.sql("""
+                        select d.day, dl.line_id, l.species, l.variety, dl.deaths, dl.culls, dl.eggs, dl.egg_rate from sf_batch_day_lines dl
+                        join sf_batch_days d on d.id = dl.batch_day_id and d.tenant_id = dl.tenant_id
+                        join sf_flock_lines l on l.id = dl.line_id and l.tenant_id = dl.tenant_id
+                        where dl.tenant_id = :t and d.group_id = :g and d.day between :from and :to order by dl.line_id""")
+                .param("t", ctx.tenantId()).param("g", g.id()).param("from", from).param("to", to).query().listOfRows()
+                .forEach(m -> byDay.computeIfAbsent(((java.sql.Date) m.get("day")).toLocalDate(), k -> new ArrayList<>()).add(new DayRecordLine(longOf(m.get("line_id")),
+                        (String) m.get("species"), (String) m.get("variety"), intOf(m.get("deaths")), intOf(m.get("culls")), intOf(m.get("eggs")), (BigDecimal) m.get("egg_rate"))));
+        return jdbc.sql("select * from sf_batch_days where tenant_id = :t and group_id = :g and day between :from and :to order by day desc")
+                .param("t", ctx.tenantId()).param("g", g.id()).param("from", from).param("to", to).query().listOfRows().stream().map(m -> {
+                    LocalDate day = ((java.sql.Date) m.get("day")).toLocalDate();
+                    return new DayRecord(day, intOf(m.get("deaths")), intOf(m.get("culls")), intOf(m.get("eggs_good")), intOf(m.get("eggs_cracked")), intOf(m.get("eggs_broken")),
+                            (BigDecimal) m.get("feed_kg"), (String) m.get("notes"), byDay.getOrDefault(day, List.of()));
+                }).toList();
+    }
+
     private BatchDay toDay(TenantContext ctx, Group g, LocalDate date) {
         Map<String, Object> row = jdbc.sql("select * from sf_batch_days where tenant_id = :t and group_id = :g and day = :d")
                 .param("t", ctx.tenantId()).param("g", g.id()).param("d", date).query().listOfRows().stream().findFirst().orElse(Map.of());

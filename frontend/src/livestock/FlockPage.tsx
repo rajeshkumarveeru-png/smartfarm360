@@ -4,8 +4,10 @@ import { ChevronRight, RotateCcw, Trash2 } from 'lucide-react';
 import { api } from '../api/client';
 import { useTenant } from '../auth/useCurrentTenant';
 import { ErrorBanner, Loading } from '../components/common';
+import { Toast } from '../components/Toast';
 import type { FinancialAccount, Party } from '../finance/types';
 import RecordsPanel from '../finance/RecordsPanel';
+import DayRecords from './DayRecords';
 import VarietyInsight, { type InsightKind } from './VarietyInsight';
 import VarietyLines, { BIRD_SPECIES, emptyVariety, type VarietyRow, varietyLines, varietyProblem } from './VarietyLines';
 import { newIdempotencyKey } from '../finance/useFinanceData';
@@ -15,7 +17,7 @@ import { formatDate, formatMoney, formatNumber, today } from '../lib/format';
 import { can } from '../lib/nav';
 import type { Item } from '../stock/types';
 import type { RecordRefLike } from './milkTypes';
-import type { BatchDay, DayLineView, Figures, FlockGroup, FlockLine, FlockReport, Movement, PlanItem } from './types';
+import type { BatchDay, DayLineView, DayRecord, Figures, FlockGroup, FlockLine, FlockReport, Movement, PlanItem } from './types';
 import { HEALTH_KINDS } from './types';
 
 const whole = (v: string) => v === '' || /^\d{1,7}$/.test(v.trim());
@@ -90,6 +92,9 @@ export default function FlockPage() {
   const [planForm, setPlanForm] = useState({ kind: 'VACCINATION', description: '', dueOn: today(), copyFrom: '' });
   const [keys, setKeys] = useState({ buy: newIdempotencyKey(), sale: newIdempotencyKey(), eggUse: newIdempotencyKey(), eggSale: newIdempotencyKey(), health: newIdempotencyKey() });
   const [message, setMessage] = useState('');
+  const [dayRecords, setDayRecords] = useState<DayRecord[]>([]);
+  const errorRef = useRef<HTMLDivElement>(null);
+  const dayFormRef = useRef<HTMLFormElement>(null);
   const [error, setError] = useState('');
 
   const group = report?.group;
@@ -108,6 +113,13 @@ export default function FlockPage() {
     }
   }, [base, flock, range.from, range.to]);
   useEffect(() => { void load(); }, [load]);
+  // Forms can be far below the page's error banner: bring a problem into view
+  useEffect(() => { if (error) errorRef.current?.scrollIntoView?.({ block: 'center', behavior: 'smooth' }); }, [error]);
+  // Follows the report, so a saved day shows in the list at once
+  useEffect(() => {
+    if (!poultry || !report) return;
+    api<DayRecord[]>(`${flock}/days?from=${range.from}&to=${range.to}`).then(d => setDayRecords(d ?? [])).catch(e => setError(describeError(e)));
+  }, [flock, poultry, report, range.from, range.to]);
   useEffect(() => {
     if (!poultry) return;
     setStale(false);
@@ -204,8 +216,8 @@ export default function FlockPage() {
             {group.strain && <> · {group.strain}</>} · <b>{t('headsNow', { count: formatNumber(report.heads, lang, 0) })}</b></p>
         </div>
       </div>
-      <ErrorBanner message={error} onRetry={stale ? () => { setError(''); setDayLoads(n => n + 1); } : undefined} retryLabel={tc('loadLatest')} />
-      {message && <p className="hint" role="status">{message}</p>}
+      <div ref={errorRef}><ErrorBanner message={error} onRetry={stale ? () => { setError(''); setDayLoads(n => n + 1); } : undefined} retryLabel={tc('loadLatest')} /></div>
+      <Toast message={message} onClose={() => setMessage('')} />
 
       <div className="crop-tabs section-space" role="tablist" aria-label={group.name}>
         {tabs.map(x => (
@@ -219,14 +231,14 @@ export default function FlockPage() {
         <label>{tf('to')}<input type="date" value={range.to} onChange={e => setRange({ ...range, to: e.target.value })} /></label>
       </div>
       <FigureCards title={tf('rangeLabel', { from: formatDate(report.period.from, lang), to: formatDate(report.period.to, lang) })} f={report.period}
-                   poultry={poultry} layers={layers} showMoney={showMoney} />
-      {report.sincePlacement && <FigureCards title={t('sincePlacement')} f={report.sincePlacement} poultry={poultry} layers={layers} showMoney={showMoney} />}
+                   poultry={poultry} layers={layers} showMoney={showMoney} flock={flock} />
+      {report.sincePlacement && <FigureCards title={t('sincePlacement')} f={report.sincePlacement} poultry={poultry} layers={layers} showMoney={showMoney} flock={flock} />}
       </>}
 
       {tab === 'daily' && poultry && dayForm && day && (
         <>
           <h3 className="section-space">{t('dailyRecord')}</h3>
-          <form className="form-card form-grid" noValidate onSubmit={saveDay}>
+          <form ref={dayFormRef} className="form-card form-grid" noValidate onSubmit={saveDay}>
             <label>{tf('date')}<input type="date" max={today()} value={date} onChange={e => setDate(e.target.value)} /></label>
             <p className="hint">{t('headsAtEnd', { count: formatNumber(day.headsAtEnd, lang, 0) })}</p>
             {day.warnings.map(w => <p key={w} className="error-banner full" role="alert">{t(`warning.${w}`)}</p>)}
@@ -276,6 +288,8 @@ export default function FlockPage() {
             <p className="hint full">{t('dailyRecordHelp')}</p>
             {open && <div className="form-actions full"><button className="primary">{t('saveDay')}</button></div>}
           </form>
+          <DayRecords records={dayRecords} lines={lines} range={range} onRange={setRange} layers={layers} showMoney={showMoney}
+                      onOpen={d => { setDate(d); dayFormRef.current?.scrollIntoView?.({ block: 'center', behavior: 'smooth' }); }} />
         </>
       )}
 
@@ -500,7 +514,7 @@ function Card({ kind, label, className, onOpen, children }: { kind: InsightKind;
   );
 }
 
-function FigureCards({ title, f, poultry, layers, showMoney }: { title: string; f: Figures; poultry: boolean; layers: boolean; showMoney: boolean }) {
+function FigureCards({ title, f, poultry, layers, showMoney, flock }: { title: string; f: Figures; poultry: boolean; layers: boolean; showMoney: boolean; flock: string }) {
   const t = useNs('livestock');
   const tf = useNs('fin');
   const lang = currentLanguage();
@@ -526,7 +540,7 @@ function FigureCards({ title, f, poultry, layers, showMoney }: { title: string; 
         {showMoney && f.profitWithEggs != null && <Card onOpen={setOpen} kind="profitWithEggs" label={t('profitWithEggs')} className={f.profitWithEggs > 0 ? 'positive' : f.profitWithEggs < 0 ? 'negative' : undefined}>
           <b>{m(f.profitWithEggs)}</b><small>{t('profitWithEggsHelp')}</small></Card>}
       </div>
-      {open && <VarietyInsight kind={open.kind} label={open.label} f={f} period={title} poultry={poultry} layers={layers} onClose={() => setOpen(null)} />}
+      {open && <VarietyInsight kind={open.kind} label={open.label} f={f} period={title} poultry={poultry} layers={layers} showMoney={showMoney} flock={flock} onClose={() => setOpen(null)} />}
     </>
   );
 }

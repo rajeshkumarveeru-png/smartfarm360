@@ -163,6 +163,39 @@ class FlockVarietiesTest extends FinanceTestSupport {
     }
 
     @Test
+    void theDayWiseRecordsShowEachVarietyAndStayInTheirBusiness() throws Exception {
+        long batch = startMixedBatch();
+        long sonali = lineId(batch, "Sonali"), muscovy = lineId(batch, "Muscovy");
+        put(l("/flocks/" + batch + "/days/2026-07-02"), owner, Map.of("lines", List.of(Map.of("lineId", sonali, "deaths", 1, "eggs", 6, "eggRate", 8),
+                Map.of("lineId", muscovy, "eggs", 4, "eggRate", 12)))).andExpect(status().isOk());
+        put(l("/flocks/" + batch + "/days/2026-07-03"), owner, Map.of("notes", "Rain")).andExpect(status().isOk());
+        put(l("/flocks/" + batch + "/days/2026-08-01"), owner, Map.of("lines", List.of(Map.of("lineId", sonali, "eggs", 2)))).andExpect(status().isOk());
+
+        String july = l("/flocks/" + batch + "/days?from=2026-07-01&to=2026-07-31");
+        JsonNode days = body(get(july, owner).andExpect(status().isOk()));
+        assertThat(days).hasSize(2);
+        assertThat(days.get(0).get("day").asText()).isEqualTo("2026-07-03");    // The latest first; August is out of the period
+        assertThat(days.get(0).get("lines")).isEmpty();
+        JsonNode second = days.get(1);
+        assertThat(second.get("eggsGood").asInt()).isEqualTo(10);
+        assertThat(second.get("lines")).hasSize(2);
+        JsonNode first = second.get("lines").get(0);
+        assertThat(first.get("variety").asText()).isEqualTo("Sonali");
+        assertThat(first.get("deaths").asInt()).isEqualTo(1);
+        assertThat(first.get("eggs").asInt()).isEqualTo(6);
+        money(first.get("eggRate"), "8");
+
+        get(l("/flocks/" + batch + "/days?from=2026-07-31&to=2026-07-01"), owner).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_DATE_RANGE"));
+
+        // Someone from another farm business cannot read them, by either route
+        var outsider = newUser("fv-outsider");
+        get(july, outsider).andExpect(status().isNotFound());
+        newFinanceTenant("var-" + UUID.randomUUID().toString().substring(0, 6));
+        put("/api/v1/tenants/" + tenant + "/modules/POULTRY", owner, Map.of("enabled", true)).andExpect(status().isOk());
+        get(l("/flocks/" + batch + "/days?from=2026-07-01&to=2026-07-31"), owner).andExpect(status().isNotFound());
+    }
+
+    @Test
     void aVarietyOfAnotherBatchIsRefused() throws Exception {
         long batch = startMixedBatch();
         long other = body(post(l("/flocks"), owner, Map.of("name", "Other", "species", "CHICKEN", "purpose", "COUNTRY", "placedOn", "2026-07-01", "heads", 4))

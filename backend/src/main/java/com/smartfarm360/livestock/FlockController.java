@@ -101,6 +101,14 @@ public class FlockController {
 
     // ---- Daily batch record and eggs (poultry) ----
 
+    @GetMapping("/flocks/{groupId}/days")
+    @RequiresPermission(Permission.LIVESTOCK_READ)
+    @RequiresModule(FarmModule.POULTRY)
+    public List<DayRecord> dayRecords(TenantContext ctx, @PathVariable long groupId, @RequestParam @DateTimeFormat(pattern = ISO) LocalDate from,
+                                      @RequestParam @DateTimeFormat(pattern = ISO) LocalDate to) {
+        return flocks.dayRecords(ctx, groupId, from, to);
+    }
+
     @GetMapping("/flocks/{groupId}/days/{date}")
     @RequiresPermission(Permission.LIVESTOCK_READ)
     @RequiresModule(FarmModule.POULTRY)

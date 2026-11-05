@@ -48,6 +48,9 @@ export type DayLineView = { lineId: number; species: string; variety: string | n
 export type BatchDay = { day: string; deaths: number; deathCause: string | null; culls: number; eggsGood: number; eggsCracked: number; eggsBroken: number;
   feedItemId: number | null; feedKg: number | null; feedDocumentId: number | null; weightBirds: number | null; weightKg: number | null; notes: string | null;
   headsAtEnd: number; warnings: string[]; version?: string; lines?: DayLineView[] };
+/** A saved day in the day-wise list, with what was recorded for each variety. */
+export type DayRecordLine = { lineId: number; species: string; variety: string | null; deaths: number; culls: number; eggs: number; eggRate: number | null };
+export type DayRecord = { day: string; deaths: number; culls: number; eggsGood: number; eggsCracked: number; eggsBroken: number; feedKg: number | null; notes: string | null; lines: DayRecordLine[] };
 export type Figures = { from: string; to: string; openingHeads: number; closingHeads: number; arrived: number; born: number; died: number; culled: number;
   sold: number; movedOut: number; soldKg: number; headDays: number; eggsGood: number; eggsCracked: number; eggsBroken: number; eggs: number;
   henDayPercent: number | null; feedKg: number; feedPerDozen: number | null; mortalityPercent: number | null; averageWeight: number | null; fcr: number | null;

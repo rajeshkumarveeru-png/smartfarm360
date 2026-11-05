@@ -1,8 +1,11 @@
+import { useEffect, useState } from 'react';
 import { Bird, Egg, Skull, Tag, Wheat, Wallet } from 'lucide-react';
-import { InsightList, InsightModal, type InsightRow, type SummaryTile, type Tone } from '../components/InsightModal';
+import { api } from '../api/client';
+import { InsightList, InsightModal, InsightState, type InsightRow, type SummaryTile, type Tone } from '../components/InsightModal';
 import { currentLanguage, useNs } from '../i18n';
-import { formatMoney, formatNumber } from '../lib/format';
-import type { Figures, VarietyFigures } from './types';
+import { describeError } from '../lib/errors';
+import { formatDate, formatMoney, formatNumber } from '../lib/format';
+import type { DayRecord, Figures, VarietyFigures } from './types';
 
 export type InsightKind = 'heads' | 'died' | 'sold' | 'born' | 'eggs' | 'feed' | 'profit' | 'cost' | 'eggValue' | 'profitWithEggs';
 
@@ -10,10 +13,21 @@ const TONE: Record<InsightKind, Tone> = { heads: 'emerald', died: 'sky', sold: '
 const ICON: Record<InsightKind, React.ReactNode> = { heads: <Bird size={22} />, died: <Skull size={22} />, sold: <Tag size={22} />, born: <Bird size={22} />, eggs: <Egg size={22} />,
   feed: <Wheat size={22} />, profit: <Wallet size={22} />, cost: <Wallet size={22} />, eggValue: <Egg size={22} />, profitWithEggs: <Wallet size={22} /> };
 
+/** The figures whose variety rows open that variety's days: what the daily record holds. */
+const DAILY: InsightKind[] = ['heads', 'died', 'eggs', 'eggValue'];
+
 /** The pop-up behind a figure of a batch or herd: that figure for each variety, with what is only known for the whole batch said plainly. */
-export default function VarietyInsight({ kind, f, label, period, poultry, layers, onClose }: {
-  kind: InsightKind; f: Figures; label: string; period: string; poultry: boolean; layers: boolean; onClose: () => void;
+export default function VarietyInsight({ kind, f, label, period, poultry, layers, showMoney, flock, onClose }: {
+  kind: InsightKind; f: Figures; label: string; period: string; poultry: boolean; layers: boolean; showMoney: boolean; flock: string; onClose: () => void;
 }) {
+  const [variety, setVariety] = useState<VarietyFigures | null>(null);
+  const [days, setDays] = useState<DayRecord[] | null>(null);
+  const [failed, setFailed] = useState('');
+  const drills = poultry && DAILY.includes(kind);
+  useEffect(() => {
+    if (!variety || days) return;
+    api<DayRecord[]>(`${flock}/days?from=${f.from}&to=${f.to}`).then(d => setDays(d ?? [])).catch(e => setFailed(describeError(e)));
+  }, [variety, days, flock, f.from, f.to]);
   const t = useNs('livestock');
   const tf = useNs('fin');
   const lang = currentLanguage();
@@ -24,8 +38,28 @@ export default function VarietyInsight({ kind, f, label, period, poultry, layers
   const percent = (part: number, whole: number) => (whole > 0 ? part * 100 / whole : null);
   const share = (part: number, whole: number) => (whole > 0 ? part * 100 / whole : 0);
   const active = (f.varieties ?? []).filter(v => v.openingHeads || v.closingHeads || v.arrived || v.born || v.died || v.culled || v.sold || v.movedOut || v.eggs);
-  const row = (v: VarietyFigures, value: string, sub: string, bar?: number): InsightRow => ({ key: v.lineId, title: name(v), badge: v.variety ? species(v) : undefined, value, sub, share: bar });
+  const row = (v: VarietyFigures, value: string, sub: string, bar?: number): InsightRow => ({ key: v.lineId, title: name(v), badge: v.variety ? species(v) : undefined, value, sub, share: bar,
+    onClick: drills ? () => setVariety(v) : undefined });
   const total = (pick: (v: VarietyFigures) => number) => active.reduce((s, v) => s + pick(v), 0);
+
+  if (variety) {
+    const mine = (days ?? []).flatMap(d => d.lines.filter(l => l.lineId === variety.lineId).map(l => ({ day: d.day, ...l })));
+    const add = (pick: (l: typeof mine[number]) => number) => mine.reduce((s, l) => s + pick(l), 0);
+    const worth = (l: typeof mine[number]) => (l.eggRate == null ? 0 : l.eggs * l.eggRate);
+    return (
+      <InsightModal tone={TONE[kind]} icon={ICON[kind]} eyebrow={t('insDayWise')} title={name(variety)} subtitle={period} onClose={onClose}
+        summary={days ? [...(layers ? [{ label: t('eggsLaid'), value: n(add(l => l.eggs)) }] : []), { label: t('deaths'), value: n(add(l => l.deaths)) }, { label: t('culls'), value: n(add(l => l.culls)) },
+          ...(layers && showMoney ? [{ label: t('dayValue'), value: m(add(worth)) }] : [])] : undefined}
+        footer={<button type="button" className="secondary" onClick={() => setVariety(null)}>{t('insBack')}</button>}>
+        {failed ? <InsightState kind="error" text={failed} /> : !days ? <InsightState kind="loading" text={t('insLoading')} />
+          : <InsightList empty={t('insNoDays')} rows={mine.map(l => ({ key: l.day, title: formatDate(l.day, lang), avatar: l.day.slice(8),
+            value: layers ? t('insEggCount', { eggs: n(l.eggs) }) : undefined,
+            sub: [`${t('deaths')} ${n(l.deaths)}`, `${t('culls')} ${n(l.culls)}`, ...(layers && l.eggRate != null ? [`${t('eggRate')} ${m(l.eggRate)}`] : []),
+              ...(layers && showMoney && l.eggRate != null ? [`${t('dayValue')} ${m(worth(l))}`] : [])].join(' · ') }))} />}
+        {days && <p className="hint variety-note">{t('insDayNote')}</p>}
+      </InsightModal>
+    );
+  }
 
   let summary: SummaryTile[] = [];
   let rows: InsightRow[] = [];
@@ -84,6 +118,7 @@ export default function VarietyInsight({ kind, f, label, period, poultry, layers
   return (
     <InsightModal tone={TONE[kind]} icon={ICON[kind]} eyebrow={t('insByVariety')} title={label} subtitle={period} summary={summary} onClose={onClose}>
       <InsightList rows={rows} empty={t('insNoVarieties')} />
+      {drills && active.length > 0 && <p className="hint variety-note">{t('insDrillHint')}</p>}
       {note && <p className="hint variety-note">{note}</p>}
     </InsightModal>
   );

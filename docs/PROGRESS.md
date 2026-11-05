@@ -2136,6 +2136,27 @@ BizManager, and clicking a batch's figure should show it by variety.
 | `mobile: npx tsc --noEmit`, `npm test` | Passed: **76 tests** |
 | Layout | Checked with the same markup and the app's stylesheets on the sign-in page. **Not checked signed in**, which needs the owner's password. The pop-ups were checked by the web tests only |
 
+### Save confirmation and day-wise records (2026-11-05)
+
+The owner got no sign that a save had worked, and could not see Sonali and the ducks day by day.
+
+- **Toast:** the batch page's messages were written at the top of the page, out of sight from the Save button. Every
+  save on the batch page now shows a toast (`components/Toast.tsx`). An error scrolls its banner into view. Other pages
+  still show their messages as before, and no other page has a toast yet.
+- **Day-wise records:** the *Daily record* tab lists the days of a period under the form, a row per variety, with a
+  filter by variety and totals. Clicking a date opens that day in the form to correct it. Days saved as batch totals
+  show as *Whole batch*.
+- **Pop-ups:** in *Opening heads*, *Died*, *Eggs* and *Eggs at your rates*, clicking a variety shows it day by day.
+- **API:** `GET /flocks/{groupId}/days?from&to`. No migration.
+
+| Command | Result |
+|---|---|
+| `backend: gradlew test bootJar` | **863 passed, 1 failed** in the full run: my new test expected 403 for a non-member, but `TenantContextInterceptor` answers 404 by design. After correcting that expectation, `FlockVarietiesTest` passed (6 tests) and `bootJar` built. The full suite was not run again, since only that test line changed |
+| `frontend: npm run lint`, `npx tsc --noEmit`, `npm run build` | Passed |
+| `frontend: npm test` | Passed: **116 tests**. New tests: the toast; the list, its filter and opening a day; a variety day by day in a pop-up |
+| `mobile: npx tsc --noEmit`, `npm test` | Passed: **76 tests** |
+| Browser | **Not checked signed in**, which needs the owner's password |
+
 ## Known gaps and defects
 
 Security and platform:

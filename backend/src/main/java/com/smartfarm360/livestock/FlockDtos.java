@@ -115,6 +115,11 @@ public final class FlockDtos {
                            BigDecimal feedKg, Long feedDocumentId, Integer weightBirds, BigDecimal weightKg, String notes, int headsAtEnd,
                            List<String> warnings, String version, List<DayLineView> lines) {}
 
+    /** A saved day for the day-wise list: its totals and what was recorded for each variety. */
+    public record DayRecord(LocalDate day, int deaths, int culls, int eggsGood, int eggsCracked, int eggsBroken, BigDecimal feedKg, String notes, List<DayRecordLine> lines) {}
+
+    public record DayRecordLine(long lineId, String species, String variety, int deaths, int culls, int eggs, BigDecimal eggRate) {}
+
     // ---- Eggs (J5) ----
 
     public record EggUseRequest(@NotNull LocalDate date, @PositiveOrZero @Max(10_000_000) Integer homeUse, @PositiveOrZero @Max(10_000_000) Integer damaged,

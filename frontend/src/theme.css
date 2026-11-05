@@ -983,3 +983,14 @@ button.im-row:focus-visible, a.im-row:focus-visible { outline: 2px solid var(--t
 .day-chip.on { background: var(--sf-brand-100); border-color: var(--sf-brand-200); color: var(--sf-brand-700); }
 .day-prefilled { padding: 8px 12px; background: var(--sf-info-bg); border: 1px solid var(--sf-info-line); border-radius: var(--sf-r-sm); color: var(--sf-info); }
 .variety-note { margin: 12px 0 0; }
+.day-records-filter { margin-bottom: 12px; }
+.day-open { font-weight: 600; white-space: nowrap; }
+.data-table tfoot th { background: var(--sf-surface-2); font-variant-numeric: tabular-nums; }
+.toast { position: fixed; top: 84px; right: 24px; z-index: 1000; display: flex; align-items: center; gap: 10px; max-width: min(440px, calc(100vw - 32px)); padding: 12px 14px; background: var(--sf-brand-800); color: #fff; border-radius: var(--sf-r-md); box-shadow: var(--sf-shadow-lg); font-size: var(--sf-fs-md); font-weight: 500; animation: toast-in var(--sf-slow) var(--sf-ease); }
+.toast svg { flex: none; color: var(--sf-accent); }
+.toast-close { display: inline-flex; flex: none; padding: 4px; border: 0; border-radius: var(--sf-r-xs); background: transparent; color: #fff; cursor: pointer; }
+.toast-close svg { color: inherit; }
+.toast-close:hover { background: rgb(255 255 255 / 15%); }
+@keyframes toast-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+@media (max-width: 600px) { .toast { top: auto; bottom: 16px; left: 16px; right: 16px; max-width: none; } }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }

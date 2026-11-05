@@ -2804,7 +2804,20 @@
     "insMoneyEggsSub": "Bought {{bought}} · Sold {{sold}} · Eggs {{eggs}}",
     "insShared": "Feed and other items of the whole batch",
     "insSharedSub": "Not split by variety",
-    "insProfitNote": "A variety's row is what its birds cost and sold for. Together with the whole-batch row, the rows add up to the batch's figure."
+    "insProfitNote": "A variety's row is what its birds cost and sold for. Together with the whole-batch row, the rows add up to the batch's figure.",
+    "dayRecords": "Day-wise records",
+    "dayRecordsHelp": "Click a date to open that day above and correct it. Head changes entered on the Birds tab are listed there.",
+    "allVarieties": "All varieties",
+    "wholeBatch": "Whole batch",
+    "noDayRecords": "No daily records in this period.",
+    "dayValue": "Value",
+    "dayTotal": "Total",
+    "insDayWise": "Day by day",
+    "insBack": "Back to all varieties",
+    "insLoading": "Loading the days…",
+    "insNoDays": "No daily records for this variety in this period.",
+    "insDrillHint": "Click a variety to see it day by day.",
+    "insDayNote": "From the daily records. Head changes entered on the Birds tab are listed there."
   },
   "aquaculture": {
     "title": "Fish farming",
