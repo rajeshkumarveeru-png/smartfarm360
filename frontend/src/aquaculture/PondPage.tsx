@@ -100,7 +100,7 @@ export default function PondPage() {
 
       <h3 className="section-space">{t('crops')}</h3>
       {cycles.length === 0 ? <p className="hint">{t('noCycles')}</p> : (
-        <table className="data-table">
+        <div className="table-scroll"><table className="data-table">
           <thead><tr><th>{t('cycle')}</th><th>{t('statusLabel')}</th><th>{t('stocked')}</th><th>{t('harvested')}</th></tr></thead>
           <tbody>{cycles.map(c => (
             <tr key={c.id}>
@@ -108,7 +108,7 @@ export default function PondPage() {
               <td>{c.stockedOn ? formatDate(c.stockedOn, lang) : '—'}</td><td>{c.harvestedOn ? formatDate(c.harvestedOn, lang) : '—'}</td>
             </tr>
           ))}</tbody>
-        </table>
+        </table></div>
       )}
       {canWrite && pond.active && !pond.openCycle && (
         <form className="form-card form-grid" noValidate onSubmit={e => void startCycle(e)}>

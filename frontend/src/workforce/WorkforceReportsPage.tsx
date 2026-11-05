@@ -38,14 +38,14 @@ export default function WorkforceReportsPage() {
       <p className="hint">{tf('actualFigures')}</p>
       <h3>{t('labourByActivity')}</h3>
       {!labour ? <Loading /> : labour.rows.length === 0 ? <p className="hint">{t('noLabour')}</p> : (
-        <table className="data-table report">
+        <div className="table-scroll"><table className="data-table report">
           <thead><tr><th>{tf('activity')}</th><th className="num">{t('days')}</th><th className="num">{t('cost')}</th></tr></thead>
           <tbody>
             {labour.rows.map(r => <tr key={r.costObjectId}><td>{r.kind === 'OVERHEAD' ? tf('overhead') : r.name}</td>
               <td className="num">{formatNumber(r.days, lang, 1)}</td><td className="num">{formatMoney(r.cost, lang)}</td></tr>)}
             <tr className="total"><td colSpan={2}>{t('total')}</td><td className="num">{formatMoney(labour.totalCost, lang)}</td></tr>
           </tbody>
-        </table>
+        </table></div>
       )}
       <h3 className="section-space">{t('musterSummary')}</h3>
       {!sheet ? <Loading /> : sheet.workers.length === 0 ? <p className="hint">{t('noWorkers')}</p> : (

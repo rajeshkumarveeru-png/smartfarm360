@@ -42,7 +42,7 @@ export default function GroupsPage() {
         </form>
       )}
       {groups.length === 0 ? <p className="hint">{t('noGroups')}</p> : (
-        <table className="data-table">
+        <div className="table-scroll"><table className="data-table">
           <thead><tr><th>{t('groupName')}</th><th>{t('purposeLabel')}</th><th className="num">{t('animals')}</th><th /></tr></thead>
           <tbody>{groups.map(g => (
             <tr key={g.id}>
@@ -51,7 +51,7 @@ export default function GroupsPage() {
                 {g.active ? t('closeGroup') : t('reopenGroup')}</button>}</td>
             </tr>
           ))}</tbody>
-        </table>
+        </table></div>
       )}
       <CollectManure />
     </>

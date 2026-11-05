@@ -131,7 +131,7 @@ export default function BatchPage() {
         </form>
       )}
       {steps.length === 0 ? <p className="hint">{t('noSteps')}</p> : (
-        <table className="data-table">
+        <div className="table-scroll"><table className="data-table">
           <thead><tr><th>{t('date')}</th><th>{t('stepLabel')}</th><th className="num">{t('kgIn')}</th><th className="num">{t('kgOut')}</th><th className="num">{t('stepLoss')}</th>
             <th>{t('details')}</th><th /></tr></thead>
           <tbody>{steps.map(s => (
@@ -146,12 +146,12 @@ export default function BatchPage() {
                 <Trash2 size={16} aria-hidden /></button>}</td>
             </tr>
           ))}</tbody>
-        </table>
+        </table></div>
       )}
 
       <h3 className="section-space">{t('outputs')}</h3>
       {outputs.length > 0 && (
-        <table className="data-table">
+        <div className="table-scroll"><table className="data-table">
           <thead><tr><th>{t('date')}</th><th>{t('roleLabel')}</th><th>{t('item')}</th><th className="num">{t('quantity')}</th><th>{t('lot')}</th><th /></tr></thead>
           <tbody>{outputs.map(o => (
             <tr key={o.id} className={o.reversed ? 'muted' : undefined}>
@@ -164,7 +164,7 @@ export default function BatchPage() {
                 <Trash2 size={16} aria-hidden /></button>}</td>
             </tr>
           ))}</tbody>
-        </table>
+        </table></div>
       )}
       {open && (
         <form className="form-card form-grid" noValidate onSubmit={e => {

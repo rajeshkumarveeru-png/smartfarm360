@@ -81,11 +81,11 @@ export function WagesReportPage() {
           )}
           <h3>{tw('labourByActivity')}</h3>
           {data.byCrop.rows.length === 0 ? <p className="hint">{tw('noLabour')}</p> : (
-            <table className="data-table report">
+            <div className="table-scroll"><table className="data-table report">
               <thead><tr><th>{tf('activity')}</th><th className="num">{tw('days')}</th>{data.amountsShown && <th className="num">{tw('cost')}</th>}</tr></thead>
               <tbody>{data.byCrop.rows.map(r => <tr key={r.costObjectId}><td>{r.kind === 'OVERHEAD' ? tf('overhead') : r.name}</td>
                 <td className="num">{formatNumber(r.days, lang, 1)}</td>{data.amountsShown && <td className="num">{money(r.cost, lang)}</td>}</tr>)}</tbody>
-            </table>
+            </table></div>
           )}
         </>
       )}

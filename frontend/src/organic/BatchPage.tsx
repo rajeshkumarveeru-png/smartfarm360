@@ -131,7 +131,7 @@ export default function BatchPage() {
         </form>
       )}
       {logs.length === 0 ? <p className="hint">{t('noLog')}</p> : (
-        <table className="data-table">
+        <div className="table-scroll"><table className="data-table">
           <thead><tr><th>{t('date')}</th><th>{t('whatWasDone')}</th><th>{t('details')}</th><th /></tr></thead>
           <tbody>{logs.map(l => (
             <tr key={l.id}>
@@ -143,12 +143,12 @@ export default function BatchPage() {
                 <Trash2 size={16} aria-hidden /></button>}</td>
             </tr>
           ))}</tbody>
-        </table>
+        </table></div>
       )}
 
       <h3 className="section-space">{t('outputs')}</h3>
       {outputs.length > 0 && (
-        <table className="data-table">
+        <div className="table-scroll"><table className="data-table">
           <thead><tr><th>{t('date')}</th><th>{t('item')}</th><th className="num">{t('quantity')}</th></tr></thead>
           <tbody>{outputs.map(o => (
             <tr key={o.documentId} className={o.reversed ? 'muted' : undefined}>
@@ -156,7 +156,7 @@ export default function BatchPage() {
               <td>{o.itemName}</td><td className="num">{formatNumber(o.quantity, lang, 3)} {o.unit}</td>
             </tr>
           ))}</tbody>
-        </table>
+        </table></div>
       )}
       {open && canStock && (
         <form className="form-card form-grid" noValidate onSubmit={e => {

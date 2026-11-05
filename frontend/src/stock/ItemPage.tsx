@@ -132,13 +132,13 @@ export default function ItemPage() {
         <>
           <h3>{t('lots')}</h3>
           {lots.length === 0 ? <p className="hint">{t('noLots')}</p> : (
-            <table className="data-table">
+            <div className="table-scroll"><table className="data-table">
               <thead><tr><th>{t('lot')}</th><th>{t('expiry')}</th><th>{t('received')}</th><th className="num">{t('quantity')}</th></tr></thead>
               <tbody>{lots.map(l => (
                 <tr key={l.id}><td>{l.lotNo}</td><td>{l.expiryDate ? formatDate(l.expiryDate, lang) : '—'}{l.expired && <small className="low-stock-label"> · {t('expired')}</small>}</td>
                   <td>{formatDate(l.receivedOn, lang)}</td><td className="num">{formatNumber(l.quantity, lang, 4)}</td></tr>
               ))}</tbody>
-            </table>
+            </table></div>
           )}
         </>
       )}

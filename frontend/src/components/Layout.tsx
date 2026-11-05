@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Bird, ChartColumn, Factory, PawPrint, Fish, HardHat, LayoutDashboard, Leaf, LogOut, Map as MapIcon, Milk, Package, ScrollText, Settings, ShieldCheck, Sprout,
   Tractor, UserRound, UsersRound, Wallet, type LucideIcon } from 'lucide-react';
@@ -12,6 +12,7 @@ import { can, visibleNav } from '../lib/nav';
 import { LanguageToggle } from './common';
 import { livestockSection } from '../livestock/LivestockLayout';
 import { BillingBanner } from '../pages/BillingPanel';
+import { ErrorBoundary } from './ErrorBoundary';
 
 /** Announcements and maintenance notices from the platform, in the user's language (O8). */
 export function AnnouncementBanner() {
@@ -33,6 +34,12 @@ export default function Layout() {
   const tenant = useCurrentTenant();
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const pageRef = useRef<HTMLDivElement>(null);
+  // Each page fades in. Animating the element keeps the page mounted, so this reloads nothing
+  useEffect(() => {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    pageRef.current?.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 240, easing: 'ease-out' });
+  }, [pathname]);
   // Poultry and goat pages live under /livestock: there their own entry is the active one, not cows and dairy
   const inOtherAnimals = pathname.includes('/livestock') && livestockSection(pathname) !== 'cattle';
   const items = visibleNav(tenant);
@@ -91,7 +98,7 @@ export default function Layout() {
         {tenant && !tenant.active && (
           <div className="error-banner" role="alert">{t('tenant.suspended')}{tenant.suspendedReason ? ` ${t('tenant.suspendedReason', { reason: tenant.suspendedReason })}` : ''}</div>
         )}
-        <Outlet />
+        <div ref={pageRef}><ErrorBoundary resetKey={pathname}><Outlet /></ErrorBoundary></div>
       </main>
     </div>
   );

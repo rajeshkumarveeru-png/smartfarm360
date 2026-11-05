@@ -90,7 +90,7 @@ export default function DocumentPage() {
       </dl>
 
       {doc.lines.length > 0 && (
-        <table className="data-table">
+        <div className="table-scroll"><table className="data-table">
           <thead><tr><th>{t('category')}</th><th>{t('description')}</th><th>{t('quantity')}</th><th>{t('activity')}</th><th className="num">{t('amount')}</th></tr></thead>
           <tbody>
             {doc.lines.map(l => (
@@ -103,13 +103,13 @@ export default function DocumentPage() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
 
       {doc.movements.length > 0 && (
         <>
           <h3>{ts('stockMovements')}</h3>
-          <table className="data-table">
+          <div className="table-scroll"><table className="data-table">
             <thead><tr><th>{ts('item')}</th><th>{ts('where')}</th><th>{ts('movementLabel')}</th><th className="num">{ts('quantity')}</th><th className="num">{ts('value')}</th></tr></thead>
             <tbody>
               {doc.movements.map(m => (
@@ -122,7 +122,7 @@ export default function DocumentPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </>
       )}
 

@@ -91,7 +91,7 @@ export function LimitsEditor({ pondId }: { pondId: number | null }) {
       <p className="hint">{t(pondId == null ? 'limitsHelp' : 'pondLimitsHelp')}</p>
       <ErrorBanner message={error} />
       <Toast message={message} onClose={() => setMessage('')} />
-      <table className="data-table">
+      <div className="table-scroll"><table className="data-table">
         <thead><tr><th>{t('parameterLabel')}</th><th>{t('lowest')}</th><th>{t('highest')}</th>{pondId != null && <th>{t('farmDefault')}</th>}</tr></thead>
         <tbody>{PARAMETERS.map(p => {
           const d = fallback(p);
@@ -106,7 +106,7 @@ export function LimitsEditor({ pondId }: { pondId: number | null }) {
             </tr>
           );
         })}</tbody>
-      </table>
+      </table></div>
       {canWrite && <div className="form-actions"><button className="secondary">{t('saveLimits')}</button></div>}
     </form>
   );

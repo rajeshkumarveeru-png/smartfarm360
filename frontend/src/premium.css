@@ -1,0 +1,280 @@
+/*
+ * SmartFarm360 premium layer (2026-11-05). Loaded after theme.css and only restyles shared classes, so every screen gets it
+ * without changing its markup or behaviour.
+ *
+ * Three ideas run through it:
+ *  - glass: translucent surfaces with a lit top edge, over a soft backdrop that drifts slowly;
+ *  - glass flash: a band of light that crosses a card or button once when the pointer arrives;
+ *  - light trace: a point of light that runs around a card's border while the pointer is on it.
+ * Movement stays small, needs a real pointer (hover: hover), and stops for prefers-reduced-motion.
+ */
+
+@property --sf-trace { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+
+:root {
+  --sf-glass: rgb(255 255 255 / 68%);
+  --sf-glass-strong: rgb(255 255 255 / 86%);
+  --sf-glass-edge: rgb(255 255 255 / 92%);
+  --sf-glass-line: rgb(255 255 255 / 75%);
+  --sf-glass-blur: blur(18px) saturate(1.6);
+  --sf-lit: 0 1px 0 rgb(255 255 255 / 95%) inset, 0 -1px 0 rgb(16 32 24 / 3%) inset;
+  --sf-lift-1: var(--sf-lit), 0 1px 2px rgb(16 32 24 / 4%), 0 12px 32px -18px rgb(16 32 24 / 22%);
+  --sf-lift-2: var(--sf-lit), 0 2px 4px rgb(16 32 24 / 5%), 0 26px 50px -22px rgb(16 32 24 / 34%);
+  --sf-spring: cubic-bezier(.2, .9, .25, 1.1);
+  --sf-flash: linear-gradient(112deg, transparent 38%, rgb(255 255 255 / 75%) 50%, transparent 62%);
+  --sf-grad-brand: linear-gradient(135deg, #2f9e62 0%, #1f7a4d 48%, #0f766e 100%);
+  --sf-grad-brand-hover: linear-gradient(135deg, #2a9159 0%, #1a6b43 48%, #0c6660 100%);
+}
+
+/* ---- Backdrop: a slow aurora behind everything ---------------------------------------------------------------- */
+body { background: transparent; }
+body::before {
+  content: ''; position: fixed; inset: -12vmax; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(38vmax 30vmax at 82% 8%, rgb(56 189 248 / 20%), transparent 70%),
+    radial-gradient(44vmax 34vmax at 26% 2%, rgb(163 230 53 / 22%), transparent 70%),
+    radial-gradient(36vmax 30vmax at 96% 92%, rgb(167 139 250 / 18%), transparent 70%),
+    radial-gradient(40vmax 30vmax at 6% 96%, rgb(251 191 36 / 16%), transparent 70%),
+    radial-gradient(30vmax 26vmax at 52% 54%, rgb(45 212 191 / 9%), transparent 70%);
+  animation: sf-aurora 42s ease-in-out infinite alternate;
+  will-change: transform;
+}
+@keyframes sf-aurora { from { transform: translate3d(-1.5%, -1%, 0) scale(1); } to { transform: translate3d(1.5%, 1.5%, 0) scale(1.05); } }
+
+/* ---- Type ----------------------------------------------------------------------------------------------------- */
+:root { font-feature-settings: 'cv11', 'ss03', 'tnum' 0; }
+h1, h2, h3 { text-wrap: balance; }
+h3.section-space { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 700; letter-spacing: -.015em; }
+h3.section-space::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgb(16 32 24 / 12%), transparent); }
+.hint { line-height: 1.55; }
+code { padding: 1px 6px; border-radius: var(--sf-r-xs); background: rgb(16 32 24 / 6%); font-size: .92em; }
+
+/* ---- Surfaces ------------------------------------------------------------------------------------------------- */
+.form-card, .panel, .db-card, .crop-controls, .fw-hero {
+  background-color: var(--sf-glass); backdrop-filter: var(--sf-glass-blur); -webkit-backdrop-filter: var(--sf-glass-blur);
+  border: 1px solid var(--sf-glass-line); box-shadow: var(--sf-lift-1);
+  transition: box-shadow var(--sf-slow) var(--sf-ease), border-color var(--sf-slow) var(--sf-ease);
+}
+/* The form being filled in comes forward */
+.form-card:focus-within { box-shadow: var(--sf-lift-2), 0 0 0 1px rgb(79 163 106 / 22%); }
+.form-card label { transition: color var(--sf-base) var(--sf-ease); }
+.form-card label:focus-within { color: var(--sf-brand-600); }
+
+/* Cards that respond to the pointer: the flash and the trace need no extra elements, only background layers */
+.cycle-card, .crop-record, .activity-row, .parcel-row, .tenant-card, .farm-card, .variety-card {
+  --sf-fill: linear-gradient(180deg, rgb(255 255 255 / 86%), rgb(255 255 255 / 66%));
+  border: 1px solid transparent;
+  background:
+    var(--sf-flash) padding-box no-repeat,
+    var(--sf-fill) padding-box,
+    linear-gradient(180deg, var(--sf-glass-edge), rgb(16 32 24 / 8%)) border-box;
+  background-size: 280% 100%, 100% 100%, 100% 100%;
+  background-position: 130% 0, 0 0, 0 0;
+  backdrop-filter: var(--sf-glass-blur); -webkit-backdrop-filter: var(--sf-glass-blur);
+  box-shadow: var(--sf-lift-1);
+}
+.finance-stats > .finance-stat {
+  --sf-fill: linear-gradient(150deg, rgb(var(--tint) / 15%), rgb(255 255 255 / 78%) 58%);
+  border: 1px solid transparent;
+  background:
+    var(--sf-flash) padding-box no-repeat,
+    var(--sf-fill) padding-box,
+    linear-gradient(rgb(255 255 255 / 58%), rgb(255 255 255 / 58%)) padding-box,
+    linear-gradient(170deg, var(--sf-glass-edge), rgb(var(--tint) / 34%)) border-box;
+  background-size: 280% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 130% 0, 0 0, 0 0, 0 0;
+  box-shadow: var(--sf-lit), 0 1px 2px rgb(16 32 24 / 4%), 0 14px 30px -20px rgb(var(--tint) / 60%);
+}
+.finance-stats > .finance-stat b { font-size: 25px; font-weight: 750; letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+.finance-stats > .finance-stat::before { width: 3px; }
+
+@media (hover: hover) {
+  .cycle-card:hover, .crop-record:hover, a.activity-row:hover, .activity-row.record-link:hover, .tenant-card:hover, .farm-card:hover, .variety-card:hover {
+    background-position: -30% 0, 0 0, 0 0;
+    transition: background-position .85s var(--sf-ease), box-shadow var(--sf-base) var(--sf-ease), transform var(--sf-base) var(--sf-spring);
+    transform: translateY(-3px); box-shadow: var(--sf-lift-2);
+    border-color: transparent;
+  }
+  .parcel-row:hover, .activity-row:hover { background-position: -30% 0, 0 0, 0 0; transition: background-position .85s var(--sf-ease), box-shadow var(--sf-base) var(--sf-ease); box-shadow: var(--sf-lift-2); }
+  .finance-stats > button.finance-stat:hover, .finance-stats > a.finance-stat:hover {
+    --sf-trace-color: rgb(var(--tint));
+    background:
+      var(--sf-flash) padding-box no-repeat,
+      var(--sf-fill) padding-box,
+      linear-gradient(rgb(255 255 255 / 80%), rgb(255 255 255 / 80%)) padding-box,
+      conic-gradient(from var(--sf-trace), transparent 0 62%, rgb(var(--tint) / 35%) 78%, var(--sf-trace-color) 96%, #fff 100%) border-box,
+      linear-gradient(rgb(var(--tint) / 25%), rgb(var(--tint) / 25%)) border-box;
+    background-size: 280% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+    background-position: -30% 0, 0 0, 0 0, 0 0, 0 0;
+    border-color: transparent;
+    transform: translateY(-4px); box-shadow: var(--sf-lit), 0 3px 6px rgb(16 32 24 / 5%), 0 26px 44px -22px rgb(var(--tint) / 75%);
+    transition: background-position .85s var(--sf-ease), box-shadow var(--sf-base) var(--sf-ease), transform var(--sf-base) var(--sf-spring);
+    animation: sf-trace 2.6s linear infinite;
+  }
+}
+@keyframes sf-trace { to { --sf-trace: 360deg; } }
+button.finance-stat:active, a.finance-stat:active, .cycle-card:active, .farm-card:active, .tenant-card:active { transform: translateY(-1px) scale(.992); }
+
+/* Figures and cards arrive one after another. Only "backwards": a kept end state would override the hover lift */
+.finance-stats > *, .db-card, .cycle-card, .farm-card, .variety-card, .pnl-card { animation: sf-rise .46s var(--sf-ease) backwards; }
+.finance-stats > :nth-child(2), .cycle-card:nth-child(2), .farm-card:nth-child(2), .variety-card:nth-child(2) { animation-delay: 40ms; }
+.finance-stats > :nth-child(3), .cycle-card:nth-child(3), .farm-card:nth-child(3), .variety-card:nth-child(3) { animation-delay: 80ms; }
+.finance-stats > :nth-child(4), .cycle-card:nth-child(4), .farm-card:nth-child(4), .variety-card:nth-child(4) { animation-delay: 120ms; }
+.finance-stats > :nth-child(n + 5), .cycle-card:nth-child(n + 5), .farm-card:nth-child(n + 5), .variety-card:nth-child(n + 5) { animation-delay: 160ms; }
+@keyframes sf-rise { from { opacity: 0; transform: translateY(10px); } }
+/* The hover animation above replaces the entrance while the pointer is on a figure */
+
+/* ---- Buttons -------------------------------------------------------------------------------------------------- */
+.primary { position: relative; overflow: hidden; isolation: isolate; background: var(--sf-grad-brand); box-shadow: 0 1px 0 rgb(255 255 255 / 28%) inset, 0 -1px 0 rgb(0 0 0 / 10%) inset, 0 8px 18px -8px rgb(15 118 110 / 62%); font-weight: 650; }
+.primary::after {
+  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(112deg, transparent 35%, rgb(255 255 255 / 42%) 50%, transparent 65%); transform: translateX(-110%);
+}
+.primary:hover { background: var(--sf-grad-brand-hover); box-shadow: 0 1px 0 rgb(255 255 255 / 28%) inset, 0 -1px 0 rgb(0 0 0 / 10%) inset, 0 14px 26px -10px rgb(15 118 110 / 72%); }
+@media (hover: hover) { .primary:hover::after { transform: translateX(110%); transition: transform .75s var(--sf-ease); } }
+.primary:active { transform: translateY(0) scale(.97); }
+.secondary { background: var(--sf-glass-strong); border-color: rgb(16 32 24 / 10%); box-shadow: var(--sf-lit), 0 1px 2px rgb(16 32 24 / 5%); }
+.secondary:hover { background: #fff; border-color: var(--sf-brand-400); color: var(--sf-brand-700); box-shadow: var(--sf-lit), 0 8px 18px -10px rgb(47 133 80 / 45%); }
+.danger { box-shadow: 0 1px 2px rgb(16 32 24 / 5%); }
+.danger:hover { box-shadow: 0 10px 20px -10px rgb(178 59 43 / 70%); }
+.icon-button:active, .rp-btn:active, .toast-close:active { transform: scale(.9); }
+.day-chip { transition: border-color var(--sf-base) var(--sf-ease), background-color var(--sf-base) var(--sf-ease), transform var(--sf-fast) var(--sf-ease); }
+.day-chip:active { transform: scale(.95); }
+
+/* ---- Fields --------------------------------------------------------------------------------------------------- */
+:is(input:not([type=checkbox], [type=radio], [type=range], [type=file], [type=color]), select, textarea) {
+  background-color: rgb(255 255 255 / 76%); border-color: rgb(16 32 24 / 12%);
+  box-shadow: 0 1px 2px rgb(16 32 24 / 6%) inset, 0 1px 0 rgb(255 255 255 / 80%);
+  transition: border-color var(--sf-base) var(--sf-ease), box-shadow var(--sf-base) var(--sf-ease), background-color var(--sf-base) var(--sf-ease);
+}
+:is(input:not([type=checkbox], [type=radio], [type=range], [type=file], [type=color]), select, textarea):hover:not(:disabled, :focus) { border-color: rgb(47 133 80 / 45%); background-color: #fff; }
+
+/* ---- Tabs: one look, including the Billing and Platform pages -------------------------------------------------- */
+.tabs {
+  display: inline-flex; flex-wrap: wrap; max-width: 100%; gap: 4px; padding: 5px; margin-bottom: 18px; border: 1px solid var(--sf-glass-line); border-radius: 14px;
+  background: var(--sf-glass); backdrop-filter: var(--sf-glass-blur); -webkit-backdrop-filter: var(--sf-glass-blur); box-shadow: var(--sf-lit), 0 8px 22px -14px rgb(16 32 24 / 28%);
+}
+.tabs .tab {
+  border: 0; border-radius: 10px; padding: 9px 16px; background: transparent; color: var(--sf-text-2); font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer;
+  transition: background-color var(--sf-base) var(--sf-ease), color var(--sf-base) var(--sf-ease), transform var(--sf-fast) var(--sf-ease);
+}
+.tabs .tab:hover { background: rgb(255 255 255 / 85%); color: var(--sf-text); }
+.tabs .tab.active, .crop-tabs a.active, .crop-tabs button.active { color: #fff; background: var(--sf-grad-brand); box-shadow: 0 1px 0 rgb(255 255 255 / 28%) inset, 0 8px 16px -8px rgb(15 118 110 / 62%); }
+.crop-tabs a, .crop-tabs button { transition: background-color var(--sf-base) var(--sf-ease), color var(--sf-base) var(--sf-ease), box-shadow var(--sf-base) var(--sf-ease), transform var(--sf-fast) var(--sf-ease); }
+.tabs .tab:active, .crop-tabs a:active, .crop-tabs button:active { transform: scale(.97); }
+
+/* ---- Tables --------------------------------------------------------------------------------------------------- */
+.data-table { background: var(--sf-glass-strong); border-color: var(--sf-glass-line); box-shadow: var(--sf-lift-1); overflow: hidden; }
+.data-table th { background: linear-gradient(180deg, rgb(238 246 236 / 95%), rgb(230 241 228 / 95%)); color: var(--sf-brand-700); border-bottom-color: rgb(47 133 80 / 18%); }
+.data-table tbody tr:nth-child(even) { background: rgb(247 250 246 / 60%); }
+.data-table tbody tr td:first-child { transition: box-shadow var(--sf-base) var(--sf-ease); }
+.data-table tbody tr:hover { background: linear-gradient(90deg, rgb(226 243 228 / 90%), rgb(238 248 252 / 80%)); }
+.data-table tbody tr:hover td:first-child { box-shadow: 3px 0 0 var(--sf-brand-400) inset; }
+.data-table td.num, .data-table th.num { font-variant-numeric: tabular-nums; }
+.table-scroll { box-shadow: var(--sf-lift-1); }
+.table-scroll > .data-table { box-shadow: none; }
+
+/* ---- Badges, banners and messages ------------------------------------------------------------------------------ */
+.status, .stage, .severity, .count, .pill, .badge { box-shadow: 0 1px 0 rgb(255 255 255 / 55%) inset, 0 0 0 1px rgb(16 32 24 / 5%); }
+.badge { display: inline-flex; align-items: center; border-radius: var(--sf-r-full); padding: 3px 10px; background: var(--sf-brand-100); color: var(--sf-brand-700); font-size: var(--sf-fs-xs); font-weight: 650; }
+.warning { color: var(--sf-warning); background: var(--sf-warning-bg); border: 1px solid var(--sf-warning-line); border-radius: var(--sf-r-sm); padding: 8px 12px; font-size: 13px; font-weight: 500; }
+li.warning { list-style: none; margin: 6px 0; }
+.error-banner, .info-banner { backdrop-filter: var(--sf-glass-blur); -webkit-backdrop-filter: var(--sf-glass-blur); box-shadow: var(--sf-lit), 0 10px 24px -18px rgb(16 32 24 / 35%); animation: sf-rise .3s var(--sf-ease) backwards; }
+.toast { background: rgb(15 42 29 / 90%); backdrop-filter: blur(14px) saturate(1.5); -webkit-backdrop-filter: blur(14px) saturate(1.5); border: 1px solid rgb(255 255 255 / 14%); box-shadow: 0 1px 0 rgb(255 255 255 / 14%) inset, 0 26px 50px -18px rgb(15 42 29 / 70%); }
+
+/* Loading: a shimmer under the text, so a wait does not look like an empty page */
+.crop-loading { display: flex; flex-wrap: wrap; align-items: center; }
+.crop-loading::after {
+  content: ''; flex: 0 0 100%; height: 86px; margin-top: 12px; border-radius: var(--sf-r-lg); border: 1px solid var(--sf-glass-line);
+  background: linear-gradient(100deg, rgb(255 255 255 / 45%) 30%, rgb(255 255 255 / 95%) 50%, rgb(255 255 255 / 45%) 70%) 0 0 / 220% 100%; animation: sf-shimmer 1.5s linear infinite;
+}
+@keyframes sf-shimmer { from { background-position: 130% 0; } to { background-position: -90% 0; } }
+.empty-state { background: rgb(255 255 255 / 45%); border: 1.5px dashed rgb(47 133 80 / 28%); border-radius: var(--sf-r-lg); }
+
+/* ---- Shell ---------------------------------------------------------------------------------------------------- */
+.sidebar { box-shadow: 1px 0 0 rgb(255 255 255 / 5%), 18px 0 40px -28px rgb(0 0 0 / 55%); background: radial-gradient(90% 34% at 12% 0%, rgb(183 229 138 / 12%), transparent 70%), radial-gradient(90% 30% at 90% 100%, rgb(45 212 191 / 9%), transparent 70%), linear-gradient(180deg, var(--sf-sidebar-2) 0%, var(--sf-sidebar) 55%); }
+.sidebar .side-link { transition: background-color var(--sf-base) var(--sf-ease), color var(--sf-base) var(--sf-ease), transform var(--sf-base) var(--sf-spring); }
+@media (hover: hover) { .sidebar .side-link:hover { transform: translateX(3px); } }
+.sidebar .side-link.active { background: linear-gradient(90deg, rgb(183 229 138 / 22%), rgb(45 212 191 / 8%)); box-shadow: 0 1px 0 rgb(255 255 255 / 7%) inset, 0 8px 18px -12px rgb(183 229 138 / 45%); }
+.sidebar .side-link.active::before { box-shadow: 0 0 10px 1px rgb(183 229 138 / 75%); }
+.sidebar .brand-mark { box-shadow: 0 1px 0 rgb(255 255 255 / 55%) inset, 0 8px 20px -6px rgb(183 229 138 / 55%); }
+.sidebar { scrollbar-width: thin; scrollbar-color: rgb(255 255 255 / 16%) transparent; }
+.topbar { background: rgb(248 251 247 / 60%); backdrop-filter: blur(20px) saturate(1.7); -webkit-backdrop-filter: blur(20px) saturate(1.7); border-bottom: 1px solid rgb(255 255 255 / 75%); box-shadow: 0 10px 28px -24px rgb(16 32 24 / 45%); }
+.language { background: var(--sf-glass-strong); box-shadow: var(--sf-lit), 0 1px 2px rgb(16 32 24 / 6%); transition: box-shadow var(--sf-base) var(--sf-ease), border-color var(--sf-base) var(--sf-ease), transform var(--sf-fast) var(--sf-ease); }
+.language:hover { border-color: var(--sf-brand-400); box-shadow: var(--sf-lit), 0 8px 18px -10px rgb(47 133 80 / 45%); }
+.language:active { transform: scale(.97); }
+
+/* Pop-ups */
+.im-overlay { backdrop-filter: blur(10px) saturate(1.2); -webkit-backdrop-filter: blur(10px) saturate(1.2); }
+.im-dialog { box-shadow: 0 1px 0 rgb(255 255 255 / 50%) inset, 0 40px 90px -30px rgb(10 25 18 / 65%); }
+
+/* ---- Small pieces that had no styles --------------------------------------------------------------------------- */
+.move-variety { color: var(--sf-brand-600); font-weight: 600; }
+.milk-session { padding: 14px 16px; background: var(--sf-surface-2); border: 1px solid var(--sf-border); border-radius: var(--sf-r-md); }
+.recovery-codes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin: 12px 0; padding: 0; list-style: none; }
+.recovery-codes code { display: block; padding: 8px 12px; text-align: center; background: var(--sf-surface-2); border: 1px solid var(--sf-border); border-radius: var(--sf-r-sm); letter-spacing: .06em; }
+.legal-document { padding: 18px 20px; margin-bottom: 14px; background: var(--sf-glass); border: 1px solid var(--sf-glass-line); border-radius: var(--sf-r-lg); box-shadow: var(--sf-lift-1); }
+.legal-text { max-height: 320px; overflow-y: auto; white-space: pre-wrap; line-height: 1.6; font-size: 13.5px; color: var(--sf-text-2); }
+.db-month { transition: opacity var(--sf-base) var(--sf-ease); }
+
+/* The app's own error page, in place of a blank screen */
+.page-crash { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; max-width: 560px; margin: 40px auto; padding: 26px; background: var(--sf-glass); backdrop-filter: var(--sf-glass-blur); -webkit-backdrop-filter: var(--sf-glass-blur); border: 1px solid var(--sf-glass-line); border-radius: var(--sf-r-xl); box-shadow: var(--sf-lift-2); }
+.page-crash > svg { color: var(--sf-danger); }
+.page-crash h2 { margin: 0; font-size: 20px; }
+.page-crash p { margin: 0; color: var(--sf-text-2); line-height: 1.55; }
+
+/* ---- Phones: blur is costly on many cards, so lists use solid fills -------------------------------------------- */
+@media (max-width: 760px) {
+  .cycle-card, .crop-record, .activity-row, .parcel-row, .tenant-card, .farm-card, .variety-card, .finance-stats > .finance-stat { backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .form-card, .panel, .db-card, .crop-controls, .fw-hero, .tabs { --sf-glass: rgb(255 255 255 / 88%); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  body::before { animation: none; }
+  .finance-stats > .finance-stat b { font-size: 22px; }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root { --sf-glass: rgb(255 255 255 / 94%); --sf-glass-strong: #fff; }
+}
+
+/* ---- Motion and print ------------------------------------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  body::before { animation: none; }
+  .finance-stats > *, .db-card, .cycle-card, .farm-card, .variety-card, .pnl-card, .error-banner, .info-banner { animation: none; }
+  .primary:hover::after { transition: none; }
+  .finance-stats > button.finance-stat:hover, .finance-stats > a.finance-stat:hover { animation: none; }
+  .cycle-card:hover, .crop-record:hover, a.activity-row:hover, .tenant-card:hover, .farm-card:hover, .pnl-card:hover, .variety-card:hover, .rp-cat:hover, .im-tile:hover,
+  .finance-stats > button.finance-stat:hover, .finance-stats > a.finance-stat:hover, .sidebar .side-link:hover { transform: none; }
+  .crop-loading::after { animation: none; }
+}
+@media print {
+  body::before { display: none; }
+  .form-card, .panel, .db-card, .crop-controls, .fw-hero, .cycle-card, .crop-record, .activity-row, .parcel-row, .farm-card, .tenant-card, .variety-card, .pnl-card, .finance-stats > .finance-stat, .data-table, .table-scroll {
+    background: #fff !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; box-shadow: none !important; border: 1px solid #ccc !important;
+  }
+  .toast-stack, .im-overlay { display: none; }
+}
+
+/* Figures fit their card: the size follows the card's width, and an amount never breaks in the middle */
+.finance-stats > .finance-stat { container-type: inline-size; min-width: 0; }
+.finance-stats > .finance-stat b { font-size: clamp(15px, 13cqi, 25px); white-space: nowrap; }
+.attention-list, .attention-list li, .attention-list a { min-width: 0; max-width: 100%; }
+.attention-list a { overflow-wrap: anywhere; }
+
+/* A row that opens more detail is a button: it fills the list like the others */
+.im-item, button.im-row { display: block; width: 100%; }
+button.im-row { display: flex; font: inherit; text-align: left; cursor: pointer; }
+
+/* Sign-in and other public pages: the glass card sits directly on the aurora */
+.auth-shell { background: transparent; }
+.auth-card { background: var(--sf-glass); backdrop-filter: blur(26px) saturate(1.7); -webkit-backdrop-filter: blur(26px) saturate(1.7); box-shadow: var(--sf-lit), 0 40px 80px -36px rgb(16 32 24 / 42%); }
+
+/* A wide list scrolls inside its box; nothing widens the page */
+.main, .main > div, .db-card, .panel, .records-panel, .fw-grid > *, .db-grid > * { min-width: 0; }
+.table-scroll { overflow-x: auto; }
+.table-scroll > .data-table { min-width: 100%; }
+/* Records in a narrow column: the text wraps and the action buttons stay inside the card */
+.records-panel .fw-records { min-width: 0; padding-left: 0; }
+.records-panel .fw-records li { max-width: 100%; min-width: 0; }
+.records-panel .fw-records .rp-row { min-width: 0; }
+.records-panel .fw-record-main { min-width: 0; overflow-wrap: anywhere; }
+/* Two columns only when records have room to be read */
+.db-grid.fw-grid { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1500px) { .db-grid.fw-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); } }

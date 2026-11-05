@@ -28,7 +28,7 @@ export default function MaintenancePage() {
       <div className="crop-page-head"><div><h2>{t('maintenance')}</h2><p>{t('maintenanceHelp')}</p></div></div>
       <ErrorBanner message={error} />
       {!plans ? <Loading /> : plans.length === 0 ? <p className="hint">{t('noPlans')}</p> : (
-        <table className="data-table">
+        <div className="table-scroll"><table className="data-table">
           <thead><tr><th>{t('name')}</th><th>{t('planName')}</th><th>{t('statusLabel')}</th><th>{t('next')}</th></tr></thead>
           <tbody>{plans.map(p => (
             <tr key={p.id}>
@@ -38,7 +38,7 @@ export default function MaintenancePage() {
               <td>{[p.nextDate && formatDate(p.nextDate, lang), p.hoursLeft != null && t('hoursLeft', { hours: formatNumber(p.hoursLeft, lang, 1) })].filter(Boolean).join(' · ')}</td>
             </tr>
           ))}</tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

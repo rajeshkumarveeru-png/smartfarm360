@@ -163,7 +163,7 @@ export default function CyclePage() {
             <div className="finance-stat"><span>{t('unsold')}</span><b>{formatNumber(report.unsold, lang, 2)} {report.costUnit ? ts(`unit.${report.costUnit}`) : ''}</b>
               {report.estimateValue != null && <small className="low-stock-label">{t('estimateLabel', { amount: formatMoney(report.estimateValue, lang) })}</small>}</div>
           </div>
-          <table className="data-table report">
+          <div className="table-scroll"><table className="data-table report">
             <tbody>
               <tr className="section"><th colSpan={2}>{tf('operatingRevenue')}</th></tr>
               {report.revenue.map(r => <tr key={`r${r.accountCode}-${r.categoryId}`}><td>{r.categoryId ? categoryLabel({ code: r.categoryCode, name: r.categoryName }) : tf(`ledger.${r.accountCode}`)}</td><td className="num">{formatMoney(r.amount, lang)}</td></tr>)}
@@ -173,7 +173,7 @@ export default function CyclePage() {
               {report.allocatedOverhead.map(r => <tr key={`a${r.accountCode}-${r.categoryId}`}><td>{r.categoryId ? categoryLabel({ code: r.categoryCode, name: r.categoryName }) : tf(`ledger.${r.accountCode}`)}</td><td className="num">{formatMoney(r.amount, lang)}</td></tr>)}
               <tr className="total"><td>{t('profit')}</td><td className="num">{formatMoney(report.profit, lang)}</td></tr>
             </tbody>
-          </table>
+          </table></div>
         </>
       )}
 

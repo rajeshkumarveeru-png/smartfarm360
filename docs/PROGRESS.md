@@ -2178,6 +2178,50 @@ About 25 pages saved with no confirmation at all, and about 20 wrote a message t
 | Backend | Not run: no backend change |
 | Browser | Toast position checked with the same markup on the sign-in page: seen at desktop width, and measured at 375 x 812 (16 px from the edges, no sideways scroll; the pane's screenshot at that size was not usable). **Not checked signed in**, which needs the owner's password |
 
+## Premium design pass (2026-11-05)
+
+The owner asked for a premium redesign of every screen, with glass and light effects, changing the look only. It is a new
+layer, `frontend/src/premium.css`, loaded after `theme.css`, so all 59 pages get it without changing what they do. No API,
+schema or business rule changed.
+
+- **Glass:** translucent surfaces with a lit top edge, over a slowly drifting aurora backdrop.
+- **Glass flash:** a band of light crosses a card or button once when the pointer arrives.
+- **Light trace:** a point of light runs around the border of a figure card while the pointer is on it.
+- **Micro-interactions:** figures rise in one after another, pages fade in without reloading, buttons press, the form being
+  filled comes forward, loading shows a shimmer, table rows mark the one under the pointer.
+- **Limits:** movement needs a real pointer and stops for `prefers-reduced-motion`. Phones use solid fills instead of blur,
+  and print removes the effects.
+
+Bugs found by reviewing and fixed:
+
+- Tabs on the Billing and Platform pages had no styles, and neither did warnings, recovery codes, legal text and badges.
+- Amounts broke in the middle of a number on five-across figure cards (`₹3,60,650.` / `00`). Their size now follows the card.
+- Clickable rows in pop-ups shrank to their content.
+- Records on the farm page widened the whole page below about 1,500 px; the panels now stack until both have room.
+- 43 data tables had no scrolling box, so a wide one widened the page (the Pay page by 134 px). All tables now have one.
+- A fault in one page blanked the whole app. `ErrorBoundary` now shows a message with the menu still in place.
+
+**How it was reviewed:** a temporary page, never committed and now deleted, ran the real app in the browser on sample data,
+with no sign-in and no contact with any database. Every route was loaded at 1280 and 375 px wide and measured for sideways
+overflow.
+
+- 41 of 69 routes rendered, and none overflow now.
+- **28 routes were not seen,** because the sample data lacked what they need: report detail pages, crop cycle, animal, milk,
+  pond, batch detail, record detail, stock and workforce overviews, asset detail, Settings and Activity history. They use
+  the same shared classes, and a check of every class name found no other unstyled ones.
+- **Platform admin** also failed on the sample data, so its tabs were not seen either.
+- **Not checked against real data or on a real phone.** The sample data is not the owner's.
+
+Not changed: the phone app, the phone-width navigation layout, the confirm pop-ups that use the browser's own dialog, and
+dark mode, which the app does not have.
+
+| Command | Result |
+|---|---|
+| `frontend: npm run lint`, `npx tsc --noEmit`, `npm run build` | Passed |
+| `frontend: npm test` | Passed: **123 tests**, one new (`ErrorBoundary.test.tsx`) |
+| `mobile: npx tsc --noEmit`, `npm test` | Passed: **76 tests** |
+| Backend | Not run: no backend change |
+
 ## Known gaps and defects
 
 Security and platform:

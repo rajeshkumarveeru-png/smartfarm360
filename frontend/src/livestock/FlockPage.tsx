@@ -324,7 +324,7 @@ export default function FlockPage() {
         </form>
       )}
       {moves.length === 0 ? <p className="hint">{t('noEvents')}</p> : (
-        <table className="data-table">
+        <div className="table-scroll"><table className="data-table">
           <thead><tr><th>{tf('date')}</th><th>{t('whatHappened')}</th><th className="num">{t('heads')}</th><th>{t('cause')}</th><th /></tr></thead>
           <tbody>{moves.map(m => (
             <tr key={m.id} className={m.reversed ? 'muted' : undefined}>
@@ -347,7 +347,7 @@ export default function FlockPage() {
               </td>
             </tr>
           ))}</tbody>
-        </table>
+        </table></div>
       )}
       </>}
 
@@ -461,7 +461,7 @@ export default function FlockPage() {
       <h3 className="section-space">{t('healthPlan')}</h3>
       <p className="hint">{t('healthPlanHelp')}</p>
       {plan.length === 0 ? <p className="hint">{t('noPlan')}</p> : (
-        <table className="data-table">
+        <div className="table-scroll"><table className="data-table">
           <thead><tr><th>{t('dueLabel')}</th><th>{t('kindLabel')}</th><th>{t('description')}</th><th /></tr></thead>
           <tbody>{plan.map(p => (
             <tr key={p.id}>
@@ -471,7 +471,7 @@ export default function FlockPage() {
                   description: p.description, planItemId: p.id }, 'health', () => t('healthRecorded'))}>{t('markDoneToday')}</button>)}</td>
             </tr>
           ))}</tbody>
-        </table>
+        </table></div>
       )}
       {open && (
         <form className="form-card form-grid" noValidate onSubmit={e => {

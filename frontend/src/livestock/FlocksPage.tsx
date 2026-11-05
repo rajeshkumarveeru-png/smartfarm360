@@ -104,7 +104,7 @@ export default function FlocksPage({ kind }: { kind: 'poultry' | 'smallStock' })
       )}
       {kind === 'poultry' && <label className="check"><input type="checkbox" checked={showClosed} onChange={e => setShowClosed(e.target.checked)} />{t('showClosed')}</label>}
       {!groups ? <Loading /> : visible.length === 0 ? <p className="hint">{t(kind === 'poultry' ? 'noBatches' : 'noHerds')}</p> : (
-        <table className="data-table">
+        <div className="table-scroll"><table className="data-table">
           <thead><tr><th>{t('groupName')}</th><th>{t('purposeLabel')}</th><th>{t(kind === 'poultry' ? 'placedOn' : 'startedOn')}</th><th className="num">{t('heads')}</th></tr></thead>
           <tbody>{visible.map(g => (
             <tr key={g.id}>
@@ -114,7 +114,7 @@ export default function FlocksPage({ kind }: { kind: 'poultry' | 'smallStock' })
               <td className="num">{formatNumber(g.animals, lang, 0)}</td>
             </tr>
           ))}</tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

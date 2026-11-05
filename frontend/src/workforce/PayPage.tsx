@@ -108,7 +108,7 @@ export default function PayPage() {
             <label>{t('date')}<input type="date" value={payment.date} onChange={e => setPayment({ ...payment, date: e.target.value })} /></label>
             <label>{t('paidFrom')}<select value={payment.financialAccountId} onChange={e => setPayment({ ...payment, financialAccountId: e.target.value })}>{accountOptions}</select></label>
           </div>
-          <table className="data-table">
+          <div className="table-scroll"><table className="data-table">
             <thead><tr><th>{t('worker')}</th><th className="num">{t('owed')}</th><th className="num">{t('advance')}</th><th>{t('cashNow')}</th><th>{t('recoverAdvance')}</th></tr></thead>
             <tbody>
               {owing.map(w => (
@@ -121,7 +121,7 @@ export default function PayPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
           <div className="form-actions"><button className="primary" disabled={busy}>{t('recordPayments')}</button></div>
         </form>
       )}

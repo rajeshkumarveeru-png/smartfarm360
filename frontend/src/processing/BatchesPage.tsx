@@ -78,7 +78,7 @@ export default function BatchesPage() {
         </form>
       )}
       {!batches ? <Loading /> : batches.length === 0 ? <p className="hint">{t('noBatches')}</p> : (
-        <table className="data-table">
+        <div className="table-scroll"><table className="data-table">
           <thead><tr><th>{t('code')}</th><th>{t('batchName')}</th><th>{t('mainProduct')}</th><th>{t('startedOn')}</th><th>{t('statusLabel')}</th></tr></thead>
           <tbody>{batches.map(b => {
             const late = !b.finishedOn && b.expectedEnd && b.expectedEnd < today();
@@ -90,7 +90,7 @@ export default function BatchesPage() {
               </tr>
             );
           })}</tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

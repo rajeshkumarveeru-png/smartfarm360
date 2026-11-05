@@ -94,7 +94,7 @@ function ComparisonView({ c }: { c: IncomeComparison }) {
   return (
     <div className="table-scroll">
       <p className="hint">{tr(`compare.${c.compare}`)}: {formatDate(c.previous.from, lang)} – {formatDate(c.previous.to, lang)}</p>
-      <table className="data-table report">
+      <div className="table-scroll"><table className="data-table report">
         <thead><tr><th>{t('description')}</th><th className="num">{tr('thisPeriod')}</th><th className="num">{tr('earlierPeriod')}</th>
           <th className="num">{tr('change')}</th><th className="num">{tr('changePercent')}</th></tr></thead>
         <tbody>
@@ -110,7 +110,7 @@ function ComparisonView({ c }: { c: IncomeComparison }) {
             <td>{tr(`section.${l.section}`)}</td><td className="num">{formatMoney(l.current, lang)}</td><td className="num">{formatMoney(l.previous, lang)}</td>
             <td className="num">{formatMoney(l.change, lang)}</td><td className="num">{pct(l.changePercent)}</td></tr>)}
         </tbody>
-      </table>
+      </table></div>
     </div>
   );
 }
@@ -126,7 +126,7 @@ function IncomeView({ r }: { r: IncomeStatement }) {
     </tr>
   ));
   return (
-    <table className="data-table report">
+    <div className="table-scroll"><table className="data-table report">
       <tbody>
         <tr className="section"><th colSpan={2}>{t('operatingRevenue')}</th></tr>{rows(r.operatingRevenue)}
         <tr className="subtotal"><td>{t('totalRevenue')}</td><td className="num">{formatMoney(r.operatingRevenueTotal, lang)}</td></tr>
@@ -138,7 +138,7 @@ function IncomeView({ r }: { r: IncomeStatement }) {
         <tr><td>{t('losses')}</td><td className="num">−{formatMoney(r.losses, lang)}</td></tr>
         <tr className="total"><td>{t('netProfit')}</td><td className="num">{formatMoney(r.netProfit, lang)}</td></tr>
       </tbody>
-    </table>
+    </table></div>
   );
 }
 
@@ -147,7 +147,7 @@ function CashFlowView({ r }: { r: CashFlow }) {
   const lang = currentLanguage();
   const line = (label: string, value: number, cls = '') => <tr className={cls}><td>{label}</td><td className="num">{formatMoney(value, lang)}</td></tr>;
   return (
-    <table className="data-table report">
+    <div className="table-scroll"><table className="data-table report">
       <tbody>
         {line(t('openingCash'), r.opening, 'subtotal')}
         {line(t('flow.OPERATING'), r.operating)}
@@ -157,7 +157,7 @@ function CashFlowView({ r }: { r: CashFlow }) {
         {line(t('netChange'), r.netChange, 'subtotal')}
         {line(t('closingCash'), r.closing, 'total')}
       </tbody>
-    </table>
+    </table></div>
   );
 }
 
@@ -190,7 +190,7 @@ function ActivityView({ r }: { r: Activity }) {
   const t = useNs('fin');
   const lang = currentLanguage();
   return (
-    <table className="data-table">
+    <div className="table-scroll"><table className="data-table">
       <thead><tr><th>{t('activity')}</th><th className="num">{t('revenue')}</th><th className="num">{t('costs')}</th><th className="num">{t('contribution')}</th></tr></thead>
       <tbody>
         {r.rows.map(row => (
@@ -200,6 +200,6 @@ function ActivityView({ r }: { r: Activity }) {
           </tr>
         ))}
       </tbody>
-    </table>
+    </table></div>
   );
 }

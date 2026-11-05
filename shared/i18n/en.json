@@ -308,6 +308,8 @@
     "required": "This field is required.",
     "saved": "Saved.",
     "deleted": "Deleted.",
+    "crashTitle": "This page could not be shown",
+    "crashBody": "Your records are safe. Try again, or use the menu to go to another page.",
     "copyLink": "Copy link",
     "copied": "Copied",
     "previous": "Previous",

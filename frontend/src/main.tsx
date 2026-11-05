@@ -4,6 +4,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes, useParams } from 'react
 import './i18n';
 import './styles.css';
 import './theme.css';
+import './premium.css';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import Layout from './components/Layout';
 import { SavedToast } from './components/Toast';

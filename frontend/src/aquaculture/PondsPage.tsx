@@ -88,7 +88,7 @@ export default function PondsPage() {
         </form>
       )}
       {!ponds ? <Loading /> : ponds.length === 0 ? <p className="hint">{t('noPonds')}</p> : (
-        <table className="data-table">
+        <div className="table-scroll"><table className="data-table">
           <thead><tr><th>{t('pondName')}</th><th className="num">{t('waterAreaAcres')}</th><th>{t('crop')}</th><th>{t('latestReading')}</th></tr></thead>
           <tbody>{ponds.map(p => (
             <tr key={p.id} className={p.active ? undefined : 'muted'}>
@@ -102,7 +102,7 @@ export default function PondsPage() {
                 {p.latestReading.outOfLimits.length > 0 && ` · ${p.latestReading.outOfLimits.map(x => t(`parameter.${x}`)).join(', ')} ${t('outsideLimits')}`}</span> : '—'}</td>
             </tr>
           ))}</tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

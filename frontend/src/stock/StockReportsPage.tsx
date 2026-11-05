@@ -51,7 +51,7 @@ export default function StockReportsPage() {
       </div>
       <p className="hint">{tf('asOfLabel', { date: formatDate(asOf, lang) })} · {tf('actualFigures')}</p>
       {!valuation ? <Loading /> : valuation.items.length === 0 ? <p className="hint">{t('noStock')}</p> : (
-        <table className="data-table report">
+        <div className="table-scroll"><table className="data-table report">
           <thead><tr><th>{t('item')}</th><th className="num">{t('quantity')}</th><th className="num">{t('value')}</th></tr></thead>
           <tbody>
             {valuation.items.map(r => (
@@ -59,7 +59,7 @@ export default function StockReportsPage() {
             ))}
             <tr className="total"><td colSpan={2}>{t('totalValue')}</td><td className="num">{formatMoney(valuation.totalValue, lang)}</td></tr>
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

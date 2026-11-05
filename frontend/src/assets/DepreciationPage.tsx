@@ -56,13 +56,13 @@ export default function DepreciationPage() {
           </form>
           {preview && (preview.assets.length === 0 ? <p className="hint">{t('nothingToDepreciate', { month: preview.month })}</p> : (
             <>
-              <table className="data-table report">
+              <div className="table-scroll"><table className="data-table report">
                 <thead><tr><th>{t('name')}</th><th className="num">{t('depreciationAmount')}</th><th className="num">{t('bookValueAfter')}</th></tr></thead>
                 <tbody>
                   {preview.assets.map(a => <tr key={a.assetId}><td>{a.name}</td><td className="num">{formatMoney(a.amount, lang)}</td><td className="num">{formatMoney(a.bookValueAfter, lang)}</td></tr>)}
                   <tr className="total"><td>{t('total')}</td><td className="num">{formatMoney(preview.total, lang)}</td><td /></tr>
                 </tbody>
-              </table>
+              </table></div>
               <div className="form-actions">
                 <button type="button" className="primary" disabled={busy} onClick={() => void run(async () => {
                   await api(`${base}/depreciation-runs`, { method: 'POST', body: { month: preview.month }, headers: { 'Idempotency-Key': key } });
@@ -76,7 +76,7 @@ export default function DepreciationPage() {
 
       <h3 className="section-space">{t('runs')}</h3>
       {!runs ? <Loading /> : runs.length === 0 ? <p className="hint">{t('noRuns')}</p> : (
-        <table className="data-table report">
+        <div className="table-scroll"><table className="data-table report">
           <thead><tr><th>{t('month')}</th><th>{t('record')}</th><th className="num">{t('total')}</th></tr></thead>
           <tbody>{runs.map(r => (
             <tr key={r.documentId}><td>{r.month}</td>
@@ -84,14 +84,14 @@ export default function DepreciationPage() {
                 {r.status !== 'POSTED' && <small> · {tf(`status.${r.status}`)}</small>}</td>
               <td className="num">{formatMoney(r.total, lang)}</td></tr>
           ))}</tbody>
-        </table>
+        </table></div>
       )}
       <p className="hint">{t('reverseHelp')}</p>
 
       {rec && (
         <>
           <h3 className="section-space">{t('reconciliation')}</h3>
-          <table className="data-table report">
+          <div className="table-scroll"><table className="data-table report">
             <thead><tr><th /><th className="num">{t('register')}</th><th className="num">{t('ledger')}</th></tr></thead>
             <tbody>
               <tr><td>{t('cost')}</td><td className="num">{formatMoney(rec.registerCost, lang)}</td><td className="num">{formatMoney(rec.ledgerCost, lang)}</td></tr>
@@ -100,7 +100,7 @@ export default function DepreciationPage() {
               <tr><td>{t('manualDepreciation')}</td><td /><td className="num">{formatMoney(rec.manualDepreciation, lang)}</td></tr>
               <tr className="total"><td>{t('unexplained')}</td><td /><td className="num">{formatMoney(rec.unexplained, lang)}</td></tr>
             </tbody>
-          </table>
+          </table></div>
           <p className="hint">{rec.unexplained === 0 ? t('reconciled') : t('notReconciled')}</p>
         </>
       )}
