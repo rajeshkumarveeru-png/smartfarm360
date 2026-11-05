@@ -2220,6 +2220,7 @@ dark mode, which the app does not have.
 | `frontend: npm run lint`, `npx tsc --noEmit`, `npm run build` | Passed |
 | `frontend: npm test` | Passed: **123 tests**, one new (`ErrorBoundary.test.tsx`) |
 | `mobile: npx tsc --noEmit`, `npm test` | Passed: **76 tests** |
+| `frontend/src/pages/farm.test.tsx` | Failed once under load: a timing race, as records load apart from the figures. It now waits for the records, with the same check |
 | Backend | Not run: no backend change |
 
 ## Known gaps and defects

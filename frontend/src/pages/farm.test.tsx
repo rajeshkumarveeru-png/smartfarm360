@@ -72,7 +72,8 @@ describe('farm workspace', () => {
     renderAt('/t/9/farms/2', <FarmPage />, '/t/:tenantId/farms/:farmId');
     expect(await screen.findByRole('heading', { name: 'Yerpathi' })).toBeInTheDocument();
     expect(await screen.findByText('₹38,000.00')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Expense bill · BILL\/2026-27\/0004/ })).toHaveAttribute('href', '/t/9/finance/records/41');
+    // The records load apart from the figures
+    expect(await screen.findByRole('link', { name: /Expense bill · BILL\/2026-27\/0004/ })).toHaveAttribute('href', '/t/9/finance/records/41');
     expect(screen.getByText('North field')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Add expense' }));
     expect(await screen.findByRole('form', { name: 'Add expense' })).toBeInTheDocument();
