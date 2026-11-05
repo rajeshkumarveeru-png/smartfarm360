@@ -975,3 +975,11 @@ button.im-row:focus-visible, a.im-row:focus-visible { outline: 2px solid var(--t
 .day-line-name strong { font-size: var(--sf-fs-md); overflow-wrap: anywhere; }
 .day-line-name small { color: var(--sf-text-3); font-size: var(--sf-fs-xs); }
 @media (max-width: 600px) { .day-line.with-eggs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.day-field { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; }
+.day-field > label { width: 100%; }
+.day-line input.suggested { background: var(--sf-info-bg); border-color: var(--sf-info-line); color: var(--sf-brand-700); }
+.day-chip { padding: 3px 10px; border: 1px solid var(--sf-border-strong); border-radius: var(--sf-r-full); background: var(--sf-surface); color: var(--sf-text-2); font: inherit; font-size: var(--sf-fs-xs); font-weight: 600; cursor: pointer; }
+.day-chip:hover { border-color: var(--sf-brand-400); color: var(--sf-brand-700); }
+.day-chip.on { background: var(--sf-brand-100); border-color: var(--sf-brand-200); color: var(--sf-brand-700); }
+.day-prefilled { padding: 8px 12px; background: var(--sf-info-bg); border: 1px solid var(--sf-info-line); border-radius: var(--sf-r-sm); color: var(--sf-info); }
+.variety-note { margin: 12px 0 0; }

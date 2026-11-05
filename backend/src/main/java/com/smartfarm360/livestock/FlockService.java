@@ -78,6 +78,18 @@ public class FlockService {
                 .param("t", tenantId).param("g", groupId).query((rs, i) -> new Move(rs.getObject(1, LocalDate.class), rs.getString(2), rs.getInt(3))).list();
     }
 
+    /** A movement with its variety, for the figures by variety. */
+    record LineMove(long lineId, Move move, BigDecimal kg) {}
+
+    List<LineMove> lineMoves(long tenantId, long groupId) {
+        return jdbc.sql("""
+                        select m.line_id, m.move_date, m.kind, m.heads, m.kg from sf_head_movements m
+                        left join sf_finance_documents d on d.id = m.document_id and d.tenant_id = m.tenant_id
+                        where m.tenant_id = :t and m.group_id = :g and m.line_id is not null and (m.document_id is null or d.status = 'POSTED') order by m.move_date, m.id""")
+                .param("t", tenantId).param("g", groupId)
+                .query((rs, i) -> new LineMove(rs.getLong(1), new Move(rs.getObject(2, LocalDate.class), rs.getString(3), rs.getInt(4)), rs.getBigDecimal(5))).list();
+    }
+
     int heads(long tenantId, long groupId, LocalDate date) {
         return moves(tenantId, groupId).stream().filter(m -> !m.date().isAfter(date)).mapToInt(Move::signed).sum();
     }
@@ -419,9 +431,24 @@ public class FlockService {
             jdbc.sql("select line_id, deaths, culls, eggs, egg_rate from sf_batch_day_lines where tenant_id = :t and batch_day_id = :d")
                     .param("t", tenantId).param("d", dayId).query().listOfRows().forEach(m -> saved.put(((Number) m.get("line_id")).longValue(), m));
         }
+        // The last eggs and rate before this day, which the form offers for the new day
+        Map<Long, Map<String, Object>> lastEggs = new HashMap<>(), lastRate = new HashMap<>();
+        jdbc.sql("""
+                        select distinct on (dl.line_id) dl.line_id, d.day, dl.eggs from sf_batch_day_lines dl
+                        join sf_batch_days d on d.id = dl.batch_day_id and d.tenant_id = dl.tenant_id
+                        where dl.tenant_id = :t and d.group_id = :g and d.day < :date and dl.eggs > 0 order by dl.line_id, d.day desc""")
+                .param("t", tenantId).param("g", g.id()).param("date", date).query().listOfRows().forEach(m -> lastEggs.put(((Number) m.get("line_id")).longValue(), m));
+        jdbc.sql("""
+                        select distinct on (dl.line_id) dl.line_id, dl.egg_rate from sf_batch_day_lines dl
+                        join sf_batch_days d on d.id = dl.batch_day_id and d.tenant_id = dl.tenant_id
+                        where dl.tenant_id = :t and d.group_id = :g and d.day < :date and dl.egg_rate is not null order by dl.line_id, d.day desc""")
+                .param("t", tenantId).param("g", g.id()).param("date", date).query().listOfRows().forEach(m -> lastRate.put(((Number) m.get("line_id")).longValue(), m));
         return lines(tenantId, g.id(), date).stream().map(l -> {
             Map<String, Object> m = saved.getOrDefault(l.id(), Map.of());
-            return new DayLineView(l.id(), l.species(), l.variety(), l.heads(), intOf(m.get("deaths")), intOf(m.get("culls")), intOf(m.get("eggs")), (BigDecimal) m.get("egg_rate"));
+            Map<String, Object> eggs = lastEggs.get(l.id());
+            return new DayLineView(l.id(), l.species(), l.variety(), l.heads(), intOf(m.get("deaths")), intOf(m.get("culls")), intOf(m.get("eggs")), (BigDecimal) m.get("egg_rate"),
+                    eggs == null ? null : Integer.valueOf(intOf(eggs.get("eggs"))), eggs == null ? null : ((java.sql.Date) eggs.get("day")).toLocalDate(),
+                    lastRate.containsKey(l.id()) ? (BigDecimal) lastRate.get(l.id()).get("egg_rate") : null);
         }).toList();
     }
 

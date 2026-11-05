@@ -107,7 +107,8 @@ public final class FlockDtos {
                           @PositiveOrZero @Max(10_000_000) Integer eggs, @PositiveOrZero @Digits(integer = 8, fraction = 2) BigDecimal eggRate) {}
 
     /** A variety on a day, with its heads at the end of the day. */
-    public record DayLineView(long lineId, String species, String variety, int heads, int deaths, int culls, int eggs, BigDecimal eggRate) {}
+    public record DayLineView(long lineId, String species, String variety, int heads, int deaths, int culls, int eggs, BigDecimal eggRate,
+                              Integer lastEggs, LocalDate lastEggsOn, BigDecimal lastEggRate) {}
 
     /** {@code warnings}: EGGS_WITHHELD while a withdrawal applies to the batch (J9); HIGH_MORTALITY above 1% of the birds. */
     public record BatchDay(LocalDate day, int deaths, String deathCause, int culls, int eggsGood, int eggsCracked, int eggsBroken, Long feedItemId,
@@ -144,7 +145,15 @@ public final class FlockDtos {
                           int movedOut, BigDecimal soldKg, long headDays, int eggsGood, int eggsCracked, int eggsBroken, int eggs, BigDecimal henDayPercent,
                           BigDecimal feedKg, BigDecimal feedPerDozen, BigDecimal mortalityPercent, BigDecimal averageWeight, BigDecimal fcr,
                           BigDecimal revenue, BigDecimal costs, BigDecimal profit, BigDecimal costPerEgg, BigDecimal costPerKg, BigDecimal costPerHeadMonth,
-                          BigDecimal eggValue, BigDecimal profitWithEggs) {}
+                          BigDecimal eggValue, BigDecimal profitWithEggs, List<VarietyFigures> varieties) {}
+
+    /**
+     * One variety's part of the figures. Money is null without finance access: what its birds cost and sold for, from
+     * their bill lines, and its eggs at the owner's rates. Feed and other costs belong to the whole batch (V6).
+     */
+    public record VarietyFigures(long lineId, String species, String variety, int openingHeads, int closingHeads, int arrived, int born, int died, int culled,
+                                 int sold, int movedOut, BigDecimal soldKg, long headDays, int eggs, BigDecimal eggRate, BigDecimal eggValue,
+                                 BigDecimal boughtAmount, BigDecimal soldAmount) {}
 
     /** A batch or herd: the period and, for batches, since placement (principle 4). */
     public record FlockReport(Group group, int heads, Figures period, Figures sincePlacement) {}

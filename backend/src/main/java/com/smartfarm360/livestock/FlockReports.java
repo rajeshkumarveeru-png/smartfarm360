@@ -2,7 +2,9 @@ package com.smartfarm360.livestock;
 
 import com.smartfarm360.finance.ReportService;
 import com.smartfarm360.livestock.FlockDtos.Figures;
+import com.smartfarm360.livestock.FlockDtos.FlockLine;
 import com.smartfarm360.livestock.FlockDtos.FlockReport;
+import com.smartfarm360.livestock.FlockDtos.VarietyFigures;
 import com.smartfarm360.livestock.LivestockDtos.Group;
 import com.smartfarm360.platform.rbac.Permission;
 import com.smartfarm360.platform.security.TenantContext;
@@ -137,7 +139,68 @@ public class FlockReports {
                 exposed == 0 ? null : BigDecimal.valueOf(died).multiply(HUNDRED).divide(BigDecimal.valueOf(exposed), 2, RoundingMode.HALF_UP),
                 sold == 0 || soldKg.signum() == 0 ? null : soldKg.divide(BigDecimal.valueOf(sold), 2, RoundingMode.HALF_UP),
                 soldKg.signum() == 0 || feedKg.signum() == 0 ? null : feedKg.divide(soldKg, 2, RoundingMode.HALF_UP),
-                revenue, costs, profit, costPerEgg, costPerKg, costPerHeadMonth, eggValue, profitWithEggs);
+                revenue, costs, profit, costPerEgg, costPerKg, costPerHeadMonth, eggValue, profitWithEggs, varieties(ctx, g, from, to));
+    }
+
+    /** The period's figures for each variety of the group. */
+    private List<VarietyFigures> varieties(TenantContext ctx, Group g, LocalDate from, LocalDate to) {
+        long t = ctx.tenantId();
+        Map<Long, List<FlockService.LineMove>> movesByLine = new HashMap<>();
+        for (FlockService.LineMove m : flocks.lineMoves(t, g.id())) movesByLine.computeIfAbsent(m.lineId(), k -> new ArrayList<>()).add(m);
+        Map<Long, Map<String, Object>> eggs = new HashMap<>();
+        jdbc.sql("""
+                        select dl.line_id, sum(dl.eggs) as eggs, sum(dl.eggs * dl.egg_rate) as egg_value, sum(case when dl.egg_rate is null then 0 else dl.eggs end) as rated
+                        from sf_batch_day_lines dl join sf_batch_days d on d.id = dl.batch_day_id and d.tenant_id = dl.tenant_id
+                        where dl.tenant_id = :t and d.group_id = :g and d.day between :from and :to group by dl.line_id""")
+                .param("t", t).param("g", g.id()).param("from", from).param("to", to).query().listOfRows().forEach(m -> eggs.put(((Number) m.get("line_id")).longValue(), m));
+        boolean money = ctx.has(Permission.FINANCE_READ);
+        Map<Long, BigDecimal> bought = new HashMap<>(), soldFor = new HashMap<>();
+        if (money) {
+            // A bill has a line per variety in the order of its movements; a sale has one of each
+            jdbc.sql("""
+                            with mv as (select m.line_id, m.kind, m.document_id, row_number() over (partition by m.document_id order by m.id) as n
+                                        from sf_head_movements m join sf_finance_documents d on d.id = m.document_id and d.tenant_id = m.tenant_id
+                                        where m.tenant_id = :t and m.group_id = :g and m.line_id is not null and d.status = 'POSTED' and m.move_date between :from and :to),
+                                 dl as (select l.document_id, l.amount, row_number() over (partition by l.document_id order by l.line_no) as n
+                                        from sf_finance_document_lines l where l.tenant_id = :t and l.document_id in (select document_id from mv))
+                            select mv.line_id, mv.kind, sum(dl.amount) as amount from mv join dl on dl.document_id = mv.document_id and dl.n = mv.n group by mv.line_id, mv.kind""")
+                    .param("t", t).param("g", g.id()).param("from", from).param("to", to).query().listOfRows().forEach(m ->
+                            ("SOLD".equals(m.get("kind")) ? soldFor : bought).merge(((Number) m.get("line_id")).longValue(), (BigDecimal) m.get("amount"), BigDecimal::add));
+        }
+        List<VarietyFigures> out = new ArrayList<>();
+        for (FlockLine l : flocks.lines(t, g.id(), to)) {
+            int opening = 0;
+            Map<String, Integer> byKind = new HashMap<>();
+            Map<LocalDate, Integer> change = new HashMap<>();
+            BigDecimal soldKg = BigDecimal.ZERO;
+            for (FlockService.LineMove m : movesByLine.getOrDefault(l.id(), List.of())) {
+                LocalDate d = m.move().date();
+                if (d.isBefore(from)) { opening += m.move().signed(); continue; }
+                if (d.isAfter(to)) continue;
+                change.merge(d, m.move().signed(), Integer::sum);
+                byKind.merge(m.move().kind(), m.move().heads(), Integer::sum);
+                if ("SOLD".equals(m.move().kind()) && m.kg() != null) soldKg = soldKg.add(m.kg());
+            }
+            long headDays = 0;
+            int running = opening;
+            for (LocalDate d = from; !d.isAfter(to); d = d.plusDays(1)) {
+                running += change.getOrDefault(d, 0);
+                headDays += Math.max(running, 0);
+            }
+            Map<String, Object> e = eggs.getOrDefault(l.id(), Map.of());
+            int laid = e.get("eggs") == null ? 0 : ((Number) e.get("eggs")).intValue();
+            int rated = e.get("rated") == null ? 0 : ((Number) e.get("rated")).intValue();
+            BigDecimal value = (BigDecimal) e.get("egg_value");
+            out.add(new VarietyFigures(l.id(), l.species(), l.variety(), opening, running,
+                    byKind.getOrDefault("PLACED", 0) + byKind.getOrDefault("BOUGHT", 0) + byKind.getOrDefault("MOVED_IN", 0), byKind.getOrDefault("BORN", 0),
+                    byKind.getOrDefault("DIED", 0), byKind.getOrDefault("CULLED", 0), byKind.getOrDefault("SOLD", 0), byKind.getOrDefault("MOVED_OUT", 0),
+                    soldKg.setScale(3, RoundingMode.HALF_UP), headDays, laid,
+                    !money || value == null || rated == 0 ? null : value.divide(BigDecimal.valueOf(rated), 2, RoundingMode.HALF_UP),
+                    !money ? null : value == null ? BigDecimal.ZERO.setScale(2) : value.setScale(2, RoundingMode.HALF_UP),
+                    !money ? null : bought.getOrDefault(l.id(), BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP),
+                    !money ? null : soldFor.getOrDefault(l.id(), BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP)));
+        }
+        return out;
     }
 
     /** For the dashboard: open poultry batches with no daily record for a date. */

@@ -2108,6 +2108,34 @@ variety rows had never been written, which also affected *Start batch*, *Buy mor
 | `frontend: npm run lint`, `npm test`, `npm run build` | Passed: **110 tests**; the mixed-batch test also checks that an empty variety is not asked about |
 | Layout at 800 and 375 px wide | Checked with the same markup and the app's stylesheets on the sign-in page; no sideways scroll. **Not checked signed in**, which needs the owner's password |
 
+### Last day's eggs and rate, and figures by variety (2026-11-05)
+
+The owner asked for two things: the daily record should start from the last day's values, as the payment amount does in
+BizManager, and clicking a batch's figure should show it by variety.
+
+- **Daily record:** on a day with no record yet, *Eggs laid* and *Rate per egg* are filled in from each variety's last
+  record, tinted and editable, with a *Last: …* button that brings the value back.
+  - Nothing is saved until *Save the day*.
+  - *Deaths* and *Culled* stay empty, because a carried-over death would remove birds.
+  - A day that already has a record is not filled in; a closed batch or a read-only user sees no filled values.
+- **Figures:** every card on the batch page opens a pop-up by variety: heads, deaths, sales, births, eggs, the value of
+  eggs at the owner's rates, and profit.
+  - What a variety's birds cost and sold for comes from its own bill lines.
+  - Feed and other costs stay with the whole batch (V6). The profit pop-ups show them as one row, so the rows add up to
+    the batch's figure. The feed pop-up shows an estimate by bird-days and says so.
+  - Eggs recorded earlier as a batch total show as *Not split by variety*.
+- **API, additive, no migration:** `lastEggs`, `lastEggsOn` and `lastEggRate` on a day's varieties; `varieties` on the
+  batch figures, with money null without finance access.
+- **Not changed:** the phone's daily record, which still takes batch totals.
+
+| Command | Result |
+|---|---|
+| `backend: gradlew test bootJar` | Passed: **861 tests, 0 failures**. `FlockVarietiesTest` has two new tests: the last values offered and not saved, and figures by variety, with a reversed sale and a worker without finance access |
+| `frontend: npm run lint`, `npx tsc --noEmit`, `npm run build` | Passed |
+| `frontend: npm test` | Passed: **113 tests**. New tests: a new day is filled and saved only on Save; a recorded day is not filled; the pop-ups by variety |
+| `mobile: npx tsc --noEmit`, `npm test` | Passed: **76 tests** |
+| Layout | Checked with the same markup and the app's stylesheets on the sign-in page. **Not checked signed in**, which needs the owner's password. The pop-ups were checked by the web tests only |
+
 ## Known gaps and defects
 
 Security and platform:

@@ -43,7 +43,8 @@ export type Movement = { id: number; date: string; kind: string; heads: number; 
 /** A variety in a batch or herd, with its heads today. */
 export type FlockLine = { id: number; species: string; variety: string | null; heads: number };
 /** A variety on a day: deaths, culls, eggs laid and the owner's rate for an egg. */
-export type DayLineView = { lineId: number; species: string; variety: string | null; heads: number; deaths: number; culls: number; eggs: number; eggRate: number | null };
+export type DayLineView = { lineId: number; species: string; variety: string | null; heads: number; deaths: number; culls: number; eggs: number; eggRate: number | null;
+  lastEggs?: number | null; lastEggsOn?: string | null; lastEggRate?: number | null };
 export type BatchDay = { day: string; deaths: number; deathCause: string | null; culls: number; eggsGood: number; eggsCracked: number; eggsBroken: number;
   feedItemId: number | null; feedKg: number | null; feedDocumentId: number | null; weightBirds: number | null; weightKg: number | null; notes: string | null;
   headsAtEnd: number; warnings: string[]; version?: string; lines?: DayLineView[] };
@@ -51,6 +52,9 @@ export type Figures = { from: string; to: string; openingHeads: number; closingH
   sold: number; movedOut: number; soldKg: number; headDays: number; eggsGood: number; eggsCracked: number; eggsBroken: number; eggs: number;
   henDayPercent: number | null; feedKg: number; feedPerDozen: number | null; mortalityPercent: number | null; averageWeight: number | null; fcr: number | null;
   revenue: number | null; costs: number | null; profit: number | null; costPerEgg: number | null; costPerKg: number | null; costPerHeadMonth: number | null;
-  eggValue?: number | null; profitWithEggs?: number | null };
+  eggValue?: number | null; profitWithEggs?: number | null; varieties?: VarietyFigures[] };
+/** A variety's part of the figures; money is null without finance access. */
+export type VarietyFigures = { lineId: number; species: string; variety: string | null; openingHeads: number; closingHeads: number; arrived: number; born: number; died: number; culled: number;
+  sold: number; movedOut: number; soldKg: number; headDays: number; eggs: number; eggRate: number | null; eggValue: number | null; boughtAmount: number | null; soldAmount: number | null };
 export type FlockReport = { group: FlockGroup; heads: number; period: Figures; sincePlacement: Figures | null };
 export type PlanItem = { id: number; kind: string; description: string; dueOn: string; doneEventId: number | null };

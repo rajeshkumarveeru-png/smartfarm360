@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { RotateCcw, Trash2 } from 'lucide-react';
+import { ChevronRight, RotateCcw, Trash2 } from 'lucide-react';
 import { api } from '../api/client';
 import { useTenant } from '../auth/useCurrentTenant';
 import { ErrorBanner, Loading } from '../components/common';
 import type { FinancialAccount, Party } from '../finance/types';
 import RecordsPanel from '../finance/RecordsPanel';
+import VarietyInsight, { type InsightKind } from './VarietyInsight';
 import VarietyLines, { BIRD_SPECIES, emptyVariety, type VarietyRow, varietyLines, varietyProblem } from './VarietyLines';
 import { newIdempotencyKey } from '../finance/useFinanceData';
 import { currentLanguage, useNs } from '../i18n';
@@ -24,7 +25,9 @@ const num = (v: string) => (v.trim() === '' ? null : Number(v));
 const str = (v: number | null | undefined) => (v == null || v === 0 ? '' : String(v));
 const monthStart = () => `${today().slice(0, 7)}-01`;
 /** A variety on the day's form: deaths, culls, eggs laid and the rate for an egg (bin and batch varieties design, V5). */
-type DayLineForm = { lineId: number; label: string; heads: number; deaths: string; culls: string; eggs: string; rate: string };
+type DayLineForm = { lineId: number; label: string; heads: number; deaths: string; culls: string; eggs: string; rate: string;
+  /** Eggs and rate of the last record: offered as a button, and filled in on a day with no record yet ({@code prefilled}) */
+  lastEggs: string; lastEggsOn: string; lastRate: string; prefilled: boolean };
 type DayForm = { deaths: string; deathCause: string; culls: string; eggsGood: string; eggsCracked: string; eggsBroken: string; feedItemId: string; feedKg: string;
   weightBirds: string; weightKg: string; notes: string; lines: DayLineForm[] };
 /** The varieties to ask about: those with birds or with something recorded that day (all of them if none qualifies). */
@@ -32,10 +35,15 @@ const dayLinesToShow = (lines: DayLineView[]) => {
   const live = lines.filter(l => l.heads > 0 || l.deaths > 0 || l.culls > 0 || l.eggs > 0 || l.eggRate != null);
   return live.length > 0 ? live : lines;
 };
-const toForm = (d: BatchDay, label: (l: DayLineView) => string): DayForm => ({ deaths: str(d.deaths), deathCause: d.deathCause ?? '', culls: str(d.culls), eggsGood: str(d.eggsGood),
+const toForm = (d: BatchDay, label: (l: DayLineView) => string): DayForm => {
+  const fresh = d.version === '0';   // Nothing is recorded for this day
+  return { deaths: str(d.deaths), deathCause: d.deathCause ?? '', culls: str(d.culls), eggsGood: str(d.eggsGood),
   eggsCracked: str(d.eggsCracked), eggsBroken: str(d.eggsBroken), feedItemId: d.feedItemId ? String(d.feedItemId) : '', feedKg: str(d.feedKg),
   weightBirds: str(d.weightBirds), weightKg: str(d.weightKg), notes: d.notes ?? '',
-  lines: dayLinesToShow(d.lines ?? []).map(l => ({ lineId: l.lineId, label: label(l), heads: l.heads, deaths: str(l.deaths), culls: str(l.culls), eggs: str(l.eggs), rate: str(l.eggRate) })) });
+  lines: dayLinesToShow(d.lines ?? []).map(l => ({ lineId: l.lineId, label: label(l), heads: l.heads, deaths: str(l.deaths), culls: str(l.culls),
+    eggs: fresh ? str(l.lastEggs) : str(l.eggs), rate: fresh ? str(l.lastEggRate) : str(l.eggRate), lastEggs: str(l.lastEggs), lastEggsOn: l.lastEggsOn ?? '', lastRate: str(l.lastEggRate),
+    prefilled: fresh && (l.lastEggs != null || l.lastEggRate != null) })) };
+};
 
 /** One poultry batch or goat and sheep herd: figures (J8), the daily record (J4), head movements (J7), sales (J6), eggs (J5) and the health plan (J9). */
 type FlockTab = 'summary' | 'daily' | 'heads' | 'money' | 'health';
@@ -232,12 +240,21 @@ export default function FlockPage() {
                       <label><span>{t('deaths')}</span><input inputMode="numeric" disabled={!open} aria-label={`${t('deaths')} ${l.label}`} value={l.deaths} onChange={e => put({ deaths: e.target.value })} /></label>
                       <label><span>{t('culls')}</span><input inputMode="numeric" disabled={!open} aria-label={`${t('culls')} ${l.label}`} value={l.culls} onChange={e => put({ culls: e.target.value })} /></label>
                       {layers && <>
-                        <label><span>{t('eggsLaid')}</span><input inputMode="numeric" disabled={!open} aria-label={`${t('eggsLaid')} ${l.label}`} value={l.eggs} onChange={e => put({ eggs: e.target.value })} /></label>
-                        <label><span>{t('eggRate')}</span><input inputMode="decimal" disabled={!open} aria-label={`${t('eggRate')} ${l.label}`} placeholder="₹" value={l.rate} onChange={e => put({ rate: e.target.value })} /></label>
+                        <div className="day-field">
+                          <label><span>{t('eggsLaid')}</span><input inputMode="numeric" disabled={!open} aria-label={`${t('eggsLaid')} ${l.label}`} className={l.prefilled && l.lastEggs && l.eggs === l.lastEggs ? 'suggested' : undefined}
+                                                                    value={!open && l.prefilled ? '' : l.eggs} onChange={e => put({ eggs: e.target.value })} /></label>
+                          {open && l.lastEggs && <button type="button" className={`day-chip${l.eggs === l.lastEggs ? ' on' : ''}`} title={formatDate(l.lastEggsOn, lang)} onClick={() => put({ eggs: l.lastEggs })}>{t('lastValue', { value: l.lastEggs })}</button>}
+                        </div>
+                        <div className="day-field">
+                          <label><span>{t('eggRate')}</span><input inputMode="decimal" disabled={!open} aria-label={`${t('eggRate')} ${l.label}`} placeholder="₹" className={l.prefilled && l.lastRate && l.rate === l.lastRate ? 'suggested' : undefined}
+                                                                   value={!open && l.prefilled ? '' : l.rate} onChange={e => put({ rate: e.target.value })} /></label>
+                          {open && l.lastRate && <button type="button" className={`day-chip${l.rate === l.lastRate ? ' on' : ''}`} onClick={() => put({ rate: l.lastRate })}>{t('lastValue', { value: formatMoney(Number(l.lastRate), lang) })}</button>}
+                        </div>
                       </>}
                     </div>
                   );
                 })}
+                {layers && open && dayForm.lines.some(l => l.prefilled) && <p className="hint day-prefilled">{t('dayPrefilled')}</p>}
                 {layers && <p className="hint">{t('eggRateHelp')}</p>}
               </div>
             ) : <>
@@ -474,31 +491,42 @@ export default function FlockPage() {
 }
 
 /** The batch's or herd's figures for a period (J8); money only with FINANCE_READ. */
+function Card({ kind, label, className, onOpen, children }: { kind: InsightKind; label: string; className?: string; onOpen: (o: { kind: InsightKind; label: string }) => void; children: React.ReactNode }) {
+  const t = useNs('farm');
+  return (
+    <button type="button" className={`finance-stat kpi-button${className ? ` ${className}` : ''}`} onClick={() => onOpen({ kind, label })}>
+      <span>{label}</span>{children}<small className="kpi-hint">{t('clickHint')}<ChevronRight size={13} aria-hidden /></small>
+    </button>
+  );
+}
+
 function FigureCards({ title, f, poultry, layers, showMoney }: { title: string; f: Figures; poultry: boolean; layers: boolean; showMoney: boolean }) {
   const t = useNs('livestock');
   const tf = useNs('fin');
   const lang = currentLanguage();
   const n = (v: number | null, d = 2) => (v == null ? '—' : formatNumber(v, lang, d));
   const m = (v: number | null) => (v == null ? '—' : formatMoney(v, lang));
+  const [open, setOpen] = useState<{ kind: InsightKind; label: string } | null>(null);
   return (
     <>
       <h3 className="section-space">{title}</h3>
       <div className="finance-stats">
-        <div className="finance-stat"><span>{t('openingHeads')}</span><b>{n(f.openingHeads, 0)}</b><small>{t('closingHeads')} {n(f.closingHeads, 0)}</small></div>
-        <div className="finance-stat"><span>{t('died')}</span><b>{n(f.died, 0)}</b><small>{t('mortality')} {n(f.mortalityPercent)}</small></div>
-        <div className="finance-stat"><span>{t('soldHeads')}</span><b>{n(f.sold, 0)}</b>{f.soldKg > 0 && <small>{n(f.soldKg)} kg</small>}</div>
-        {!poultry && <div className="finance-stat"><span>{t('bornHeads')}</span><b>{n(f.born, 0)}</b></div>}
-        {layers && <div className="finance-stat"><span>{t('eggs')}</span><b>{n(f.eggs, 0)}</b><small>{t('henDay')} {n(f.henDayPercent, 1)}</small></div>}
-        {poultry && <div className="finance-stat"><span>{t('feedKg')}</span><b>{n(f.feedKg)}</b>
-          <small>{layers ? `${t('feedPerDozen')} ${n(f.feedPerDozen)}` : `${t('fcr')} ${n(f.fcr)} · ${t('averageWeight')} ${n(f.averageWeight, 3)}`}</small></div>}
-        {showMoney && <div className="finance-stat"><span>{t('profit')}</span><b>{m(f.profit)}</b>
-          <small>{tf('revenue')} {m(f.revenue)} · {tf('costs')} {m(f.costs)}</small></div>}
-        {showMoney && <div className="finance-stat"><span>{t(layers ? 'costPerEgg' : poultry ? 'costPerKg' : 'costPerHeadMonth')}</span>
-          <b>{m(layers ? f.costPerEgg : poultry ? f.costPerKg : f.costPerHeadMonth)}</b></div>}
-        {showMoney && f.eggValue != null && <div className="finance-stat"><span>{t('eggValue')}</span><b>{m(f.eggValue)}</b><small>{t('eggValueHelp')}</small></div>}
-        {showMoney && f.profitWithEggs != null && <div className={`finance-stat${f.profitWithEggs > 0 ? ' positive' : f.profitWithEggs < 0 ? ' negative' : ''}`}>
-          <span>{t('profitWithEggs')}</span><b>{m(f.profitWithEggs)}</b><small>{t('profitWithEggsHelp')}</small></div>}
+        <Card onOpen={setOpen} kind="heads" label={t('openingHeads')}><b>{n(f.openingHeads, 0)}</b><small>{t('closingHeads')} {n(f.closingHeads, 0)}</small></Card>
+        <Card onOpen={setOpen} kind="died" label={t('died')}><b>{n(f.died, 0)}</b><small>{t('mortality')} {n(f.mortalityPercent)}</small></Card>
+        <Card onOpen={setOpen} kind="sold" label={t('soldHeads')}><b>{n(f.sold, 0)}</b>{f.soldKg > 0 && <small>{n(f.soldKg)} kg</small>}</Card>
+        {!poultry && <Card onOpen={setOpen} kind="born" label={t('bornHeads')}><b>{n(f.born, 0)}</b></Card>}
+        {layers && <Card onOpen={setOpen} kind="eggs" label={t('eggs')}><b>{n(f.eggs, 0)}</b><small>{t('henDay')} {n(f.henDayPercent, 1)}</small></Card>}
+        {poultry && <Card onOpen={setOpen} kind="feed" label={t('feedKg')}><b>{n(f.feedKg)}</b>
+          <small>{layers ? `${t('feedPerDozen')} ${n(f.feedPerDozen)}` : `${t('fcr')} ${n(f.fcr)} · ${t('averageWeight')} ${n(f.averageWeight, 3)}`}</small></Card>}
+        {showMoney && <Card onOpen={setOpen} kind="profit" label={t('profit')}><b>{m(f.profit)}</b>
+          <small>{tf('revenue')} {m(f.revenue)} · {tf('costs')} {m(f.costs)}</small></Card>}
+        {showMoney && <Card onOpen={setOpen} kind="cost" label={t(layers ? 'costPerEgg' : poultry ? 'costPerKg' : 'costPerHeadMonth')}>
+          <b>{m(layers ? f.costPerEgg : poultry ? f.costPerKg : f.costPerHeadMonth)}</b></Card>}
+        {showMoney && f.eggValue != null && <Card onOpen={setOpen} kind="eggValue" label={t('eggValue')}><b>{m(f.eggValue)}</b><small>{t('eggValueHelp')}</small></Card>}
+        {showMoney && f.profitWithEggs != null && <Card onOpen={setOpen} kind="profitWithEggs" label={t('profitWithEggs')} className={f.profitWithEggs > 0 ? 'positive' : f.profitWithEggs < 0 ? 'negative' : undefined}>
+          <b>{m(f.profitWithEggs)}</b><small>{t('profitWithEggsHelp')}</small></Card>}
       </div>
+      {open && <VarietyInsight kind={open.kind} label={open.label} f={f} period={title} poultry={poultry} layers={layers} onClose={() => setOpen(null)} />}
     </>
   );
 }

@@ -91,6 +91,77 @@ class FlockVarietiesTest extends FinanceTestSupport {
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("EGGS_SPLIT"));
     }
 
+    private static JsonNode lineOf(JsonNode day, long lineId) {
+        return StreamSupport.stream(day.get("lines").spliterator(), false).filter(n -> n.get("lineId").asLong() == lineId).findFirst().orElseThrow();
+    }
+
+    private static JsonNode varietyOf(JsonNode figures, String variety) {
+        return StreamSupport.stream(figures.get("varieties").spliterator(), false).filter(n -> variety.equals(n.get("variety").asText())).findFirst().orElseThrow();
+    }
+
+    @Test
+    void aNewDayOffersTheLastEggsAndRateWithoutSavingThem() throws Exception {
+        long batch = startMixedBatch();
+        long sonali = lineId(batch, "Sonali"), muscovy = lineId(batch, "Muscovy");
+        put(l("/flocks/" + batch + "/days/2026-07-02"), owner, Map.of("lines", List.of(Map.of("lineId", sonali, "eggs", 6, "eggRate", 8)))).andExpect(status().isOk());
+        put(l("/flocks/" + batch + "/days/2026-07-03"), owner, Map.of("lines", List.of(Map.of("lineId", sonali, "eggs", 7)))).andExpect(status().isOk());
+
+        JsonNode next = body(get(l("/flocks/" + batch + "/days/2026-07-04"), owner).andExpect(status().isOk()));
+        assertThat(next.get("version").asText()).isEqualTo("0");   // Nothing is recorded for the day
+        JsonNode line = lineOf(next, sonali);
+        assertThat(line.get("eggs").asInt()).isZero();
+        assertThat(line.get("lastEggs").asInt()).isEqualTo(7);
+        assertThat(line.get("lastEggsOn").asText()).isEqualTo("2026-07-03");
+        money(line.get("lastEggRate"), "8");                       // The last rate given, a day earlier
+        assertThat(lineOf(next, muscovy).get("lastEggs").isNull()).isTrue();
+        // A later record is not offered for an earlier day
+        assertThat(lineOf(body(get(l("/flocks/" + batch + "/days/2026-07-02"), owner)), sonali).get("lastEggs").isNull()).isTrue();
+    }
+
+    @Test
+    void theFiguresAreSplitByVariety() throws Exception {
+        long batch = startMixedBatch();
+        long sonali = lineId(batch, "Sonali"), muscovy = lineId(batch, "Muscovy");
+        put(l("/flocks/" + batch + "/days/2026-07-02"), owner, Map.of("lines", List.of(Map.of("lineId", sonali, "deaths", 1, "eggs", 6, "eggRate", 8),
+                Map.of("lineId", muscovy, "eggs", 4, "eggRate", 12)))).andExpect(status().isOk());
+        put(l("/flocks/" + batch + "/days/2026-07-03"), owner, Map.of("lines", List.of(Map.of("lineId", sonali, "eggs", 2, "eggRate", 10)))).andExpect(status().isOk());
+        long sale = body(post(l("/flocks/" + batch + "/sales"), owner, Map.of("date", "2026-07-05", "heads", 2, "rate", 300, "rateBasis", "HEAD",
+                "financialAccountId", cash, "lineId", muscovy)).andExpect(status().isCreated())).get("documentId").asLong();
+
+        String report = l("/flocks/" + batch + "/report?from=2026-07-01&to=2026-07-31");
+        JsonNode figures = body(get(report, owner)).get("period");
+        JsonNode s = varietyOf(figures, "Sonali"), m = varietyOf(figures, "Muscovy");
+        assertThat(s.get("arrived").asInt()).isEqualTo(10);
+        assertThat(s.get("died").asInt()).isEqualTo(1);
+        assertThat(s.get("closingHeads").asInt()).isEqualTo(9);
+        assertThat(s.get("eggs").asInt()).isEqualTo(8);
+        money(s.get("eggValue"), "68");                            // 6 x 8 + 2 x 10
+        money(s.get("eggRate"), "8.5");
+        money(s.get("boughtAmount"), "500");                       // Each from its own line of the one bill
+        money(m.get("boughtAmount"), "400");
+        assertThat(m.get("sold").asInt()).isEqualTo(2);
+        money(m.get("soldAmount"), "600");
+        assertThat(m.get("closingHeads").asInt()).isEqualTo(3);
+        assertThat(s.get("closingHeads").asInt() + m.get("closingHeads").asInt()).isEqualTo(figures.get("closingHeads").asInt());
+        assertThat(s.get("headDays").asLong() + m.get("headDays").asLong()).isEqualTo(figures.get("headDays").asLong());
+
+        // A reversed sale no longer counts for its variety
+        post("/api/v1/tenants/" + tenant + "/finance/documents/" + sale + "/reverse", owner, Map.of()).andExpect(status().isOk());
+        JsonNode after = varietyOf(body(get(report, owner)).get("period"), "Muscovy");
+        assertThat(after.get("sold").asInt()).isZero();
+        money(after.get("soldAmount"), "0");
+        assertThat(after.get("closingHeads").asInt()).isEqualTo(5);
+
+        // Without finance access the heads and eggs show, not the money
+        var worker = newUser("fv-worker");
+        addMember(owner, tenant, worker, "WORKER");
+        JsonNode seen = varietyOf(body(get(report, worker).andExpect(status().isOk())).get("period"), "Sonali");
+        assertThat(seen.get("eggs").asInt()).isEqualTo(8);
+        assertThat(seen.get("eggValue").isNull()).isTrue();
+        assertThat(seen.get("boughtAmount").isNull()).isTrue();
+        assertThat(seen.get("soldAmount").isNull()).isTrue();
+    }
+
     @Test
     void aVarietyOfAnotherBatchIsRefused() throws Exception {
         long batch = startMixedBatch();
