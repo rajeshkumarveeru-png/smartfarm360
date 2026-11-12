@@ -366,6 +366,8 @@
     "consentRequired": "Tick the box to accept, or sign out."
   },
   "nav": {
+    "collapseMenu": "Collapse the menu",
+    "expandMenu": "Expand the menu",
     "farms": "Farms & land",
     "crops": "Crops",
     "finance": "Finance",

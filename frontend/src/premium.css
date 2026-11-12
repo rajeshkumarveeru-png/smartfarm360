@@ -278,3 +278,104 @@ button.im-row { display: flex; font: inherit; text-align: left; cursor: pointer;
 /* Two columns only when records have room to be read */
 .db-grid.fw-grid { grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 1500px) { .db-grid.fw-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); } }
+
+/* ---- Compact layout (2026-11-05): more of the farm on one screen. Phones keep their larger touch targets ------ */
+:root { --sf-gutter: clamp(14px, 1.7vw, 24px); --sf-side: 216px; }
+.menu-toggle {
+  display: inline-grid; flex: none; place-items: center; width: 32px; height: 32px; padding: 0; border: 1px solid transparent; border-radius: var(--sf-r-sm);
+  background: transparent; color: var(--sf-text-2); cursor: pointer;
+  transition: background-color var(--sf-base) var(--sf-ease), color var(--sf-base) var(--sf-ease), border-color var(--sf-base) var(--sf-ease), transform var(--sf-fast) var(--sf-ease);
+}
+.menu-toggle:hover { background: var(--sf-glass-strong); border-color: var(--sf-brand-200); color: var(--sf-brand-700); }
+.menu-toggle:active { transform: scale(.92); }
+.finance-stats > .finance-stat .kpi-hint { position: absolute; top: 8px; right: 8px; margin: 0; font-size: 0 !important; line-height: 0; }
+
+@media (max-width: 900px) { .menu-toggle { display: none; } }
+
+@media (min-width: 901px) {
+  /* The menu, and its icon-only form */
+  .sidebar { width: var(--sf-side); padding: 12px 10px; transition: width var(--sf-slow) var(--sf-ease); overflow-x: hidden; }
+  .main { margin-left: var(--sf-side); max-width: none; padding: 0 var(--sf-gutter) 14px; transition: margin-left var(--sf-slow) var(--sf-ease); }
+  .brand { padding: 0 4px 12px; gap: 9px; }
+  .brand-mark { width: 36px; height: 36px; flex: 0 0 36px; border-radius: 11px; }
+  .brand-mark svg { width: 20px; height: 20px; }
+  .brand strong { font-size: 16px; white-space: nowrap; }
+  .brand small { font-size: 10px; white-space: nowrap; }
+  .tenant-switcher { margin: 0 0 8px; }
+  .tenant-switcher select { min-height: 34px; padding-top: 4px; padding-bottom: 4px; font-size: 12.5px; }
+  .sidebar .side-link { padding: 6px 10px; min-height: 32px; font-size: 13px; white-space: nowrap; }
+  .side-bottom { padding-top: 6px; margin-top: 6px; gap: 4px; }
+
+  .sf-menu-collapsed { --sf-side: 60px; }
+  .sf-menu-collapsed .brand { justify-content: center; padding: 0 0 12px; }
+  .sf-menu-collapsed .brand > div:last-child, .sf-menu-collapsed .tenant-switcher, .sf-menu-collapsed .side-bottom small { display: none; }
+  .sf-menu-collapsed .side-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .sf-menu-collapsed .sidebar .side-link, .sf-menu-collapsed .side-signout { justify-content: center; padding: 8px 0; gap: 0; }
+  .sf-menu-collapsed .sidebar .side-link svg { width: 19px; height: 19px; }
+  .sf-menu-collapsed .sidebar .side-link:hover { transform: none; }
+  .sf-menu-collapsed .side-signout { width: 100%; }
+
+  /* The top bar and page headings */
+  .topbar { margin: 0 calc(-1 * var(--sf-gutter)) 12px; padding: 6px var(--sf-gutter); min-height: 46px; }
+  .language { padding: 5px 11px; }
+  .crop-page { padding: 4px 0 8px; }
+  .crop-page-head { margin-bottom: 10px; gap: 12px; flex-direction: row; align-items: flex-start; }
+  .crop-page-head h2, .db-head h2 { font-size: 22px; margin: 1px 0 2px; }
+  .crop-page-head p { font-size: 13px; }
+  .db-head { margin: 0 0 10px; }
+  .db-head p { font-size: 13px; }
+  .section-head { margin: 10px 0 8px; }
+  .section-head h2 { font-size: 16px; }
+  .section-space { margin-top: 14px; }
+  h3.section-space { margin-bottom: 6px; font-size: 14.5px; }
+  .crop-tabs.section-space { margin-top: 8px; }
+  .fw-hero { padding: 12px 16px; }
+
+  /* Tabs */
+  .crop-tabs, .tabs { padding: 3px; margin-bottom: 10px; border-radius: 11px; }
+  .crop-tabs a, .crop-tabs button, .tabs .tab { padding: 6px 12px; font-size: 13px; border-radius: 8px; }
+
+  /* Cards and forms: fields keep a sensible width instead of stretching across the page */
+  .form-card, .panel { padding: 12px 14px; margin: 0 0 10px; }
+  .db-card { padding: 12px 14px; }
+  .db-grid { gap: 10px; }
+  .form-card.form-grid, .form-card.filters, .filters { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 12px; }
+  .form-card label, .panel label, .crop-controls > label { gap: 4px; }
+  .crop-controls { padding: 10px 14px; margin-bottom: 10px; gap: 12px; justify-content: flex-start; flex-wrap: wrap; }
+  .crop-controls > label { flex: 0 1 200px; min-width: 150px; }
+  .form-actions { padding-top: 0; }
+  .lines { padding: 10px 12px; gap: 8px; }
+
+  /* Figures */
+  .finance-stats { gap: 8px; margin: 6px 0 10px; grid-template-columns: repeat(auto-fit, minmax(146px, 1fr)); }
+  .finance-stats > .finance-stat { padding: 10px 12px; gap: 3px; }
+  .finance-stats > .finance-stat b { font-size: clamp(15px, 13cqi, 21px); }
+  .finance-stats > .finance-stat span { font-size: 12px; }
+  .finance-stats > .finance-stat small { font-size: 11.5px; line-height: 1.35; }
+  .db-kpi-icon { width: 26px; height: 26px; }
+  .db-kpi-icon svg { width: 14px; height: 14px; }
+
+  /* Lists */
+  .cycle-card, .crop-record, .activity-row, .parcel-row, .tenant-card, .farm-card { padding: 9px 12px; }
+  .variety-card { padding: 9px 12px; }
+  .variety-card b { margin-top: 2px; font-size: 18px; }
+  .day-lines { gap: 8px; }
+  .day-line { padding: 9px 12px; gap: 6px 10px; }
+  .data-table { font-size: 13px; }
+  .data-table th, .data-table td { padding: 7px 10px; }
+  .empty-state { padding: 12px 14px; }
+  .fw-records a { padding-top: 6px; padding-bottom: 6px; }
+}
+
+/* A mouse is precise, so controls can be shorter than a finger needs */
+@media (min-width: 901px) and (pointer: fine) {
+  :is(input:not([type=checkbox], [type=radio], [type=range], [type=file], [type=color]), select, textarea) { min-height: 34px; padding-top: 5px; padding-bottom: 5px; font-size: 13.5px; border-radius: 9px; }
+  textarea { min-height: 56px; }
+  .primary, .secondary, .danger { min-height: 34px; padding: 6px 12px; font-size: 13px; border-radius: 9px; }
+  .icon-button { width: 30px; height: 30px; }
+  .rp-btn { width: 28px; height: 28px; }
+}
+@media (min-width: 901px) {
+  .brand > div:last-child { min-width: 0; }
+  .brand small { font-size: 9.5px; overflow: hidden; text-overflow: ellipsis; }
+}

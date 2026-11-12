@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { TenantSummary } from '../api/types';
 import { setLanguage } from '../i18n';
@@ -25,6 +26,34 @@ function renderAt(tenant: TenantSummary, platformAdmin = false) {
 }
 
 const base: TenantSummary = { id: 7, name: 'Green Valley', slug: 'gv', preferredLanguage: 'en', active: true, roles: [], permissions: [], enabledModules: ['CROP'], createdAt: '' };
+
+describe('collapsing the menu', () => {
+  afterEach(() => { localStorage.clear(); cleanup(); });
+
+  it('collapses to icons, keeps every link reachable by name, and remembers the choice', async () => {
+    const first = renderAt({ ...base, permissions: ['TENANT_READ'] });
+    const collapse = await screen.findByRole('button', { name: 'Collapse the menu' });
+    expect(collapse).toHaveAttribute('aria-expanded', 'true');
+    expect(document.documentElement).not.toHaveClass('sf-menu-collapsed');
+
+    await userEvent.click(collapse);
+    expect(document.documentElement).toHaveClass('sf-menu-collapsed');
+    expect(screen.getByRole('button', { name: 'Expand the menu' })).toHaveAttribute('aria-expanded', 'false');
+    // Icon-only: the links keep their names, and a tooltip says the same
+    const dashboard = screen.getByRole('link', { name: 'Dashboard' });
+    expect(dashboard).toHaveAttribute('title', 'Dashboard');
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
+
+    // Coming back, it stays collapsed until expanded again
+    first.unmount();
+    expect(document.documentElement).not.toHaveClass('sf-menu-collapsed');
+    renderAt({ ...base, permissions: ['TENANT_READ'] });
+    expect(document.documentElement).toHaveClass('sf-menu-collapsed');
+    await userEvent.click(await screen.findByRole('button', { name: 'Expand the menu' }));
+    expect(document.documentElement).not.toHaveClass('sf-menu-collapsed');
+    expect(screen.getByRole('link', { name: 'Dashboard' })).not.toHaveAttribute('title');
+  });
+});
 
 describe('layout navigation', () => {
   it('shows a worker only the sections they can use', () => {

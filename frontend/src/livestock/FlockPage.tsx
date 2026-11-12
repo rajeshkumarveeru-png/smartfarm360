@@ -208,10 +208,10 @@ export default function FlockPage() {
         <div>
           <p><Link to={listPath}>{t(poultry ? 'poultry' : 'smallStock')}</Link></p>
           <h2>{group.name}{group.closed && <small> · {t('closed')}</small>}</h2>
-          {canWrite && <button type="button" className="danger flock-delete" onClick={() => void deleteGroup()}><Trash2 size={15} aria-hidden />{t(poultry ? 'deleteBatch' : 'deleteHerd')}</button>}
           <p>{t(`species.${group.species}`)} · {t(`purpose.${group.purpose}`)}{group.placedOn && <> · {t(poultry ? 'placedOn' : 'startedOn')} {formatDate(group.placedOn, lang)}</>}
             {group.strain && <> · {group.strain}</>} · <b>{t('headsNow', { count: formatNumber(report.heads, lang, 0) })}</b></p>
         </div>
+        {canWrite && <button type="button" className="danger flock-delete" onClick={() => void deleteGroup()}><Trash2 size={15} aria-hidden />{t(poultry ? 'deleteBatch' : 'deleteHerd')}</button>}
       </div>
       <ErrorBanner message={error} onRetry={stale ? () => { setError(''); setDayLoads(n => n + 1); } : undefined} retryLabel={tc('loadLatest')} />
       <Toast message={message} onClose={() => setMessage('')} />
