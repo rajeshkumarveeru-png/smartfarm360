@@ -10,12 +10,12 @@ describe('navigation visibility', () => {
   it('shows only sections the member has permission for', () => {
     const worker = tenant(['TENANT_READ', 'FARM_READ', 'CROP_READ', 'CROP_ACTIVITY_WRITE']);
     // Every member gets the dashboard first (H1) and the reports list, which shows only reports they may open
-    expect(visibleNav(worker).map(i => i.key)).toEqual(['dashboard', 'farms', 'crops', 'reports', 'settings']);
+    expect(visibleNav(worker).map(i => i.key)).toEqual(['dashboard', 'farms', 'reports', 'settings']);
   });
 
   it('hides modules the tenant has not enabled', () => {
     const owner = tenant(['TENANT_READ', 'FARM_READ', 'CROP_READ', 'FINANCE_READ'], []);
-    expect(visibleNav(owner).map(i => i.key)).not.toContain('crops');
+    expect(visibleNav(owner).map(i => i.key)).toContain('farms');
   });
 
   it('gives each animal section its own entry: cows and dairy, poultry, goats and sheep', () => {

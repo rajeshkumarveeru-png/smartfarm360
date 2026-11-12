@@ -8,6 +8,7 @@ import { Toast } from '../components/Toast';
 import type { FinancialAccount, Party } from '../finance/types';
 import RecordsPanel from '../finance/RecordsPanel';
 import DayRecords from './DayRecords';
+import HatchingPanel from './HatchingPanel';
 import VarietyInsight, { type InsightKind } from './VarietyInsight';
 import VarietyLines, { BIRD_SPECIES, emptyVariety, type VarietyRow, varietyLines, varietyProblem } from './VarietyLines';
 import { newIdempotencyKey } from '../finance/useFinanceData';
@@ -48,7 +49,7 @@ const toForm = (d: BatchDay, label: (l: DayLineView) => string): DayForm => {
 };
 
 /** One poultry batch or goat and sheep herd: figures (J8), the daily record (J4), head movements (J7), sales (J6), eggs (J5) and the health plan (J9). */
-type FlockTab = 'summary' | 'daily' | 'heads' | 'money' | 'health';
+type FlockTab = 'summary' | 'daily' | 'hatching' | 'heads' | 'money' | 'health';
 
 export default function FlockPage() {
   const { groupId } = useParams();
@@ -199,8 +200,8 @@ export default function FlockPage() {
 
   const kinds = ['DIED', 'CULLED', 'RECEIVED', 'MOVED', 'COUNT', ...(poultry ? [] : ['BORN'])];
   // One part of the batch per tab, so the page stays short
-  const tabs: FlockTab[] = ['summary', ...(poultry ? ['daily' as const] : []), 'heads', ...(canMoney || (layers && canWrite) ? ['money' as const] : []), 'health'];
-  const tabLabel = (x: FlockTab) => ({ summary: t('tabSummary'), daily: t('tabDaily'), heads: t(poultry ? 'tabBirds' : 'tabAnimals'),
+  const tabs: FlockTab[] = ['summary', ...(poultry ? ['daily' as const, 'hatching' as const] : []), 'heads', ...(canMoney || (layers && canWrite) ? ['money' as const] : []), 'health'];
+  const tabLabel = (x: FlockTab) => ({ summary: t('tabSummary'), daily: t('tabDaily'), hatching: 'Hatching', heads: t(poultry ? 'tabBirds' : 'tabAnimals'),
     money: t('tabMoney'), health: t('healthPlan') })[x];
   return (
     <>
@@ -290,6 +291,8 @@ export default function FlockPage() {
         </>
       )}
 
+      {tab === 'hatching' && poultry && <HatchingPanel groupId={Number(groupId)} lines={lines} editable={open} onChanged={() => { void load(); setDayLoads(n => n + 1); }} />}
+
       {tab === 'heads' && <>
       {lines.length > 0 && <>
         <h3 className="section-space">{t('varieties')}</h3>
@@ -376,14 +379,14 @@ export default function FlockPage() {
             const problem = varietyProblem(buy.rows, true, t);
             if (problem) { setError(problem); return; }
             if (!payerOk(buy)) { setError(t('errors.purchase')); return; }
-            const total = buy.rows.reduce((sum, row) => sum + Number(row.amount), 0).toFixed(2);
+            const total = buy.rows.reduce((sum, row) => sum + Number(row.amount) * Number(row.heads), 0).toFixed(2);
             void send(`${flock}/purchases`, 'POST', { date: buy.date, bill: { amount: total, ...payer(buy) }, lines: varietyLines(buy.rows, true) }, 'buy',
               () => { setBuy({ ...buy, rows: [emptyVariety(poultry ? 'CHICKEN' : group.species)] }); return t('purchaseRecorded'); });
           }}>
             <label>{tf('date')}<input type="date" max={today()} value={buy.date} onChange={e => setBuy({ ...buy, date: e.target.value })} /></label>
             <VarietyLines kind={poultry ? 'poultry' : 'smallStock'} rows={buy.rows} priced existing={lines} onChange={rows => setBuy({ ...buy, rows })} />
             <PayerFields parties={parties} accounts={accounts} f={buy} set={p => setBuy({ ...buy, ...p })} partyLabel={t('boughtFrom')} accountLabel={tf('paidFrom')} />
-            <div className="form-actions full"><button className="secondary">{t('recordPurchase')}</button></div>
+            <div className="form-actions full"><button className="primary">{t('recordPurchase')}</button></div>
           </form>
         </>
       )}
@@ -409,7 +412,7 @@ export default function FlockPage() {
               <option value="KG">{t('perKg')}</option><option value="HEAD">{t('perHead')}</option></select></label>
             <label>{t('rate')}<input inputMode="decimal" value={sale.rate} onChange={e => setSale({ ...sale, rate: e.target.value })} /></label>
             <PayerFields parties={parties} accounts={accounts} f={sale} set={p => setSale({ ...sale, ...p })} partyLabel={t('buyer')} accountLabel={tf('receivedInto')} />
-            <div className="form-actions full"><button className="secondary">{t('recordSale')}</button></div>
+            <div className="form-actions full"><button className="primary">{t('recordSale')}</button></div>
           </form>
         </>
       )}
@@ -444,7 +447,7 @@ export default function FlockPage() {
                 {['piece', 'dozen', 'tray'].map(u => <option key={u} value={u}>{t(`eggUnits.${u}`)}</option>)}</select></label>
               <label>{t('billAmountTotal')}<input inputMode="decimal" value={eggSale.amount} onChange={e => setEggSale({ ...eggSale, amount: e.target.value })} /></label>
               <PayerFields parties={parties} accounts={accounts} f={eggSale} set={p => setEggSale({ ...eggSale, ...p })} partyLabel={t('buyer')} accountLabel={tf('receivedInto')} />
-              <div className="form-actions full"><button className="secondary">{t('recordSale')}</button></div>
+              <div className="form-actions full"><button className="primary">{t('recordSale')}</button></div>
             </form>
           )}
         </>

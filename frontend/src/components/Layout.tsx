@@ -76,7 +76,7 @@ export default function Layout() {
             return (
               <NavLink key={item.key} to={`/t/${tenant.id}/${item.path}`}
                 title={collapsed ? t(`nav.${item.key}`) : undefined}
-                className={({ isActive }) => `side-link${isActive && !(item.key === 'livestock' && inOtherAnimals) ? ' active' : ''}`}>
+                className={({ isActive }) => `side-link${(isActive || (item.key === 'farms' && (pathname.includes('/farms') || pathname.includes('/crops')))) && !(item.key === 'livestock' && inOtherAnimals) ? ' active' : ''}`}>
                 <Icon size={17} aria-hidden /><span className="side-text">{t(`nav.${item.key}`)}</span>
               </NavLink>
             );

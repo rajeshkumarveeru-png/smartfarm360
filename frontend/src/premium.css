@@ -379,3 +379,257 @@ button.im-row { display: flex; font: inherit; text-align: left; cursor: pointer;
   .brand > div:last-child { min-width: 0; }
   .brand small { font-size: 9.5px; overflow: hidden; text-overflow: ellipsis; }
 }
+
+
+/* ---- Unified Farm & Crop workspace -------------------------------------------------------------------------- */
+.farm-crop-tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 18px; padding: 5px; border: 1px solid rgb(255 255 255 / 72%); border-radius: 14px; background: rgb(255 255 255 / 58%); box-shadow: var(--sf-lift-1); backdrop-filter: var(--sf-glass-blur); }
+.farm-crop-tabs a { white-space: nowrap; }
+
+/* Poultry batch forms use a stable two-column grid; repeating variety rows align by field,
+   rather than wrapping into uneven flex rows on tablet and desktop widths. */
+.flock-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 16px 18px; }
+.flock-form > label { min-width: 0; width: 100%; }
+.flock-form .variety-lines { min-width: 0; width: 100%; padding: 16px; border: 1px solid var(--sf-border); border-radius: var(--sf-r-md); background: rgb(255 255 255 / 42%); }
+.flock-form .variety-row { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(110px, .7fr) minmax(110px, .7fr) auto; align-items: end; gap: 12px; padding: 12px; border: 1px solid var(--sf-border); border-radius: 12px; background: rgb(255 255 255 / 72%); }
+.flock-form .variety-row > label { min-width: 0; width: 100%; }
+.flock-form .variety-row input, .flock-form .variety-row select { width: 100%; min-width: 0; }
+.flock-form .variety-row > .icon-button { margin: 0 0 5px; }
+.flock-form .variety-foot { margin-top: 12px; }
+.flock-form .form-actions.full, .flock-form .full { grid-column: 1 / -1; }
+@media (max-width: 760px) {
+  .flock-form { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .flock-form .variety-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .flock-form .variety-row > .icon-button { justify-self: end; }
+  .farm-crop-tabs { overflow-x: auto; flex-wrap: nowrap; }
+}
+@media (max-width: 420px) { .flock-form .variety-row { grid-template-columns: minmax(0, 1fr); } }
+
+
+/* ---- Poultry & livestock visual consistency pass -------------------------------------------------------------
+   Keep the variety editor aligned in every context (new batch AND Buy more), not only inside .flock-form. */
+.variety-lines {
+  width: 100%;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--sf-glass-line);
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgb(241 249 239 / 78%), rgb(255 255 255 / 78%));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 88%);
+}
+.variety-lines > legend {
+  padding: 0 8px;
+  color: var(--sf-brand-700);
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: .015em;
+}
+.variety-lines .variety-row {
+  display: grid;
+  grid-template-columns: minmax(125px, 1fr) minmax(145px, 1.2fr) minmax(150px, 1.25fr) minmax(90px, .75fr) minmax(150px, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid rgb(47 133 80 / 16%);
+  border-radius: 13px;
+  background: linear-gradient(135deg, rgb(255 255 255 / 96%), rgb(247 251 246 / 94%));
+  box-shadow: 0 3px 12px rgb(24 55 36 / 5%), inset 0 1px 0 #fff;
+}
+.variety-lines .variety-row > label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  color: var(--sf-text-2);
+  font-size: 11px;
+  font-weight: 700;
+}
+.variety-lines .variety-row input,
+.variety-lines .variety-row select {
+  width: 100%;
+  min-width: 0;
+}
+.variety-lines .variety-row label small {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 2px;
+  padding: 4px 8px;
+  border: 1px solid rgb(47 133 80 / 15%);
+  border-radius: 7px;
+  background: linear-gradient(90deg, #edf8eb, #f1f8fc);
+  color: var(--sf-brand-700);
+  font-size: 10px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+.variety-lines .variety-row > .icon-button {
+  margin: 0 0 4px;
+  justify-self: end;
+}
+.variety-lines .variety-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+}
+.variety-lines .variety-foot .hint {
+  margin: 0;
+  padding: 7px 11px;
+  border: 1px solid rgb(47 133 80 / 14%);
+  border-radius: 9px;
+  background: rgb(234 246 231 / 72%);
+  color: var(--sf-brand-700);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.variety-cards {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 185px), 1fr));
+  align-items: stretch;
+  gap: 14px;
+  margin: 0 0 12px;
+}
+.variety-cards .variety-card {
+  position: relative;
+  min-width: 0;
+  min-height: 124px;
+  overflow: hidden;
+  gap: 5px;
+  padding: 15px 16px 14px;
+  border: 1px solid var(--sf-variety-border, rgb(47 133 80 / 20%));
+  border-radius: 15px;
+  background: var(--sf-variety-bg, linear-gradient(145deg, #f0f8ed, #fff 72%));
+  box-shadow: 0 5px 16px rgb(24 55 36 / 7%), inset 0 1px 0 rgb(255 255 255 / 92%);
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.variety-cards .variety-card::after {
+  content: '';
+  position: absolute;
+  width: 86px;
+  height: 86px;
+  right: -34px;
+  top: -38px;
+  border-radius: 50%;
+  background: var(--sf-variety-glow, rgb(47 133 80 / 10%));
+  pointer-events: none;
+}
+.variety-cards .variety-card:nth-child(4n + 1) {
+  --sf-variety-bg: linear-gradient(145deg, #eaf7e8, #fff 78%);
+  --sf-variety-border: #cde7c9;
+  --sf-variety-glow: rgb(67 160 71 / 17%);
+}
+.variety-cards .variety-card:nth-child(4n + 2) {
+  --sf-variety-bg: linear-gradient(145deg, #eaf5fc, #fff 78%);
+  --sf-variety-border: #c8e3f4;
+  --sf-variety-glow: rgb(33 150 243 / 15%);
+}
+.variety-cards .variety-card:nth-child(4n + 3) {
+  --sf-variety-bg: linear-gradient(145deg, #fff4e3, #fff 78%);
+  --sf-variety-border: #f2dfbd;
+  --sf-variety-glow: rgb(255 167 38 / 17%);
+}
+.variety-cards .variety-card:nth-child(4n + 4) {
+  --sf-variety-bg: linear-gradient(145deg, #f2edff, #fff 78%);
+  --sf-variety-border: #ded3f7;
+  --sf-variety-glow: rgb(126 87 194 / 15%);
+}
+.variety-cards .variety-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--sf-brand-300);
+  box-shadow: 0 12px 24px rgb(24 55 36 / 10%);
+}
+.variety-cards .variety-card span {
+  position: relative;
+  z-index: 1;
+  width: fit-content;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 72%);
+  color: var(--sf-text-3);
+  font-size: 10px;
+  font-weight: 700;
+}
+.variety-cards .variety-card strong {
+  position: relative;
+  z-index: 1;
+  color: var(--sf-text);
+  font-size: 14px;
+  line-height: 1.3;
+}
+.variety-cards .variety-card b {
+  position: relative;
+  z-index: 1;
+  margin-top: auto;
+  color: var(--sf-brand-800);
+  font-size: 25px;
+  line-height: 1.1;
+  font-weight: 800;
+}
+.variety-cards .variety-card small {
+  position: relative;
+  z-index: 1;
+  color: var(--sf-text-3);
+  font-size: 10px;
+}
+
+/* Common button states across feature modules. Preserve each button's semantic colour. */
+.primary, .secondary, .danger, .rp-btn, .day-chip, .rp-cat, .text-action, .icon-button {
+  -webkit-tap-highlight-color: transparent;
+}
+.primary:focus-visible, .secondary:focus-visible, .danger:focus-visible,
+.rp-btn:focus-visible, .day-chip:focus-visible, .rp-cat:focus-visible,
+.text-action:focus-visible, .icon-button:focus-visible {
+  outline: 3px solid rgb(47 133 80 / 28%);
+  outline-offset: 2px;
+}
+.primary:disabled, .secondary:disabled, .danger:disabled,
+.rp-btn:disabled, .day-chip:disabled, .rp-cat:disabled {
+  opacity: .48;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+.secondary {
+  background: linear-gradient(180deg, #fff, #f5f8f4);
+  border: 1px solid #d7e2d5;
+  color: #405b49;
+}
+.secondary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #f5fbf3, #eaf5e8);
+  border-color: #9bc69a;
+  color: #216b43;
+}
+.danger {
+  background: linear-gradient(180deg, #fff, #fff8f7);
+  border-color: #f0c9c3;
+  color: #a63e32;
+}
+.danger:hover:not(:disabled) {
+  background: linear-gradient(135deg, #b94336, #982f28);
+  border-color: #982f28;
+  color: #fff;
+}
+.rp-btn.danger-btn { color: #a63e32; border-color: #f0c9c3; }
+.rp-btn.danger-btn:hover:not(:disabled) { background: #fff0ed; color: #a63e32; border-color: #e6a69d; }
+@media (max-width: 900px) {
+  .variety-lines .variety-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .variety-lines .variety-row > .icon-button { justify-self: end; }
+}
+@media (max-width: 480px) {
+  .variety-lines { padding: 12px; }
+  .variety-lines .variety-row { grid-template-columns: minmax(0, 1fr); padding: 11px; }
+  .variety-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+  .variety-cards .variety-card { min-height: 112px; padding: 12px; }
+}

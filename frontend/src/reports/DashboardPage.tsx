@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowDownLeft, ArrowUpRight, ChevronRight, CircleCheck, Factory, Fish, HardHat, Landmark, Leaf, Milk, Package, Sprout, Tractor,
+import { ArrowDownLeft, ArrowUpRight, ChevronRight, CircleCheck, Egg, Factory, Fish, HardHat, Landmark, Leaf, Milk, Package, Sprout, Tractor,
   TrendingDown, TrendingUp, TriangleAlert, Wallet, type LucideIcon } from 'lucide-react';
 import { api } from '../api/client';
 import { useTenant } from '../auth/useCurrentTenant';
@@ -10,7 +10,7 @@ import { currentLanguage, useNs } from '../i18n';
 import { describeError } from '../lib/errors';
 import { formatDate, formatMoney, today } from '../lib/format';
 import TrendChart from './TrendChart';
-import type { Attention, Dashboard } from './types';
+import type { Attention, BusinessProfit, Dashboard } from './types';
 
 /** Where each "needs attention" item is dealt with (dashboard and reports design, section 3C). */
 export const ATTENTION_LINKS: Record<string, string> = {
@@ -42,6 +42,13 @@ function DashboardSkeleton({ label }: { label: string }) {
     </section>
   );
 }
+
+const BUSINESS_META: Record<BusinessProfit['module'], { label: string; href: string; Icon: LucideIcon }> = {
+  FARM: { label: 'Farm / Crop', href: 'farms', Icon: Tractor },
+  POULTRY: { label: 'Poultry', href: 'livestock/poultry', Icon: Egg },
+  MILK: { label: 'Milk / Dairy', href: 'livestock/milk', Icon: Milk },
+  POND: { label: 'Pond / Aquaculture', href: 'aquaculture', Icon: Fish },
+};
 
 /** The farm business at a glance: money, the last 12 months, crops in the field and what needs attention (H1–H4). */
 export default function DashboardPage() {
@@ -105,6 +112,29 @@ export default function DashboardPage() {
             <small>{t('income')} {money(m.yearRevenue)} · {t('costs')} {money(m.yearCosts)}</small>
           </div>
         </div>
+      )}
+
+      {data.businessProfits?.length > 0 && (
+        <section className="db-business-section">
+          <div className="db-card-head">
+            <h3>{lang === 'ta' ? 'தொழில் வாரியான லாபம் & நஷ்டம்' : 'Business-wise profit & loss'}</h3>
+            <small>{lang === 'ta' ? 'இந்த மாதம்' : 'This month'} · {formatDate(data.asOf, lang)}</small>
+          </div>
+          <div className="finance-stats db-kpis">
+            {data.businessProfits.map((item) => {
+              const meta = BUSINESS_META[item.module];
+              const Icon = meta.Icon;
+              return (
+                <Link key={item.module} className={`finance-stat db-kpi${tone(item.profit)}`} to={`/t/${tenant.id}/${meta.href}`}>
+                  <span className="db-kpi-label"><i className="db-kpi-icon tone-brand"><Icon size={16} aria-hidden /></i>{meta.label}</span>
+                  <b>{money(item.profit)}</b>
+                  <small>{t('income')} {money(item.revenue)} · {t('costs')} {money(item.costs)}</small>
+                  <small>{lang === 'ta' ? 'செயலில் உள்ள பதிவுகள்' : 'Active records'}: {item.activeEntries}</small>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
       )}
 
       <div className="dashboard-grid db-grid">

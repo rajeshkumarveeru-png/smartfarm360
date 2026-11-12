@@ -33,14 +33,16 @@ public class FlockController {
     private final EventService events;
     private final LivestockExports exports;
     private final ExportService export;
+    private final HatcheryService hatchery;
 
-    public FlockController(FlockService flocks, FlockReports reports, HerdService herd, EventService events, LivestockExports exports, ExportService export) {
+    public FlockController(FlockService flocks, FlockReports reports, HerdService herd, EventService events, LivestockExports exports, ExportService export, HatcheryService hatchery) {
         this.flocks = flocks;
         this.reports = reports;
         this.herd = herd;
         this.events = events;
         this.exports = exports;
         this.export = export;
+        this.hatchery = hatchery;
     }
 
     @GetMapping("/flocks")
@@ -139,6 +141,30 @@ public class FlockController {
     @ResponseStatus(HttpStatus.CREATED)
     public RecordRef eggSale(TenantContext ctx, @Valid @RequestBody EggSaleRequest r, @RequestHeader(value = KEY, required = false) String key) {
         return flocks.eggSale(ctx, r, key);
+    }
+
+    // ---- Poultry hatching ----
+
+    @GetMapping("/flocks/{groupId}/hatches")
+    @RequiresPermission(Permission.LIVESTOCK_READ)
+    @RequiresModule(FarmModule.POULTRY)
+    public List<HatcheryDtos.Hatch> hatches(TenantContext ctx, @PathVariable long groupId) {
+        return hatchery.list(ctx, groupId);
+    }
+
+    @PostMapping("/flocks/{groupId}/hatches")
+    @RequiresPermission(Permission.LIVESTOCK_WRITE)
+    @RequiresModule(FarmModule.POULTRY)
+    @ResponseStatus(HttpStatus.CREATED)
+    public HatcheryDtos.Hatch createHatch(TenantContext ctx, @PathVariable long groupId, @Valid @RequestBody HatcheryDtos.CreateRequest r) {
+        return hatchery.create(ctx, groupId, r);
+    }
+
+    @PutMapping("/hatches/{hatchId}/result")
+    @RequiresPermission(Permission.LIVESTOCK_WRITE)
+    @RequiresModule(FarmModule.POULTRY)
+    public HatcheryDtos.Hatch hatchResult(TenantContext ctx, @PathVariable long hatchId, @Valid @RequestBody HatcheryDtos.ResultRequest r) {
+        return hatchery.result(ctx, hatchId, r);
     }
 
     // ---- Health plans (J9) ----

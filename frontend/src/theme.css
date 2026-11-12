@@ -995,3 +995,20 @@ button.im-row:focus-visible, a.im-row:focus-visible { outline: 2px solid var(--t
 @keyframes toast-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
 @media (max-width: 600px) { .toast-stack { top: auto; bottom: 16px; left: 16px; right: 16px; align-items: stretch; } .toast { max-width: none; } }
 @media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+
+
+/* Farm creation stays intentionally simple: name + total land area only. */
+.farm-create-form {
+  grid-template-columns: minmax(220px, 1.3fr) minmax(220px, 1fr);
+  align-items: end;
+}
+.farm-create-form .farm-area-field .inline-fields {
+  grid-template-columns: minmax(0, 1fr) 120px;
+}
+.farm-create-form .form-actions {
+  justify-content: flex-end;
+}
+@media (max-width: 700px) {
+  .farm-create-form { grid-template-columns: minmax(0, 1fr); }
+  .farm-create-form .farm-area-field .inline-fields { grid-template-columns: minmax(0, 1fr) 112px; }
+}

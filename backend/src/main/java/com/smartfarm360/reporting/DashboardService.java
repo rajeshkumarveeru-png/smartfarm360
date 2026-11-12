@@ -13,6 +13,8 @@ import com.smartfarm360.inventory.StockReportService;
 import com.smartfarm360.aquaculture.AquaReports;
 import com.smartfarm360.aquaculture.WaterService;
 import com.smartfarm360.livestock.FlockReports;
+import com.smartfarm360.livestock.HerdService;
+import com.smartfarm360.livestock.LivestockDtos.Group;
 import com.smartfarm360.organic.OrganicService;
 import com.smartfarm360.processing.ProcessingService;
 import com.smartfarm360.livestock.LivestockReports;
@@ -56,6 +58,7 @@ public class DashboardService {
     private final AssetService assets;
     private final LivestockReports livestock;
     private final FlockReports flocks;
+    private final HerdService herd;
     private final AquaReports aqua;
     private final WaterService water;
     private final OrganicService organic;
@@ -63,13 +66,14 @@ public class DashboardService {
 
     public DashboardService(ReportService reports, LedgerReportService ledger, StockReportService stock, CropService crops,
                             CropReportService cropReports, WorkerService workers, AssetService assets,
-                            LivestockReports livestock, FlockReports flocks, AquaReports aqua, WaterService water, OrganicService organic, ProcessingService processing) {
+                            LivestockReports livestock, FlockReports flocks, HerdService herd, AquaReports aqua, WaterService water, OrganicService organic, ProcessingService processing) {
         this.processing = processing;
         this.organic = organic;
         this.aqua = aqua;
         this.water = water;
         this.livestock = livestock;
         this.flocks = flocks;
+        this.herd = herd;
         this.reports = reports;
         this.ledger = ledger;
         this.stock = stock;
@@ -86,6 +90,9 @@ public class DashboardService {
         Supplier<ReportService.Dues> dues = once(() -> reports.dues(ctx, asOf));
         Money money = finance ? tile("money", errors, () -> money(ctx, asOf, dues.get())) : null;
         Trend trend = finance ? tile("trend", errors, () -> trend(ctx, asOf)) : null;
+        List<BusinessProfit> businessProfits = finance
+                ? tile("businessProfits", errors, () -> businessProfits(ctx, asOf)) : List.of();
+        if (businessProfits == null) businessProfits = List.of();
         List<CropTile> cropTiles = ctx.has(Permission.CROP_READ) && module(ctx, FarmModule.CROP)
                 ? tile("crops", errors, () -> crops(ctx, finance)) : null;
         List<Attention> attention = new ArrayList<>();
@@ -197,7 +204,86 @@ public class DashboardService {
                 return null;
             });
         }
-        return new Dashboard(asOf, true, money, trend, cropTiles, attention, errors);
+        return new Dashboard(asOf, true, money, trend, cropTiles, businessProfits, attention, errors);
+    }
+
+    /**
+     * Separate current-month P&L for each enabled business line. The owning module report supplies the money figures,
+     * so these totals follow the same cost-object allocation as the detailed reports. Empty/inactive modules are omitted.
+     */
+    private List<BusinessProfit> businessProfits(TenantContext ctx, LocalDate asOf) {
+        LocalDate from = asOf.withDayOfMonth(1);
+        List<BusinessProfit> result = new ArrayList<>();
+
+        if (module(ctx, FarmModule.CROP) && ctx.has(Permission.CROP_READ)) {
+            BigDecimal revenue = ZERO, costs = ZERO, profit = ZERO;
+            int active = 0;
+            for (String status : List.of("GROWING", "HARVESTING", "PLANNED")) {
+                int page = 0;
+                while (true) {
+                    var pageResult = crops.cycles(ctx, null, null, null, status, page++, 100);
+                    for (Cycle c : pageResult.items()) {
+                        if (c.costObjectId() == null) continue;
+                        CycleReport r = cropReports.report(ctx, c.id(), from, asOf, "ACCRUAL", null);
+                        revenue = revenue.add(r.revenueTotal()).add(r.otherIncome());
+                        costs = costs.add(r.totalCost()).add(r.interest()).add(r.losses());
+                        profit = profit.add(r.profit());
+                        active++;
+                    }
+                    if (page >= pageResult.totalPages()) break;
+                }
+            }
+            if (active > 0) result.add(new BusinessProfit("FARM", active, revenue, costs, profit));
+        }
+
+        if (module(ctx, FarmModule.POULTRY) && ctx.has(Permission.LIVESTOCK_READ)) {
+            BigDecimal revenue = ZERO, costs = ZERO, profit = ZERO;
+            int active = 0;
+            for (com.smartfarm360.livestock.FlockDtos.FlockReport r : flocks.all(ctx, from, asOf, "CHICKEN")) {
+                if (!r.group().active()) continue;
+                com.smartfarm360.livestock.FlockDtos.Figures f = r.period();
+                if (f.revenue() == null || f.costs() == null || f.profit() == null) continue;
+                revenue = revenue.add(f.revenue());
+                costs = costs.add(f.costs());
+                profit = profit.add(f.profit());
+                active++;
+            }
+            if (active > 0) result.add(new BusinessProfit("POULTRY", active, revenue, costs, profit));
+        }
+
+        if (module(ctx, FarmModule.DAIRY) && ctx.has(Permission.LIVESTOCK_READ)) {
+            List<Group> activeDairyGroups = herd.groups(ctx).stream()
+                    .filter(Group::active)
+                    .filter(g -> "COW".equals(g.species()) || "BUFFALO".equals(g.species()))
+                    .toList();
+            if (!activeDairyGroups.isEmpty()) {
+                var report = livestock.herd(ctx, from, asOf);
+                var groupIds = activeDairyGroups.stream().map(Group::id).collect(java.util.stream.Collectors.toSet());
+                List<com.smartfarm360.livestock.LivestockDtos.HerdRow> rows = report.groups().stream()
+                        .filter(r -> groupIds.contains(r.groupId())).toList();
+                BigDecimal revenue = rows.stream().map(com.smartfarm360.livestock.LivestockDtos.HerdRow::revenue).reduce(ZERO, BigDecimal::add);
+                BigDecimal costs = rows.stream().map(com.smartfarm360.livestock.LivestockDtos.HerdRow::costTotal).reduce(ZERO, BigDecimal::add);
+                BigDecimal profit = rows.stream().map(com.smartfarm360.livestock.LivestockDtos.HerdRow::profit).reduce(ZERO, BigDecimal::add);
+                result.add(new BusinessProfit("MILK", activeDairyGroups.size(), revenue, costs, profit));
+            }
+        }
+
+        if (module(ctx, FarmModule.AQUACULTURE) && ctx.has(Permission.AQUACULTURE_READ)) {
+            BigDecimal revenue = ZERO, costs = ZERO, profit = ZERO;
+            int active = 0;
+            for (com.smartfarm360.aquaculture.AquaDtos.CycleReport r : aqua.all(ctx, from, asOf)) {
+                var c = r.cycle();
+                if (!"GROWING".equals(c.status()) || c.harvestedOn() != null) continue;
+                var f = r.period();
+                if (f.revenue() == null || f.costs() == null || f.profit() == null) continue;
+                revenue = revenue.add(f.revenue());
+                costs = costs.add(f.costs());
+                profit = profit.add(f.profit());
+                active++;
+            }
+            if (active > 0) result.add(new BusinessProfit("POND", active, revenue, costs, profit));
+        }
+        return result;
     }
 
     /** A value worked out on first use and kept for this request; a failure is not kept, so the next tile tries again. */

@@ -35,7 +35,7 @@ public final class FlockDtos {
 
     /**
      * One variety of a batch or herd (bin and batch varieties design, V1-V3): an existing line ({@code lineId}) or a new one
-     * ({@code species} and {@code variety}, such as Sonali, Kadaknath or Peruvidai), its heads and, when bought, its price.
+     * ({@code species} and {@code variety}, such as Sonali, Kadaknath or Peruvidai), its heads and, when bought, its total purchase line amount.
      */
     public record VarietyLine(Long lineId, @Pattern(regexp = "CHICKEN|DUCK|QUAIL|TURKEY|GOAT|SHEEP") String species, @Size(max = 120) String variety,
                               @NotNull @Positive @Max(1_000_000) Integer heads, @Positive @Digits(integer = 12, fraction = 2) BigDecimal amount) {}
