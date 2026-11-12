@@ -81,7 +81,7 @@ export default function CyclesPage() {
 
   const farmParcels = useMemo(() => parcels.filter(p => String(p.farmId) === form.farmId), [parcels, form.farmId]);
   const chosenFarm = farms.find(f => String(f.id) === form.farmId);
-  const animals = chosenFarm ? ANIMAL_FARMS[chosenFarm.farmType] : undefined;
+  const animals = chosenFarm?.farmType ? ANIMAL_FARMS[chosenFarm.farmType] : undefined;
   // The required fields still empty, in form order, with their labels
   const missing = ([['name', t('cycleName')], ['farmId', t('farm')], ['landParcelId', t('land')], ['cropId', t('crop')]] as const)
     .filter(([k]) => !(form[k] ?? '').trim());
