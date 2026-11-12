@@ -37,7 +37,7 @@ public class BinService {
     private BinKind kind(TenantContext ctx, String code) {
         BinKind k = kinds.get(code);
         if (k == null) throw ApiException.notFound("BIN_KIND_NOT_FOUND", "There is no such kind of item.");
-        if (!ctx.has(k.permission())) throw ApiException.forbidden("FORBIDDEN", "You do not have permission to change this item.");
+        if (!ctx.has(k.permission())) throw ApiException.forbidden("ACCESS_DENIED", "You do not have permission to change this item.");
         return k;
     }
 
@@ -59,7 +59,7 @@ public class BinService {
 
     /** Delete forever (B2, B3, B5): the owner only, and refused while money or stock records refer to the item. */
     public void purge(TenantContext ctx, String code, long id) {
-        if (!ctx.has(Permission.DATA_PURGE)) throw ApiException.forbidden("FORBIDDEN", "Only the owner can delete items forever.");
+        if (!ctx.has(Permission.DATA_PURGE)) throw ApiException.forbidden("ACCESS_DENIED", "Only the owner can delete items forever.");
         BinKind k = kind(ctx, code);
         String name;
         try {

@@ -4,6 +4,7 @@ import { api, download } from '../api/client';
 import type { Consent } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import { ErrorBanner } from '../components/common';
+import { Toast } from '../components/Toast';
 import { currentLanguage, useNs } from '../i18n';
 import { describeError } from '../lib/errors';
 import { formatDate } from '../lib/format';
@@ -41,7 +42,7 @@ export default function AccountPage() {
     <section className="crop-page">
       <div className="crop-page-head"><div><h2>{t('title')}</h2><p>{user?.email}</p></div></div>
       <ErrorBanner message={error} />
-      {notice && <div className="info-banner" role="status">{notice}</div>}
+      <Toast message={notice} onClose={() => setNotice('')} />
 
       <section className="panel">
         <h3>{t('email')}</h3>

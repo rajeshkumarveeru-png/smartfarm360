@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, CalendarDays, MapPin, Plus, RotateCcw, Ruler, ShoppingBag, Sprout, Trash2, Wallet } from 'lucide-react';
 import { api } from '../api/client';
 import type { Page } from '../api/types';
@@ -45,6 +45,7 @@ export default function CyclePage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [insight, setInsight] = useState<Insight | null>(null);
+  const navigate = useNavigate();
 
   const load = useCallback(async () => {
     setError('');
@@ -85,6 +86,16 @@ export default function CyclePage() {
   const canWrite = can(tenant, 'CROP_WRITE');
   const canReverse = can(tenant, 'FINANCE_REVERSE');
   const canSeeFinance = can(tenant, 'FINANCE_READ');
+  /** Moves the cycle to the Bin; its money stays in the accounts. */
+  async function deleteCycle() {
+    if (!cycle || !window.confirm(t('confirmDeleteCycle', { name: cycle.name }))) return;
+    try {
+      await api(`${base}/cultivation-cycles/${cycle.id}`, { method: 'DELETE' });
+      navigate(`/t/${tenant.id}/crops`);
+    } catch (e) {
+      setError(describeError(e));
+    }
+  }
   /** A work entry is deleted when it is only a note, and reversed (with its stock and money) when it moved either. */
   const diaryActions = (a: Activity) => <>
     {a.status === 'ACTIVE' && (a.stockDocumentId || a.billDocumentId) && canReverse &&
@@ -117,6 +128,7 @@ export default function CyclePage() {
             {cycle.warnings.includes('FIELD_OVERCOMMITTED') && <p className="low-stock-label">{t('warning.FIELD_OVERCOMMITTED')}</p>}
           </div>
         </div>
+        {canWrite && <div className="fw-actions"><button type="button" className="danger" onClick={() => void deleteCycle()}><Trash2 size={15} aria-hidden />{t('deleteCycle')}</button></div>}
       </header>
       <ErrorBanner message={error} />
       {notice && <p className="low-stock-label" role="status">{notice}</p>}
@@ -151,7 +163,7 @@ export default function CyclePage() {
             <div className="finance-stat"><span>{t('unsold')}</span><b>{formatNumber(report.unsold, lang, 2)} {report.costUnit ? ts(`unit.${report.costUnit}`) : ''}</b>
               {report.estimateValue != null && <small className="low-stock-label">{t('estimateLabel', { amount: formatMoney(report.estimateValue, lang) })}</small>}</div>
           </div>
-          <table className="data-table report">
+          <div className="table-scroll"><table className="data-table report">
             <tbody>
               <tr className="section"><th colSpan={2}>{tf('operatingRevenue')}</th></tr>
               {report.revenue.map(r => <tr key={`r${r.accountCode}-${r.categoryId}`}><td>{r.categoryId ? categoryLabel({ code: r.categoryCode, name: r.categoryName }) : tf(`ledger.${r.accountCode}`)}</td><td className="num">{formatMoney(r.amount, lang)}</td></tr>)}
@@ -161,7 +173,7 @@ export default function CyclePage() {
               {report.allocatedOverhead.map(r => <tr key={`a${r.accountCode}-${r.categoryId}`}><td>{r.categoryId ? categoryLabel({ code: r.categoryCode, name: r.categoryName }) : tf(`ledger.${r.accountCode}`)}</td><td className="num">{formatMoney(r.amount, lang)}</td></tr>)}
               <tr className="total"><td>{t('profit')}</td><td className="num">{formatMoney(report.profit, lang)}</td></tr>
             </tbody>
-          </table>
+          </table></div>
         </>
       )}
 

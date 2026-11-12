@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { useTenant } from '../auth/useCurrentTenant';
 import { ErrorBanner } from '../components/common';
+import { Toast } from '../components/Toast';
 import type { FinancialAccount } from '../finance/types';
 import { newIdempotencyKey } from '../finance/useFinanceData';
 import { currentLanguage, useNs } from '../i18n';
@@ -56,7 +57,7 @@ export default function PayPage() {
     <>
       <div className="crop-page-head"><div><h2>{t('pay')}</h2><p>{t('payHelp')}</p></div></div>
       <ErrorBanner message={error} />
-      {message && <p className="hint" role="status">{message}</p>}
+      <Toast message={message} onClose={() => setMessage('')} />
 
       <h3>{t('payRun')}</h3>
       <form className="form-card form-grid filters" onSubmit={e => { e.preventDefault(); void run(() => api<PayRunPreview>(`${base}/pay-runs/preview`, { method: 'POST', body: range }), setPreview); }}>
@@ -107,7 +108,7 @@ export default function PayPage() {
             <label>{t('date')}<input type="date" value={payment.date} onChange={e => setPayment({ ...payment, date: e.target.value })} /></label>
             <label>{t('paidFrom')}<select value={payment.financialAccountId} onChange={e => setPayment({ ...payment, financialAccountId: e.target.value })}>{accountOptions}</select></label>
           </div>
-          <table className="data-table">
+          <div className="table-scroll"><table className="data-table">
             <thead><tr><th>{t('worker')}</th><th className="num">{t('owed')}</th><th className="num">{t('advance')}</th><th>{t('cashNow')}</th><th>{t('recoverAdvance')}</th></tr></thead>
             <tbody>
               {owing.map(w => (
@@ -120,7 +121,7 @@ export default function PayPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
           <div className="form-actions"><button className="primary" disabled={busy}>{t('recordPayments')}</button></div>
         </form>
       )}

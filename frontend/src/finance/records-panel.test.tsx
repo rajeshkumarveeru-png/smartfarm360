@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { Permission, TenantSummary } from '../api/types';
@@ -62,7 +62,19 @@ describe('records panel', () => {
   it('lists the activity records with links to add more, booked to the same farm and activity', async () => {
     renderAt('/t/9/x', panel, '/t/:tenantId/x');
     expect(await screen.findByRole('link', { name: /BILL\/2026-27\/0004/ })).toHaveAttribute('href', '/t/9/finance/records/41');
-    expect(screen.getByRole('link', { name: 'Add expense' })).toHaveAttribute('href', '/t/9/finance/new/expense?farm=2&activity=7');
+    await userEvent.click(screen.getByRole('button', { name: 'Add expense' }));
+    const form = await screen.findByRole('form', { name: 'Add expense' });
+    expect(screen.getByRole('link', { name: /More options/ })).toHaveAttribute('href', '/t/9/finance/new/expense?farm=2&activity=7');
+    await waitFor(() => expect(screen.getAllByRole('option', { name: 'Cash in hand' }).length).toBeGreaterThan(0));
+    await userEvent.selectOptions(within(form).getByLabelText('Category'), '1');
+    await userEvent.type(within(form).getByLabelText('Amount (₹)'), '180');
+    await userEvent.selectOptions(within(form).getByLabelText('Paid from'), '5');
+    await userEvent.click(within(form).getByRole('button', { name: 'Save expense' }));
+    await waitFor(() => expect(apiMock.mock.calls.some(([u, i]) => u === '/api/v1/tenants/9/finance/bills' && i?.method === 'POST')).toBe(true));
+    const [, init] = apiMock.mock.calls.find(([u, i]) => u === '/api/v1/tenants/9/finance/bills' && i?.method === 'POST')!;
+    expect(init.body).toMatchObject({ farmId: 2, financialAccountId: 5, post: true, lines: [{ categoryId: 1, amount: '180', costObjectId: 7 }] });
+    expect(init.headers['Idempotency-Key']).toMatch(/.{8,}/);
+    await waitFor(() => expect(screen.queryByRole('form', { name: 'Add expense' })).not.toBeInTheDocument());
     expect(screen.getByRole('link', { name: /Edit draft/ })).toHaveAttribute('href', '/t/9/finance/new/expense?draft=42');
   });
 

@@ -11,10 +11,11 @@ import { describeError } from '../lib/errors';
 import { formatDate, formatNumber, today } from '../lib/format';
 import { can } from '../lib/nav';
 import type { FlockGroup } from './types';
+import VarietyLines, { emptyVariety, type VarietyRow, varietyLines, varietyProblem } from './VarietyLines';
 
 const PURPOSES: Record<'poultry' | 'smallStock', string[]> = { poultry: ['LAYER', 'BROILER', 'COUNTRY'], smallStock: ['BREEDING_HERD', 'FATTENING', 'MIXED'] };
 const empty = (kind: 'poultry' | 'smallStock') => ({ name: '', species: kind === 'poultry' ? 'CHICKEN' : 'GOAT', purpose: PURPOSES[kind][0], placedOn: today(),
-  ageDays: '', strain: '', heads: '', bought: false, amount: '', partyId: '', financialAccountId: '' });
+  ageDays: '', bought: false, partyId: '', financialAccountId: '', rows: [emptyVariety(kind === 'poultry' ? 'CHICKEN' : 'GOAT')] as VarietyRow[] });
 
 /** Poultry batches or goat and sheep herds (J1, J2): heads now, and starting a batch or herd with its first count (J3). */
 export default function FlocksPage({ kind }: { kind: 'poultry' | 'smallStock' }) {
@@ -49,14 +50,18 @@ export default function FlocksPage({ kind }: { kind: 'poultry' | 'smallStock' })
   const set = (patch: Partial<ReturnType<typeof empty>>) => setForm(f => ({ ...f, ...patch }));
   async function create(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.name.trim() || !/^\d+$/.test(form.heads) || Number(form.heads) <= 0) { setError(t('errors.nameAndHeads')); return; }
-    if (form.bought && (!/^\d+(\.\d{1,2})?$/.test(form.amount) || (!form.partyId && !form.financialAccountId))) { setError(t('errors.purchase')); return; }
+    if (!form.name.trim()) { setError(t('errors.nameAndHeads')); return; }
+    const problem = varietyProblem(form.rows, form.bought, t);
+    if (problem) { setError(problem); return; }
+    if (form.bought && !form.partyId && !form.financialAccountId) { setError(t('errors.purchase')); return; }
+    // The varieties each have a price; the bill's amount is their total
+    const total = form.rows.reduce((sum, row) => sum + Number(row.amount), 0).toFixed(2);
     setError('');
     try {
       await api(`${base}/flocks`, { method: 'POST', headers: { 'Idempotency-Key': key }, body: {
-        name: form.name.trim(), species: form.species, purpose: form.purpose, placedOn: form.placedOn, heads: Number(form.heads),
-        ageAtPlacementDays: form.ageDays ? Number(form.ageDays) : null, strain: form.strain || null,
-        bill: form.bought ? { amount: form.amount, partyId: form.partyId ? Number(form.partyId) : null,
+        name: form.name.trim(), species: form.species, purpose: form.purpose, placedOn: form.placedOn,
+        ageAtPlacementDays: form.ageDays ? Number(form.ageDays) : null, lines: varietyLines(form.rows, form.bought),
+        bill: form.bought ? { amount: total, partyId: form.partyId ? Number(form.partyId) : null,
           financialAccountId: !form.partyId && form.financialAccountId ? Number(form.financialAccountId) : null } : null } });
       setOpen(false); setForm(empty(kind)); setKey(newIdempotencyKey());
       await load();
@@ -81,14 +86,10 @@ export default function FlocksPage({ kind }: { kind: 'poultry' | 'smallStock' })
           <label>{t('purposeLabel')}<select value={form.purpose} onChange={e => set({ purpose: e.target.value })}>
             {PURPOSES[kind].map(p => <option key={p} value={p}>{t(`purpose.${p}`)}</option>)}</select></label>
           <label>{t(kind === 'poultry' ? 'placedOn' : 'startedOn')}<input type="date" max={today()} value={form.placedOn} onChange={e => set({ placedOn: e.target.value })} /></label>
-          <label>{t('heads')}<input inputMode="numeric" value={form.heads} onChange={e => set({ heads: e.target.value })} /></label>
-          {kind === 'poultry' && <>
-            <label>{t('ageAtPlacement')} <small>{tc('optional')}</small><input inputMode="numeric" value={form.ageDays} onChange={e => set({ ageDays: e.target.value })} /></label>
-            <label>{t('strain')} <small>{tc('optional')}</small><input maxLength={80} value={form.strain} onChange={e => set({ strain: e.target.value })} /></label>
-          </>}
+          {kind === 'poultry' && <label>{t('ageAtPlacement')} <small>{tc('optional')}</small><input inputMode="numeric" value={form.ageDays} onChange={e => set({ ageDays: e.target.value })} /></label>}
           {canBuy && <label className="check full"><input type="checkbox" checked={form.bought} onChange={e => set({ bought: e.target.checked })} />{t('boughtThem')}</label>}
+          <VarietyLines kind={kind} rows={form.rows} priced={form.bought} onChange={rows => set({ rows })} />
           {form.bought && <>
-            <label>{t('billAmountTotal')}<input inputMode="decimal" value={form.amount} onChange={e => set({ amount: e.target.value })} /></label>
             <label>{t('boughtFrom')} <small>{tc('optional')}</small><select value={form.partyId} onChange={e => set({ partyId: e.target.value })}>
               <option value="">—</option>{parties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
             {!form.partyId && <label>{tf('paidFrom')}<select value={form.financialAccountId} onChange={e => set({ financialAccountId: e.target.value })}>
@@ -103,7 +104,7 @@ export default function FlocksPage({ kind }: { kind: 'poultry' | 'smallStock' })
       )}
       {kind === 'poultry' && <label className="check"><input type="checkbox" checked={showClosed} onChange={e => setShowClosed(e.target.checked)} />{t('showClosed')}</label>}
       {!groups ? <Loading /> : visible.length === 0 ? <p className="hint">{t(kind === 'poultry' ? 'noBatches' : 'noHerds')}</p> : (
-        <table className="data-table">
+        <div className="table-scroll"><table className="data-table">
           <thead><tr><th>{t('groupName')}</th><th>{t('purposeLabel')}</th><th>{t(kind === 'poultry' ? 'placedOn' : 'startedOn')}</th><th className="num">{t('heads')}</th></tr></thead>
           <tbody>{visible.map(g => (
             <tr key={g.id}>
@@ -113,7 +114,7 @@ export default function FlocksPage({ kind }: { kind: 'poultry' | 'smallStock' })
               <td className="num">{formatNumber(g.animals, lang, 0)}</td>
             </tr>
           ))}</tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

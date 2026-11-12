@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Bird, ChartColumn, Factory, PawPrint, Fish, HardHat, LayoutDashboard, Leaf, LogOut, Map as MapIcon, Milk, Package, ScrollText, Settings, ShieldCheck, Sprout,
+import { Bird, ChartColumn, Factory, PawPrint, Fish, HardHat, LayoutDashboard, Leaf, LogOut, Map as MapIcon, PanelLeftClose, PanelLeftOpen, Milk, Package, ScrollText, Settings, ShieldCheck, Sprout,
   Tractor, UserRound, UsersRound, Wallet, type LucideIcon } from 'lucide-react';
 import { api } from '../api/client';
 import type { Announcement } from '../api/types';
@@ -12,6 +12,7 @@ import { can, visibleNav } from '../lib/nav';
 import { LanguageToggle } from './common';
 import { livestockSection } from '../livestock/LivestockLayout';
 import { BillingBanner } from '../pages/BillingPanel';
+import { ErrorBoundary } from './ErrorBoundary';
 
 /** Announcements and maintenance notices from the platform, in the user's language (O8). */
 export function AnnouncementBanner() {
@@ -27,12 +28,27 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   stock: Package, workforce: HardHat, assets: Tractor, reports: ChartColumn, members: UsersRound, audit: ScrollText, settings: Settings,
 };
 
+const COLLAPSED_KEY = 'sf_menu_collapsed';
+
 export default function Layout() {
   const { t } = useTranslation();
   const { user, tenants, logout } = useAuth();
   const tenant = useCurrentTenant();
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem(COLLAPSED_KEY) === '1'; } catch { return false; } });
+  // On the document, as the menu and the page both change size. Remembered per browser
+  useEffect(() => {
+    document.documentElement.classList.toggle('sf-menu-collapsed', collapsed);
+    try { localStorage.setItem(COLLAPSED_KEY, collapsed ? '1' : '0'); } catch { /* storage unavailable */ }
+    return () => document.documentElement.classList.remove('sf-menu-collapsed');
+  }, [collapsed]);
+  const pageRef = useRef<HTMLDivElement>(null);
+  // Each page fades in. Animating the element keeps the page mounted, so this reloads nothing
+  useEffect(() => {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    pageRef.current?.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 240, easing: 'ease-out' });
+  }, [pathname]);
   // Poultry and goat pages live under /livestock: there their own entry is the active one, not cows and dairy
   const inOtherAnimals = pathname.includes('/livestock') && livestockSection(pathname) !== 'cattle';
   const items = visibleNav(tenant);
@@ -59,28 +75,34 @@ export default function Layout() {
             const Icon = NAV_ICONS[item.key] ?? LayoutDashboard;
             return (
               <NavLink key={item.key} to={`/t/${tenant.id}/${item.path}`}
+                title={collapsed ? t(`nav.${item.key}`) : undefined}
                 className={({ isActive }) => `side-link${isActive && !(item.key === 'livestock' && inOtherAnimals) ? ' active' : ''}`}>
-                <Icon size={17} aria-hidden />{t(`nav.${item.key}`)}
+                <Icon size={17} aria-hidden /><span className="side-text">{t(`nav.${item.key}`)}</span>
               </NavLink>
             );
           })}
           {user?.platformAdmin && (
-            <NavLink to="/platform" className={({ isActive }) => `side-link${isActive ? ' active' : ''}`}>
-              <ShieldCheck size={16} aria-hidden />{t('nav.platform')}
+            <NavLink to="/platform" title={collapsed ? t('nav.platform') : undefined} className={({ isActive }) => `side-link${isActive ? ' active' : ''}`}>
+              <ShieldCheck size={16} aria-hidden /><span className="side-text">{t('nav.platform')}</span>
             </NavLink>
           )}
         </nav>
         <div className="side-bottom">
-          <NavLink to="/account" className={({ isActive }) => `side-link${isActive ? ' active' : ''}`}><UserRound size={15} aria-hidden />{t('nav.account')}</NavLink>
+          <NavLink to="/account" title={collapsed ? t('nav.account') : undefined} className={({ isActive }) => `side-link${isActive ? ' active' : ''}`}><UserRound size={15} aria-hidden /><span className="side-text">{t('nav.account')}</span></NavLink>
           <small>{t('auth.signedInAs', { email: user?.email ?? '' })}</small>
-          <button type="button" className="side-signout" onClick={() => void logout().then(() => navigate('/login'))}>
-            <LogOut size={15} aria-hidden />{t('auth.signOut')}
+          <button type="button" className="side-signout" title={collapsed ? t('auth.signOut') : undefined} onClick={() => void logout().then(() => navigate('/login'))}>
+            <LogOut size={15} aria-hidden /><span className="side-text">{t('auth.signOut')}</span>
           </button>
         </div>
       </aside>
       <main className="main">
         <header className="topbar">
-          <div><span className="eyebrow">SMARTFARM360</span><h1>{tenant?.name ?? t('common.appName')}</h1></div>
+          <div>
+            <button type="button" className="menu-toggle" aria-expanded={!collapsed} aria-label={t(collapsed ? 'nav.expandMenu' : 'nav.collapseMenu')} title={t(collapsed ? 'nav.expandMenu' : 'nav.collapseMenu')}
+                    onClick={() => setCollapsed(c => !c)}>
+              {collapsed ? <PanelLeftOpen size={18} aria-hidden /> : <PanelLeftClose size={18} aria-hidden />}
+            </button>
+            <span className="eyebrow">SMARTFARM360</span><h1>{tenant?.name ?? t('common.appName')}</h1></div>
           <LanguageToggle />
         </header>
         <AnnouncementBanner />
@@ -91,7 +113,7 @@ export default function Layout() {
         {tenant && !tenant.active && (
           <div className="error-banner" role="alert">{t('tenant.suspended')}{tenant.suspendedReason ? ` ${t('tenant.suspendedReason', { reason: tenant.suspendedReason })}` : ''}</div>
         )}
-        <Outlet />
+        <div ref={pageRef}><ErrorBoundary resetKey={pathname}><Outlet /></ErrorBoundary></div>
       </main>
     </div>
   );

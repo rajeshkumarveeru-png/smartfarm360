@@ -184,11 +184,11 @@ export default function AnimalPage() {
       )}
       {card.lactations.length > 0 && <>
         <h3 className="section-space">{t('lactations')}</h3>
-        <table className="data-table report">
+        <div className="table-scroll"><table className="data-table report">
           <thead><tr><th>{t('lactation')}</th><th>{t('calved')}</th><th>{t('driedOff')}</th><th className="num">{t('recordedLitres')}</th></tr></thead>
           <tbody>{card.lactations.map(l => <tr key={l.number}><td>{l.number}</td><td>{formatDate(l.calvingDate, lang)}</td>
             <td>{l.dryOffDate ? formatDate(l.dryOffDate, lang) : t('inMilk')}</td><td className="num">{l.recordedLitres != null ? formatNumber(l.recordedLitres, lang, 2) : '—'}</td></tr>)}</tbody>
-        </table>
+        </table></div>
       </>}
       {card.calves.length > 0 && <>
         <h3 className="section-space">{t('calves')}</h3>

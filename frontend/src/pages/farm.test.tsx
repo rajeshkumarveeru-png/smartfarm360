@@ -72,9 +72,12 @@ describe('farm workspace', () => {
     renderAt('/t/9/farms/2', <FarmPage />, '/t/:tenantId/farms/:farmId');
     expect(await screen.findByRole('heading', { name: 'Yerpathi' })).toBeInTheDocument();
     expect(await screen.findByText('₹38,000.00')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Expense bill · BILL\/2026-27\/0004/ })).toHaveAttribute('href', '/t/9/finance/records/41');
+    // The records load apart from the figures
+    expect(await screen.findByRole('link', { name: /Expense bill · BILL\/2026-27\/0004/ })).toHaveAttribute('href', '/t/9/finance/records/41');
     expect(screen.getByText('North field')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Add expense' })).toHaveAttribute('href', '/t/9/finance/new/expense?farm=2');
+    await userEvent.click(screen.getByRole('button', { name: 'Add expense' }));
+    expect(await screen.findByRole('form', { name: 'Add expense' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /More options/ })).toHaveAttribute('href', '/t/9/finance/new/expense?farm=2');
     expect(screen.getByRole('link', { name: 'Record sale' })).toHaveAttribute('href', '/t/9/finance/new/sale?farm=2');
     expect(apiMock.mock.calls.some(([u]) => /income-statement\?from=.*&farmId=2$/.test(u))).toBe(true);
   });

@@ -3,6 +3,7 @@ import { Trash2 } from 'lucide-react';
 import { api } from '../api/client';
 import { useTenant } from '../auth/useCurrentTenant';
 import { ErrorBanner, Loading } from '../components/common';
+import { Toast } from '../components/Toast';
 import { currentLanguage, useNs } from '../i18n';
 import { describeError, isStale } from '../lib/errors';
 import { formatDate, formatMoney, formatNumber, today } from '../lib/format';
@@ -118,7 +119,7 @@ export default function AttendancePage() {
             </table>
           </div>
           {canWrite && <div className="form-actions"><button type="button" className="primary" onClick={() => void save()}>{t('saveAttendance')}</button></div>}
-          {saved && <p className="hint" role="status">{t('saved', { date: formatDate(date, lang) })}</p>}
+          <Toast message={saved ? t('saved', { date: formatDate(date, lang) }) : ''} onClose={() => setSaved(false)} />
         </>
       )}
 

@@ -88,11 +88,11 @@ export default function TrendChart({ months }: { months: TrendMonth[] }) {
       </figcaption>
       <details className="trend-table">
         <summary>{t('showTable')}</summary>
-        <table className="data-table report">
+        <div className="table-scroll"><table className="data-table report">
           <thead><tr><th>{t('month')}</th><th className="num">{t('income')}</th><th className="num">{t('costs')}</th><th className="num">{t('operatingProfit')}</th></tr></thead>
           <tbody>{months.map(m => <tr key={m.month}><td>{m.month}</td><td className="num">{formatMoney(m.revenue, lang)}</td>
             <td className="num">{formatMoney(m.costs, lang)}</td><td className="num">{formatMoney(m.operatingProfit, lang)}</td></tr>)}</tbody>
-        </table>
+        </table></div>
       </details>
     </figure>
   );

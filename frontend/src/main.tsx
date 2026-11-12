@@ -4,8 +4,10 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes, useParams } from 'react
 import './i18n';
 import './styles.css';
 import './theme.css';
+import './premium.css';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import Layout from './components/Layout';
+import { SavedToast } from './components/Toast';
 import { Loading } from './components/common';
 import { visibleNav } from './lib/nav';
 import { AcceptInvitationPage, ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage, ConsentPage, VerifyEmailPage } from './pages/AuthPages';
@@ -238,6 +240,7 @@ createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AuthProvider><App /></AuthProvider>
+      <SavedToast />
     </BrowserRouter>
   </React.StrictMode>,
 );

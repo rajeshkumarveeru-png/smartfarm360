@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { useTenant } from '../auth/useCurrentTenant';
 import { ErrorBanner, Loading } from '../components/common';
+import { Toast } from '../components/Toast';
 import { currentLanguage, useNs } from '../i18n';
 import { describeError } from '../lib/errors';
 import { formatDate, formatDateTime, formatNumber, today } from '../lib/format';
@@ -89,8 +90,8 @@ export function LimitsEditor({ pondId }: { pondId: number | null }) {
     <form className="form-card" noValidate onSubmit={e => void save(e)}>
       <p className="hint">{t(pondId == null ? 'limitsHelp' : 'pondLimitsHelp')}</p>
       <ErrorBanner message={error} />
-      {message && <p className="hint" role="status">{message}</p>}
-      <table className="data-table">
+      <Toast message={message} onClose={() => setMessage('')} />
+      <div className="table-scroll"><table className="data-table">
         <thead><tr><th>{t('parameterLabel')}</th><th>{t('lowest')}</th><th>{t('highest')}</th>{pondId != null && <th>{t('farmDefault')}</th>}</tr></thead>
         <tbody>{PARAMETERS.map(p => {
           const d = fallback(p);
@@ -105,7 +106,7 @@ export function LimitsEditor({ pondId }: { pondId: number | null }) {
             </tr>
           );
         })}</tbody>
-      </table>
+      </table></div>
       {canWrite && <div className="form-actions"><button className="secondary">{t('saveLimits')}</button></div>}
     </form>
   );

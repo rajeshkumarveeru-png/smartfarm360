@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { Permission, TenantSummary } from '../api/types';
@@ -9,12 +9,12 @@ import FlocksPage from './FlocksPage';
 import LivestockHome from './LivestockHome';
 import LivestockLayout from './LivestockLayout';
 import LivestockReportsPage from './LivestockReportsPage';
-import type { BatchDay, Figures, FlockGroup, FlockReport, Movement } from './types';
+import type { BatchDay, DayRecord, Figures, FlockGroup, FlockReport, Movement, VarietyFigures } from './types';
 
 const apiMock = vi.fn();
 vi.mock('../api/client', async importOriginal => ({ ...(await importOriginal<object>()), api: (...args: unknown[]) => apiMock(...args) }));
 
-const all: Permission[] = ['TENANT_READ', 'LIVESTOCK_READ', 'LIVESTOCK_WRITE', 'FINANCE_READ', 'FINANCE_WRITE', 'INVENTORY_READ'];
+const all: Permission[] = ['TENANT_READ', 'LIVESTOCK_READ', 'LIVESTOCK_WRITE', 'FINANCE_READ', 'FINANCE_WRITE', 'FINANCE_REVERSE', 'INVENTORY_READ'];
 const tenant: TenantSummary = { id: 9, name: 'Test farm', slug: 't', preferredLanguage: 'en', active: true, roles: ['TENANT_OWNER'],
   permissions: all, enabledModules: ['POULTRY', 'GOAT_SHEEP'], createdAt: '' };
 vi.mock('../auth/useCurrentTenant', () => ({ useTenant: () => tenant, useCurrentTenant: () => tenant }));
@@ -34,7 +34,8 @@ const day: BatchDay = { day: '2026-10-21', deaths: 2, deathCause: null, culls: 0
 const moves: Movement[] = [
   { id: 1, date: '2026-03-01', kind: 'PLACED', heads: 1000, kg: null, cause: null, documentId: null, batchDayId: null, pairGroupId: null, pairGroupName: null, reversed: false },
   { id: 2, date: '2026-10-21', kind: 'DIED', heads: 2, kg: null, cause: null, documentId: null, batchDayId: 7, pairGroupId: null, pairGroupName: null, reversed: false },
-  { id: 3, date: '2026-10-10', kind: 'CULLED', heads: 4, kg: null, cause: 'Not laying', documentId: null, batchDayId: null, pairGroupId: null, pairGroupName: null, reversed: false }];
+  { id: 3, date: '2026-10-10', kind: 'CULLED', heads: 4, kg: null, cause: 'Not laying', documentId: null, batchDayId: null, pairGroupId: null, pairGroupName: null, reversed: false },
+  { id: 4, date: '2026-10-12', kind: 'BOUGHT', heads: 50, kg: null, cause: null, documentId: 61, batchDayId: null, pairGroupId: null, pairGroupName: null, reversed: false }];
 
 function routeApi(url: string, init?: { method?: string; body?: unknown }) {
   if (url.endsWith('/livestock/flocks') && init?.method === 'POST') return Promise.resolve(layers);
@@ -78,15 +79,18 @@ describe('poultry, goats and sheep web', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Start batch' }));
     await userEvent.type(screen.getByLabelText('Group'), 'Layer shed 2');
+    await userEvent.type(screen.getByLabelText('Variety name'), 'Sonali');
     await userEvent.type(screen.getByLabelText('Heads'), '500');
     await userEvent.click(screen.getByLabelText(/Bought them/));
-    await userEvent.type(screen.getByLabelText('Bill amount'), '17500');
+    // Each variety has its price; the bill is their total
+    await userEvent.type(screen.getByLabelText('Price (₹, total)'), '17500');
     await userEvent.selectOptions(await screen.findByLabelText(/Bought from/), '3');
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(calls((u, i) => u.endsWith('/livestock/flocks') && i?.method === 'POST')).toHaveLength(1));
     const [, init] = calls((u, i) => u.endsWith('/livestock/flocks') && i?.method === 'POST')[0];
-    expect(init!.body).toMatchObject({ name: 'Layer shed 2', species: 'CHICKEN', purpose: 'LAYER', heads: 500, ageAtPlacementDays: null,
-      bill: { amount: '17500', partyId: 3, financialAccountId: null } });
+    expect(init!.body).toMatchObject({ name: 'Layer shed 2', species: 'CHICKEN', purpose: 'LAYER', ageAtPlacementDays: null,
+      lines: [{ lineId: null, species: 'CHICKEN', variety: 'Sonali', heads: 500, amount: '17500' }],
+      bill: { amount: '17500.00', partyId: 3, financialAccountId: null } });
     expect(init!.headers!['Idempotency-Key']).toBeTruthy();
   });
 
@@ -111,12 +115,184 @@ describe('poultry, goats and sheep web', () => {
     expect(await screen.findByText(/Record for .* saved\./)).toBeInTheDocument();
   });
 
+  it('takes eggs laid and a rate for each variety of a mixed batch', async () => {
+    const mixed: BatchDay = { ...day, eggsGood: 0, lines: [
+      { lineId: 21, species: 'CHICKEN', variety: 'Sonali', heads: 600, deaths: 0, culls: 0, eggs: 0, eggRate: null },
+      { lineId: 22, species: 'DUCK', variety: 'Khaki Campbell', heads: 394, deaths: 0, culls: 0, eggs: 0, eggRate: null },
+      { lineId: 23, species: 'CHICKEN', variety: null, heads: 0, deaths: 0, culls: 0, eggs: 0, eggRate: null }] };
+    apiMock.mockImplementation((url: string, init?: { method?: string; body?: unknown }) =>
+      (url.includes('/days/') && init?.method !== 'PUT' ? Promise.resolve(mixed) : routeApi(url, init)));
+    renderAt('/t/9/livestock/flocks/1', <FlockPage />, '/t/:tenantId/livestock/flocks/:groupId');
+    await screen.findByRole('heading', { name: 'Layer shed 1' });
+    await userEvent.click(screen.getByRole('tab', { name: 'Daily record' }));
+    await userEvent.type(await screen.findByLabelText('Eggs laid Sonali · Chicken'), '400');
+    await userEvent.type(screen.getByLabelText('Rate per egg (₹) Sonali · Chicken'), '6.50');
+    await userEvent.type(screen.getByLabelText('Eggs laid Khaki Campbell · Duck'), '300');
+    await userEvent.type(screen.getByLabelText('Rate per egg (₹) Khaki Campbell · Duck'), '9');
+    await userEvent.type(screen.getByLabelText('Deaths Khaki Campbell · Duck'), '1');
+    // A variety with no birds and nothing recorded that day is not asked about
+    expect(screen.queryByLabelText('Eggs laid Chicken')).not.toBeInTheDocument();
+    // One total for good eggs is not asked: it comes from the varieties
+    expect(screen.queryByLabelText('Good eggs')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Save the day' }));
+    await waitFor(() => expect(calls((u, i) => u.includes('/days/') && i?.method === 'PUT')).toHaveLength(1));
+    expect(calls((u, i) => u.includes('/days/') && i?.method === 'PUT')[0][1]!.body).toMatchObject({ lines: [
+      // Empty boxes are sent as nothing, which the server takes as none
+      { lineId: 21, deaths: null, culls: null, eggs: 400, eggRate: '6.50' }, { lineId: 22, deaths: 1, culls: null, eggs: 300, eggRate: '9' }] });
+  });
+
+  it('fills a new day with the last eggs and rate, saves them only on Save, and leaves deaths empty', async () => {
+    const fresh: BatchDay = { ...day, version: '0', eggsGood: 0, eggsCracked: 0, feedItemId: null, feedKg: null, warnings: [], lines: [
+      { lineId: 21, species: 'CHICKEN', variety: 'Sonali', heads: 3, deaths: 0, culls: 0, eggs: 0, eggRate: null, lastEggs: 2, lastEggsOn: '2026-10-20', lastEggRate: 10 }] };
+    apiMock.mockImplementation((url: string, init?: { method?: string; body?: unknown }) =>
+      (url.includes('/days/') && init?.method !== 'PUT' ? Promise.resolve(fresh) : routeApi(url, init)));
+    renderAt('/t/9/livestock/flocks/1', <FlockPage />, '/t/:tenantId/livestock/flocks/:groupId');
+    await screen.findByRole('heading', { name: 'Layer shed 1' });
+    await userEvent.click(screen.getByRole('tab', { name: 'Daily record' }));
+    const eggs = await screen.findByLabelText('Eggs laid Sonali · Chicken');
+    expect(eggs).toHaveValue('2');
+    expect(eggs).toHaveClass('suggested');
+    expect(screen.getByLabelText('Rate per egg (₹) Sonali · Chicken')).toHaveValue('10');
+    expect(screen.getByLabelText('Deaths Sonali · Chicken')).toHaveValue('');
+    expect(screen.getByText(/filled in from your last record/)).toBeInTheDocument();
+    expect(calls((u, i) => u.includes('/days/') && i?.method === 'PUT')).toHaveLength(0);
+    // Changing the count is ordinary typing; the button brings the last count back
+    await userEvent.clear(eggs);
+    await userEvent.type(eggs, '3');
+    expect(eggs).not.toHaveClass('suggested');
+    await userEvent.click(screen.getByRole('button', { name: 'Last: 2' }));
+    expect(eggs).toHaveValue('2');
+    await userEvent.clear(eggs);
+    await userEvent.type(eggs, '3');
+    await userEvent.click(screen.getByRole('button', { name: 'Save the day' }));
+    await waitFor(() => expect(calls((u, i) => u.includes('/days/') && i?.method === 'PUT')).toHaveLength(1));
+    expect(calls((u, i) => u.includes('/days/') && i?.method === 'PUT')[0][1]!.body).toMatchObject({ lines: [{ lineId: 21, deaths: null, eggs: 3, eggRate: '10' }] });
+  });
+
+  it('does not fill a day that already has a record', async () => {
+    const saved: BatchDay = { ...day, version: 'abc', lines: [
+      { lineId: 21, species: 'CHICKEN', variety: 'Sonali', heads: 3, deaths: 0, culls: 0, eggs: 0, eggRate: null, lastEggs: 2, lastEggsOn: '2026-10-20', lastEggRate: 10 }] };
+    apiMock.mockImplementation((url: string, init?: { method?: string; body?: unknown }) =>
+      (url.includes('/days/') && init?.method !== 'PUT' ? Promise.resolve(saved) : routeApi(url, init)));
+    renderAt('/t/9/livestock/flocks/1', <FlockPage />, '/t/:tenantId/livestock/flocks/:groupId');
+    await screen.findByRole('heading', { name: 'Layer shed 1' });
+    await userEvent.click(screen.getByRole('tab', { name: 'Daily record' }));
+    expect(await screen.findByLabelText('Eggs laid Sonali · Chicken')).toHaveValue('');
+    expect(screen.queryByText(/filled in from your last record/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Last: 2' })).toBeInTheDocument();
+  });
+
+  it('opens each figure by variety, and the rows of the profit add up to the batch', async () => {
+    const line = (lineId: number, variety: string, species: string, more: Partial<VarietyFigures>): VarietyFigures => ({ lineId, species, variety, openingHeads: 0, closingHeads: 0, arrived: 0, born: 0, died: 0, culled: 0,
+      sold: 0, movedOut: 0, soldKg: 0, headDays: 100, eggs: 0, eggRate: null, eggValue: 0, boughtAmount: 0, soldAmount: 0, ...more });
+    const mixed: Figures = { ...figures, eggs: 30, eggValue: 40, profit: -2000, profitWithEggs: -1960, revenue: 0, costs: 2000, headDays: 200, feedKg: 20, varieties: [
+      line(21, 'Sonali', 'CHICKEN', { closingHeads: 3, arrived: 3, eggs: 10, eggRate: 5, eggValue: 50, boughtAmount: 500 }),
+      line(22, 'Country duck', 'DUCK', { closingHeads: 6, arrived: 7, died: 1, eggs: 18, boughtAmount: 1000 })] };
+    apiMock.mockImplementation((url: string, init?: { method?: string; body?: unknown }) =>
+      (/\/flocks\/1\/report/.test(url) ? Promise.resolve({ ...report(layers), period: mixed, sincePlacement: null }) : routeApi(url, init)));
+    renderAt('/t/9/livestock/flocks/1', <FlockPage />, '/t/:tenantId/livestock/flocks/:groupId');
+    await screen.findByRole('heading', { name: 'Layer shed 1' });
+
+    await userEvent.click(screen.getByRole('button', { name: /^Eggs\s*30/ }));
+    let dialog = within(await screen.findByRole('dialog'));
+    expect(dialog.getByText('Sonali')).toBeInTheDocument();
+    expect(dialog.getByText('Country duck')).toBeInTheDocument();
+    expect(dialog.getByText('18')).toBeInTheDocument();
+    // Two eggs were recorded as a batch total, and that is said rather than dropped
+    expect(dialog.getByText('Not split by variety')).toBeInTheDocument();
+    await userEvent.click(dialog.getByRole('button', { name: 'Close' }));
+
+    await userEvent.click(screen.getByRole('button', { name: /^Opening heads/ }));
+    dialog = within(await screen.findByRole('dialog'));
+    expect(dialog.getByText(/Came in 7 · Born 0 · Died 1/)).toBeInTheDocument();
+    await userEvent.click(dialog.getByRole('button', { name: 'Close' }));
+
+    await userEvent.click(screen.getByRole('button', { name: /^Profit\s*[-−₹]/ }));
+    dialog = within(await screen.findByRole('dialog'));
+    expect(dialog.getByText('Bought ₹500.00 · Sold ₹0.00')).toBeInTheDocument();
+    // -500 and -1,000 for the birds, and -500 for the rest of the batch, make the batch's -2,000
+    expect(dialog.getByText('Feed and other items of the whole batch')).toBeInTheDocument();
+    expect(dialog.getAllByText(/500\.00/).length).toBeGreaterThan(1);
+  });
+
+  it('shows a toast wherever the user has scrolled to after saving the day', async () => {
+    renderAt('/t/9/livestock/flocks/1', <FlockPage />, '/t/:tenantId/livestock/flocks/:groupId');
+    await screen.findByRole('heading', { name: 'Layer shed 1' });
+    await userEvent.click(screen.getByRole('tab', { name: 'Daily record' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Save the day' }));
+    const toast = await screen.findByRole('status');
+    expect(toast).toHaveClass('toast');
+    expect(toast).toHaveTextContent(/Record for .* saved\./);
+    await userEvent.click(within(toast).getByRole('button', { name: 'Close' }));
+    expect(screen.queryByText(/Record for .* saved\./)).not.toBeInTheDocument();
+  });
+
+  it('lists the days by variety, filters them, and opens a day from the list', async () => {
+    const records: DayRecord[] = [
+      { day: '2026-01-05', deaths: 1, culls: 0, eggsGood: 7, eggsCracked: 0, eggsBroken: 0, feedKg: null, notes: null, lines: [
+        { lineId: 21, species: 'CHICKEN', variety: 'Sonali', deaths: 1, culls: 0, eggs: 3, eggRate: 10 },
+        { lineId: 22, species: 'DUCK', variety: 'Country duck', deaths: 0, culls: 0, eggs: 4, eggRate: 12 }] },
+      { day: '2026-01-01', deaths: 0, culls: 0, eggsGood: 5, eggsCracked: 0, eggsBroken: 0, feedKg: null, notes: null, lines: [] }];
+    apiMock.mockImplementation((url: string, init?: { method?: string; body?: unknown }) => {
+      if (/\/flocks\/1\/days\?/.test(url)) return Promise.resolve(records);
+      if (url.endsWith('/flocks/1/lines')) return Promise.resolve([{ id: 21, species: 'CHICKEN', variety: 'Sonali', heads: 3 }, { id: 22, species: 'DUCK', variety: 'Country duck', heads: 6 }]);
+      return routeApi(url, init);
+    });
+    renderAt('/t/9/livestock/flocks/1', <FlockPage />, '/t/:tenantId/livestock/flocks/:groupId');
+    await screen.findByRole('heading', { name: 'Layer shed 1' });
+    await userEvent.click(screen.getByRole('tab', { name: 'Daily record' }));
+    const table = within(await screen.findByRole('table'));
+    expect(await table.findByText('Sonali · Chicken')).toBeInTheDocument();
+    expect(table.getByText('Country duck · Duck')).toBeInTheDocument();
+    expect(table.getByText('Whole batch')).toBeInTheDocument();
+    expect(table.getByText('₹30.00')).toBeInTheDocument();          // 3 eggs at 10
+    expect(table.getAllByText('₹78.00').length).toBe(1);             // The total: 30 and 48
+
+    await userEvent.selectOptions(screen.getByLabelText('Variety'), '22');
+    expect(table.queryByText('Sonali · Chicken')).not.toBeInTheDocument();
+    expect(table.queryByText('Whole batch')).not.toBeInTheDocument();
+    expect(table.getAllByText('₹48.00').length).toBe(2);             // The row and the total
+
+    apiMock.mockClear();
+    await userEvent.click(table.getByRole('button', { name: /2026/ }));
+    await waitFor(() => expect(calls((u, i) => u.includes('/flocks/1/days/2026-01-05') && i?.method !== 'PUT')).toHaveLength(1));
+  });
+
+  it('opens a variety day by day from the eggs pop-up', async () => {
+    const v: VarietyFigures = { lineId: 21, species: 'CHICKEN', variety: 'Sonali', openingHeads: 0, closingHeads: 3, arrived: 3, born: 0, died: 0, culled: 0, sold: 0, movedOut: 0, soldKg: 0,
+      headDays: 5, eggs: 3, eggRate: 10, eggValue: 30, boughtAmount: 0, soldAmount: 0 };
+    const records: DayRecord[] = [{ day: '2026-10-05', deaths: 0, culls: 0, eggsGood: 7, eggsCracked: 0, eggsBroken: 0, feedKg: null, notes: null, lines: [
+      { lineId: 21, species: 'CHICKEN', variety: 'Sonali', deaths: 1, culls: 0, eggs: 3, eggRate: 10 },
+      { lineId: 22, species: 'DUCK', variety: 'Country duck', deaths: 0, culls: 0, eggs: 4, eggRate: 12 }] }];
+    apiMock.mockImplementation((url: string, init?: { method?: string; body?: unknown }) => {
+      if (/\/flocks\/1\/days\?/.test(url)) return Promise.resolve(records);
+      if (/\/flocks\/1\/report/.test(url)) return Promise.resolve({ ...report(layers), period: { ...figures, eggs: 3, varieties: [v] }, sincePlacement: null });
+      return routeApi(url, init);
+    });
+    renderAt('/t/9/livestock/flocks/1', <FlockPage />, '/t/:tenantId/livestock/flocks/:groupId');
+    await screen.findByRole('heading', { name: 'Layer shed 1' });
+    await userEvent.click(screen.getByRole('button', { name: /^Eggs\s*3/ }));
+    let dialog = within(await screen.findByRole('dialog'));
+    await userEvent.click(dialog.getByRole('button', { name: /Sonali/ }));
+    dialog = within(await screen.findByRole('dialog'));
+    expect(await dialog.findByText(/Deaths 1 · Culled 0 · Rate per egg \(₹\) ₹10.00 · Value ₹30.00/)).toBeInTheDocument();
+    expect(dialog.getByText('3 eggs')).toBeInTheDocument();
+    expect(dialog.queryByText(/₹12.00/)).not.toBeInTheDocument();    // Not the duck's day
+    await userEvent.click(dialog.getByRole('button', { name: 'Back to all varieties' }));
+    expect(await within(await screen.findByRole('dialog')).findByText('Click a variety to see it day by day.')).toBeInTheDocument();
+  });
+
   it('lets only hand-entered head changes be removed, and checks a count before sending', async () => {
     renderAt('/t/9/livestock/flocks/1', <FlockPage />, '/t/:tenantId/livestock/flocks/:groupId');
     await screen.findByRole('heading', { name: 'Layer shed 1' });
     await userEvent.click(screen.getByRole('tab', { name: 'Birds' }));
     expect(await screen.findByText('Not laying')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Remove this change' })).toHaveLength(1);
+    // Removable: the start without a bill and the cull, entered by hand; not the death from the daily record
+    expect(screen.getAllByRole('button', { name: 'Remove this change' })).toHaveLength(2);
+    // The purchase with a bill is undone by reversing the bill, after asking
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await userEvent.click(screen.getByRole('button', { name: 'Undo (reverse its bill)' }));
+    await waitFor(() => expect(calls((u, i) => u.endsWith('/finance/documents/61/reverse') && i?.method === 'POST')).toHaveLength(1));
     await userEvent.selectOptions(screen.getByLabelText('What happened'), 'COUNT');
     await userEvent.click(screen.getByRole('button', { name: 'Record change' }));
     expect(screen.getByText('Enter the number of heads.')).toBeInTheDocument();

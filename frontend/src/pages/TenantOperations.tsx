@@ -4,6 +4,7 @@ import type { DeletionState, SupportGrant, TenantExport, Usage } from '../api/ty
 import { useAuth } from '../auth/AuthContext';
 import { useTenant } from '../auth/useCurrentTenant';
 import { ErrorBanner } from '../components/common';
+import { Toast } from '../components/Toast';
 import { currentLanguage, useNs } from '../i18n';
 import { describeError } from '../lib/errors';
 import { formatDate, formatNumber } from '../lib/format';
@@ -57,7 +58,7 @@ export default function TenantOperations() {
   return (
     <>
       <ErrorBanner message={error} />
-      {notice && <div className="info-banner" role="status">{notice}</div>}
+      <Toast message={notice} onClose={() => setNotice('')} />
       {deletion?.pending && deletion.scheduledFor && (
         <div className="error-banner" role="alert">{t('deletionBanner', { date: formatDate(deletion.scheduledFor, lang) })}</div>
       )}

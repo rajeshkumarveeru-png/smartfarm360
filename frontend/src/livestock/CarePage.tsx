@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useTenant } from '../auth/useCurrentTenant';
 import { ErrorBanner, Loading } from '../components/common';
+import { Toast } from '../components/Toast';
 import type { FinancialAccount } from '../finance/types';
 import { newIdempotencyKey } from '../finance/useFinanceData';
 import { currentLanguage, useNs } from '../i18n';
@@ -51,7 +52,7 @@ export default function CarePage() {
     <>
       <div className="crop-page-head"><div><h2>{t('care')}</h2><p>{t('careHelp')}</p></div></div>
       <ErrorBanner message={error} />
-      {message && <p className="hint" role="status">{message}</p>}
+      <Toast message={message} onClose={() => setMessage('')} />
       {!calendar || !health ? <Loading /> : (
         <div className="dashboard-grid">
           <div className="form-card">

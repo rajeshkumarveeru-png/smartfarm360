@@ -119,21 +119,21 @@ export default function LivestockReportsPage({ scope = 'cattle' }: { scope?: 'ca
             <div className="finance-stat"><span>{t('discarded')}</span><b>{n(milk.discarded)}</b></div>
           </div>
           {milk.animals.length > 0 && (
-            <table className="data-table report">
+            <div className="table-scroll"><table className="data-table report">
               <thead><tr><th>{t('tag')}</th><th className="num">{t('litres')}</th><th className="num">{t('daysRecorded')}</th><th className="num">{t('perDay')}</th></tr></thead>
               <tbody>{milk.animals.map(a => <tr key={a.animalId}><td>{a.tag}{a.name ? ` ${a.name}` : ''}</td><td className="num">{n(a.litres)}</td>
                 <td className="num">{a.days}</td><td className="num">{n(a.perDay)}</td></tr>)}</tbody>
-            </table>
+            </table></div>
           )}
           {milk.days.length > 0 && (
             <details className="trend-table section-space">
               <summary>{t('byDay')}</summary>
-              <table className="data-table report">
+              <div className="table-scroll"><table className="data-table report">
                 <thead><tr><th>{tf('date')}</th><th>{t('group')}</th><th className="num">{t('session.MORNING')}</th><th className="num">{t('session.EVENING')}</th>
                   <th className="num">{t('litres')}</th></tr></thead>
                 <tbody>{milk.days.map(d => <tr key={`${d.date}-${d.groupId}`}><td>{formatDate(d.date, lang)}</td><td>{d.groupName}</td>
                   <td className="num">{n(d.morning)}</td><td className="num">{n(d.evening)}</td><td className="num">{n(d.total)}</td></tr>)}</tbody>
-              </table>
+              </table></div>
             </details>
           )}
         </>

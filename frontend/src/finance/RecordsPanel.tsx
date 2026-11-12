@@ -11,6 +11,7 @@ import { formatDate, formatMoney, today } from '../lib/format';
 import { can } from '../lib/nav';
 import type { CategoryBreakdown, CategoryRow } from '../reports/types';
 import type { DocumentSummary } from './types';
+import QuickExpenseForm from './QuickExpenseForm';
 import { useCategoryLabel } from './useFinanceData';
 
 const PAGE = 10;
@@ -53,6 +54,8 @@ export default function RecordsPanel({ filter, prefill, title, newButtons = true
   const [category, setCategory] = useState<number | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState('');
+  // The expense form opens in place, so an expense is added without leaving the page
+  const [adding, setAdding] = useState(false);
 
   const merged = !!timeline;
   const query = `${filter}${category != null ? `&categoryId=${category}` : ''}`;
@@ -95,10 +98,11 @@ export default function RecordsPanel({ filter, prefill, title, newButtons = true
         <h3>{title} {paging.total > 0 && <span className="count">{paging.total}</span>}</h3>
         {actions ? <div className="rp-new">{actions}</div> : canWrite && newButtons && <div className="rp-new">
           <Link className="secondary" to={`/t/${tenant.id}/finance/new/sale?${prefill}`}><ShoppingBag size={15} aria-hidden />{t('newSale')}</Link>
-          <Link className="primary" to={`/t/${tenant.id}/finance/new/expense?${prefill}`}><Plus size={15} aria-hidden />{t('newExpense')}</Link>
+          {!adding && <button type="button" className="primary" onClick={() => setAdding(true)}><Plus size={15} aria-hidden />{t('newExpense')}</button>}
         </div>}
       </div>
       <ErrorBanner message={error} />
+      {adding && <QuickExpenseForm prefill={prefill} onCancel={() => setAdding(false)} onSaved={() => { setAdding(false); load(0); loadCosts(); }} />}
 
       {rows.length > 0 && costs && (
         <div className="rp-cats" role="group" aria-label={t('byCategory')}>

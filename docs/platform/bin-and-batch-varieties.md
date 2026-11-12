@@ -1,6 +1,6 @@
 # Recycle bin and batch varieties (design draft)
 
-- Status: **Draft for review** (2026-11-03). Nothing here is built yet.
+- Status: **Approved and partly built** (2026-11-03). See section 5 for what is built and what changed.
 - Asked for by the owner:
   - a batch of birds can hold several varieties, as line items, and its count can be increased;
   - a batch can be deleted at any time;
@@ -58,3 +58,21 @@ How it would be built:
 2. **Batch varieties.**
 
 Each step gets backend, web and tests, and is recorded in PROGRESS.
+
+## 5. As built (2026-11-03)
+
+- **The Bin (B1-B8)** is built for farms, fields, crop cycles, poultry batches, goat and sheep herds, and work notes.
+  Delete moves an item to *Settings → Bin*; the owner can restore it or delete it forever. Delete forever is refused
+  while money or stock records refer to the item, and the item stays in the Bin.
+- **B9, the other kinds** (workers, assets, parties, stock items and locations, observations, weather entries,
+  health-plan items, crops, varieties and seasons, and draft money records) are **not built yet**: they keep their
+  current remove or deactivate.
+- **Hand-entered head changes** are removed directly, as before. A bought or sold entry is undone by reversing its bill,
+  because posted money is never erased (B4).
+- **Batch varieties (V1-V4, V6-V8)** are built as designed. Variety names are free text, with common names offered
+  (Sonali, Kadaknath, Peruvidai, Aseel, Muscovy, Khaki Campbell and others).
+- **V5 changed at the owner's request:** the daily record takes deaths, culls, **eggs laid and a rate per egg for each
+  variety**. Cracked and broken eggs stay for the whole batch, and good eggs are those laid less the cracked and broken.
+  The batch's figures add *Eggs laid, at your rates* and *Profit counting eggs at your rates*. That profit counts the
+  eggs at the owner's rates in place of egg sales, so eggs are not counted twice; it is shown only with finance access.
+  The table is `sf_batch_day_lines` (changeset 062).

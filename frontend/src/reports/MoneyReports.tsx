@@ -131,7 +131,7 @@ export function CategoriesPage() {
         extra={data?.compare ? `${t(`compare.${data.compare}`)}: ${formatDate(data.previousFrom!, lang)} – ${formatDate(data.previousTo!, lang)}` : undefined} />
       <ErrorBanner message={error} />
       {!data ? !error && <Loading /> : data.rows.length === 0 ? <p className="hint">{t('nothingInPeriod')}</p> : (
-        <table className="data-table report">
+        <div className="table-scroll"><table className="data-table report">
           <thead><tr><th>{tf('category')}</th><th className="num">{tf('amount')}</th><th className="num">{t('sharePercent')}</th>
             {data.compare && <><th className="num">{t('earlierPeriod')}</th><th className="num">{t('change')}</th><th className="num">{t('changePercent')}</th></>}</tr></thead>
           <tbody>
@@ -145,7 +145,7 @@ export function CategoriesPage() {
             <tr className="total"><td>{tf('total')}</td><td className="num">{formatMoney(data.total, lang)}</td><td />
               {data.compare && <><td className="num">{formatMoney(data.previousTotal, lang)}</td><td colSpan={2} /></>}</tr>
           </tbody>
-        </table>
+        </table></div>
       )}
     </section>
   );
@@ -173,11 +173,11 @@ export function BalanceSheetPage() {
         <>
           {data.difference !== 0 && <p className="error-banner" role="alert">{t('notBalanced', { amount: formatMoney(data.difference, lang) })}</p>}
           <div className="balance-sheet">
-            <table className="data-table report">
+            <div className="table-scroll"><table className="data-table report">
               <thead><tr><th colSpan={2}>{t('section.ASSETS')}</th></tr></thead>
               <tbody>{lines(data.assets)}<tr className="total"><td>{t('assetTotal')}</td><td className="num">{formatMoney(data.assetTotal, lang)}</td></tr></tbody>
-            </table>
-            <table className="data-table report">
+            </table></div>
+            <div className="table-scroll"><table className="data-table report">
               <thead><tr><th colSpan={2}>{t('section.LIABILITIES')}</th></tr></thead>
               <tbody>
                 {lines(data.liabilities)}
@@ -189,7 +189,7 @@ export function BalanceSheetPage() {
                 <tr className="subtotal"><td>{t('equityTotal')}</td><td className="num">{formatMoney(data.equityTotal, lang)}</td></tr>
                 <tr className="total"><td>{t('liabilitiesAndEquity')}</td><td className="num">{formatMoney(data.liabilitiesAndEquity, lang)}</td></tr>
               </tbody>
-            </table>
+            </table></div>
           </div>
           <p className="hint">{t('fiscalYearNote', { date: formatDate(data.fiscalYearFrom, lang) })}</p>
         </>
@@ -278,11 +278,11 @@ export function PartyStatementPage() {
           <p className="hint">{t('balanceSignHelp')}</p>
           {data.openItems.length > 0 && <>
             <h3>{t('openItems')}</h3>
-            <table className="data-table report">
+            <div className="table-scroll"><table className="data-table report">
               <thead><tr><th>{t('record')}</th><th>{tf('date')}</th><th>{tf('dueDate')}</th><th className="num">{tf('total')}</th><th className="num">{tf('openAmount')}</th></tr></thead>
               <tbody>{data.openItems.map(o => <tr key={o.documentId}><td>{o.number} <small>· {tf(`type.${o.documentType}`)}</small></td><td>{formatDate(o.date, lang)}</td>
                 <td>{o.dueDate ? formatDate(o.dueDate, lang) : '—'}</td><td className="num">{formatMoney(o.total, lang)}</td><td className="num">{formatMoney(o.open, lang)}</td></tr>)}</tbody>
-            </table>
+            </table></div>
           </>}
         </>
       )}

@@ -4,6 +4,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { api } from '../api/client';
 import { useTenant } from '../auth/useCurrentTenant';
 import { ErrorBanner, Loading } from '../components/common';
+import { Toast } from '../components/Toast';
 import type { FinancialAccount, Party } from '../finance/types';
 import { newIdempotencyKey } from '../finance/useFinanceData';
 import { currentLanguage, useNs } from '../i18n';
@@ -141,7 +142,7 @@ export default function CyclePage() {
         </div>
       </div>
       <ErrorBanner message={error} onRetry={stale ? () => { setError(''); setDayLoads(n => n + 1); } : undefined} retryLabel={tc('loadLatest')} />
-      {message && <p className="hint" role="status">{message}</p>}
+      <Toast message={message} onClose={() => setMessage('')} />
 
       <div className="form-card form-grid filters">
         <label>{tf('from')}<input type="date" value={range.from} onChange={e => setRange({ ...range, from: e.target.value })} /></label>
@@ -154,7 +155,7 @@ export default function CyclePage() {
         <>
           <h3 className="section-space">{t('fishInPond')}</h3>
           <p className="hint">{t('estimateHelp')}</p>
-          <table className="data-table">
+          <div className="table-scroll"><table className="data-table">
             <thead><tr><th>{t('speciesLabel')}</th><th className="num">{t('stocked')}</th><th className="num">{t('deathsSeen')}</th><th className="num">{t('harvestedCount')}</th>
               <th className="num">{t('estimatedCount')}</th><th className="num">{t('averageGrams')}</th><th className="num">{t('estimatedKg')}</th></tr></thead>
             <tbody>{report.species.map(s => (
@@ -165,13 +166,13 @@ export default function CyclePage() {
                 <td className="num">{s.estimatedKg == null ? '—' : formatNumber(s.estimatedKg, lang, 1)}</td>
               </tr>
             ))}</tbody>
-          </table>
+          </table></div>
         </>
       )}
 
       <h3 className="section-space">{t('stockings')}</h3>
       {stockings.length > 0 && (
-        <table className="data-table">
+        <div className="table-scroll"><table className="data-table">
           <thead><tr><th>{tf('date')}</th><th>{t('speciesLabel')}</th><th className="num">{t('fishCount')}</th><th className="num">{t('kg')}</th><th>{t('hatchery')}</th></tr></thead>
           <tbody>{stockings.map(s => (
             <tr key={s.id} className={s.reversed ? 'muted' : undefined}>
@@ -180,7 +181,7 @@ export default function CyclePage() {
               <td className="num">{formatNumber(s.count, lang, 0)}</td><td className="num">{formatNumber(s.kg, lang, 3)}</td><td>{s.hatchery ?? ''}</td>
             </tr>
           ))}</tbody>
-        </table>
+        </table></div>
       )}
       {open && (
         <form className="form-card form-grid" noValidate onSubmit={e => {
@@ -250,7 +251,7 @@ export default function CyclePage() {
         <>
           <h3 className="section-space">{t('samples')}</h3>
           {samples.length > 0 && (
-            <table className="data-table">
+            <div className="table-scroll"><table className="data-table">
               <thead><tr><th>{tf('date')}</th><th>{t('speciesLabel')}</th><th className="num">{t('fishWeighed')}</th><th className="num">{t('kg')}</th><th className="num">{t('averageGrams')}</th><th /></tr></thead>
               <tbody>{samples.map(s => (
                 <tr key={s.id}>
@@ -261,7 +262,7 @@ export default function CyclePage() {
                     <Trash2 size={16} aria-hidden /></button>}</td>
                 </tr>
               ))}</tbody>
-            </table>
+            </table></div>
           )}
           {open && (
             <form className="form-card form-grid" noValidate onSubmit={e => {
@@ -289,14 +290,14 @@ export default function CyclePage() {
                 {open && (!h.saleDocumentId || h.reversed) && <button type="button" className="icon-button" aria-label={t('removeHarvest')}
                   onClick={() => { if (window.confirm(t('confirmRemoveHarvest'))) void send(`${base}/harvests/${h.id}`, 'DELETE', undefined, null, () => t('harvestRemoved')); }}>
                   <Trash2 size={16} aria-hidden /></button>}</p>
-              <table className="data-table">
+              <div className="table-scroll"><table className="data-table">
                 <thead><tr><th>{t('speciesLabel')}</th><th>{t('grade')}</th><th className="num">{t('kg')}</th><th className="num">{t('fishCount')}</th><th>{t('use')}</th>
                   <th className="num">{t('ratePerKg')}</th><th className="num">{tf('amount')}</th></tr></thead>
                 <tbody>{h.lines.map((l, i) => (
                   <tr key={i}><td>{name(l)}</td><td>{l.grade ?? ''}</td><td className="num">{formatNumber(l.kg, lang, 3)}</td><td className="num">{l.count ?? '—'}</td>
                     <td>{t(`useKind.${l.use}`)}</td><td className="num">{l.rate == null ? '' : formatMoney(l.rate, lang)}</td><td className="num">{l.amount == null ? '' : formatMoney(l.amount, lang)}</td></tr>
                 ))}</tbody>
-              </table>
+              </table></div>
             </div>
           ))}
           {open && (

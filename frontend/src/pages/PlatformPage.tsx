@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { api } from '../api/client';
 import type { Announcement, LegalDocument, Operations, OpsCheck, Page, PlatformAuditEntry, PlatformTenant, PlatformTenantDetail, PlatformUser } from '../api/types';
 import { ErrorBanner, Loading } from '../components/common';
+import { Toast } from '../components/Toast';
 import { currentLanguage, useNs } from '../i18n';
 import { describeError } from '../lib/errors';
 import { formatDate, formatNumber } from '../lib/format';
@@ -231,7 +232,7 @@ function OpsTab() {
   return (
     <section className="panel">
       <ErrorBanner message={error} />
-      {notice && <div className="info-banner" role="status">{notice}</div>}
+      <Toast message={notice} onClose={() => setNotice('')} />
       <p>{t('version', { version: ops.version })}</p>
       <ul className="plain-list">
         <CheckLine label={t('lastBackup')} check={ops.lastBackup} />

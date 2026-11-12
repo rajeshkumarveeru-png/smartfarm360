@@ -2020,6 +2020,209 @@ home use. No backend change.
 | `frontend: npm test` | Passed: **109 tests**. The batch tests open the tab they need and keep all their checks. The layer batch test checks the tab list. The permissions test now opens *Birds* and *Sales & expenses* to check the money buttons are absent there |
 | `mobile: npm test` | Passed: **76 tests** |
 
+## Recycle bin and batch varieties (2026-11-03)
+
+Built from the approved design [docs/platform/bin-and-batch-varieties.md](platform/bin-and-batch-varieties.md); its
+section 5 says what is built and what changed.
+
+### Recycle bin (two-level delete)
+
+- Deleting a farm, field, crop cycle, poultry batch, goat or sheep herd, or work note moves it to **Settings → Bin**. It
+  leaves every list, and *Restore* brings it back.
+- *Delete forever* (owner only, new permission `DATA_PURGE`) erases it and what belongs only to it. It is refused, and
+  the item stays in the Bin, while money or stock records refer to it. Every step goes into the activity history.
+- The other kinds in B9 (workers, assets, parties, stock items and locations, observations, weather, health-plan items,
+  crops, varieties and seasons, draft money records) are **not done yet**.
+
+### Batch varieties and the daily record
+
+- A batch holds several varieties (chicken, duck, quail, turkey; goat and sheep for herds), each with its own name and
+  heads. *Start batch* and *Buy more birds* take several rows, with a price each and one bill for the total. Common
+  names are offered as you type (Sonali, Kadaknath, Peruvidai, Aseel, Muscovy and others).
+- Deaths, culls, counts, moves and sales choose the variety when there is more than one. Existing batches became one
+  variety each.
+- The daily record takes, for each variety, deaths, culls, **eggs laid and a rate per egg**. Cracked and broken eggs
+  are for the whole batch. The figures add *Eggs laid, at your rates* and *Profit counting eggs at your rates*, which
+  counts eggs at those rates in place of egg sales, so they are not counted twice.
+- Head changes: any hand-entered entry can be removed. A bought or sold entry is undone by reversing its bill.
+- Adding an expense on a farm, crop cycle or batch happens in place, on the same screen. *More options* opens the full
+  form.
+
+### Database migrations
+
+- `018-bin-and-batch-lines.yaml`:
+  - changeset `060-recycle-bin`: `deleted_at` and `deleted_by` on the first kinds; inactive farms and fields go to the
+    Bin; `DATA_PURGE` for the owner.
+  - changeset `061-flock-lines`: `sf_flock_lines`, `sf_head_movements.line_id`, and one line per existing batch.
+- `019-batch-day-lines.yaml`, changeset `062-batch-day-lines`: `sf_batch_day_lines` with its RLS policy.
+  - It is a new changeset, not part of 061, because 061 had already been applied to the local database at 10:30
+    when the IDE backend started.
+
+### APIs
+
+- `GET /bin`, `POST /bin/{kind}/{id}`, `POST /bin/{kind}/{id}/restore` and `DELETE /bin/{kind}/{id}`.
+- The batch API:
+  - `DELETE /livestock/groups/{groupId}` and `DELETE /cultivation-cycles/{id}` move the item to the Bin.
+  - `GET /livestock/flocks/{groupId}/lines`.
+  - `lines` on start, purchase and the day record; `lineId` on movements and sales.
+
+### Tests and evidence
+
+| Command | Result |
+|---|---|
+| `backend: gradlew test bootJar` | **858 passed, 1 failed:** `DashboardPerformanceTest` took 1,056 ms against its 1,000 ms budget while the machine had 0.7 GB of 7.8 GB RAM free. Run alone it passed, together with `bootJar`. The budget was not changed. An earlier run stopped on a corrupt test-results file in `build/`, which was deleted |
+| `frontend: npm run lint`, `npx tsc --noEmit`, `npm run build` | Passed |
+| `frontend: npm test` | Passed: **110 tests**. *Start batch* now enters a variety with its price, and the bill is the total. A new test enters eggs and a rate for each variety of a mixed batch |
+| `mobile: npx tsc --noEmit`, `npm test` | Passed: **76 tests** |
+| Local database | Backed up first with `pg_dump --enable-row-security`. Changeset 062 applied by starting the new jar on port 8081: no errors, health 200, the 060–061 checksums accepted. `sf_batch_day_lines` has the forced policy, every table with `tenant_id` has a policy, and every batch has a variety line |
+| Manual browser check | **Not done** |
+
+New backend tests:
+
+- `BinTest` (5).
+- `FlockVarietiesTest` (3), covering:
+  - a mixed batch with one bill;
+  - a variety required when there are several;
+  - heads per variety;
+  - buying more;
+  - a count;
+  - eggs and rates in the profit;
+  - `EGGS_SPLIT`;
+  - a variety of another batch refused.
+- The migration test lists changesets 060–062 and the new tables.
+
+Found and fixed on the way: the batch page loaded the day again on every render once the variety labels became a
+dependency, which hung the web tests; it now reads the latest labels through a ref.
+
+### Fix: variety rows had no layout (2026-11-04)
+
+The owner found the daily record by variety unclear: the boxes had no labels and ran together. The styles for the
+variety rows had never been written, which also affected *Start batch*, *Buy more birds* and the *Birds* tab cards.
+
+- Each variety on the daily record is now its own block with its name, its birds, and labelled boxes: deaths, culled,
+  eggs laid and rate per egg.
+- A variety with no birds and nothing recorded that day is no longer asked about.
+
+| Command | Result |
+|---|---|
+| `frontend: npm run lint`, `npm test`, `npm run build` | Passed: **110 tests**; the mixed-batch test also checks that an empty variety is not asked about |
+| Layout at 800 and 375 px wide | Checked with the same markup and the app's stylesheets on the sign-in page; no sideways scroll. **Not checked signed in**, which needs the owner's password |
+
+### Last day's eggs and rate, and figures by variety (2026-11-05)
+
+The owner asked for two things: the daily record should start from the last day's values, as the payment amount does in
+BizManager, and clicking a batch's figure should show it by variety.
+
+- **Daily record:** on a day with no record yet, *Eggs laid* and *Rate per egg* are filled in from each variety's last
+  record, tinted and editable, with a *Last: …* button that brings the value back.
+  - Nothing is saved until *Save the day*.
+  - *Deaths* and *Culled* stay empty, because a carried-over death would remove birds.
+  - A day that already has a record is not filled in; a closed batch or a read-only user sees no filled values.
+- **Figures:** every card on the batch page opens a pop-up by variety: heads, deaths, sales, births, eggs, the value of
+  eggs at the owner's rates, and profit.
+  - What a variety's birds cost and sold for comes from its own bill lines.
+  - Feed and other costs stay with the whole batch (V6). The profit pop-ups show them as one row, so the rows add up to
+    the batch's figure. The feed pop-up shows an estimate by bird-days and says so.
+  - Eggs recorded earlier as a batch total show as *Not split by variety*.
+- **API, additive, no migration:** `lastEggs`, `lastEggsOn` and `lastEggRate` on a day's varieties; `varieties` on the
+  batch figures, with money null without finance access.
+- **Not changed:** the phone's daily record, which still takes batch totals.
+
+| Command | Result |
+|---|---|
+| `backend: gradlew test bootJar` | Passed: **861 tests, 0 failures**. `FlockVarietiesTest` has two new tests: the last values offered and not saved, and figures by variety, with a reversed sale and a worker without finance access |
+| `frontend: npm run lint`, `npx tsc --noEmit`, `npm run build` | Passed |
+| `frontend: npm test` | Passed: **113 tests**. New tests: a new day is filled and saved only on Save; a recorded day is not filled; the pop-ups by variety |
+| `mobile: npx tsc --noEmit`, `npm test` | Passed: **76 tests** |
+| Layout | Checked with the same markup and the app's stylesheets on the sign-in page. **Not checked signed in**, which needs the owner's password. The pop-ups were checked by the web tests only |
+
+### Save confirmation and day-wise records (2026-11-05)
+
+The owner got no sign that a save had worked, and could not see Sonali and the ducks day by day.
+
+- **Toast:** the batch page's messages were written at the top of the page, out of sight from the Save button. Every
+  save on the batch page now shows a toast (`components/Toast.tsx`). The next section extends this to the whole app.
+- **Day-wise records:** the *Daily record* tab lists the days of a period under the form, a row per variety, with a
+  filter by variety and totals. Clicking a date opens that day in the form to correct it. Days saved as batch totals
+  show as *Whole batch*.
+- **Pop-ups:** in *Opening heads*, *Died*, *Eggs* and *Eggs at your rates*, clicking a variety shows it day by day.
+- **API:** `GET /flocks/{groupId}/days?from&to`. No migration.
+
+| Command | Result |
+|---|---|
+| `backend: gradlew test bootJar` | **863 passed, 1 failed** in the full run: my new test expected 403 for a non-member, but `TenantContextInterceptor` answers 404 by design. After correcting that expectation, `FlockVarietiesTest` passed (6 tests) and `bootJar` built. The full suite was not run again, since only that test line changed |
+| `frontend: npm run lint`, `npx tsc --noEmit`, `npm run build` | Passed |
+| `frontend: npm test` | Passed: **116 tests**. New tests: the toast; the list, its filter and opening a day; a variety day by day in a pop-up |
+| `mobile: npx tsc --noEmit`, `npm test` | Passed: **76 tests** |
+| Browser | **Not checked signed in**, which needs the owner's password |
+
+### Save confirmation across the app (2026-11-05)
+
+About 25 pages saved with no confirmation at all, and about 20 wrote a message that could be off-screen.
+
+- **Every save to a farm business now confirms.** The API client reports successful writes (`onSaved`), and `SavedToast`,
+  mounted at the root so it outlives a page that navigates away, says *Saved.* or *Deleted.*. Several writes together give
+  one toast. It stays silent for previews, exports and billing, which either save nothing or say what happened themselves.
+- **A page's own message takes its place:** pages that said something specific (`message`, `notice`) now show it through
+  `Toast`, which replaces the general one. A longer message stays longer.
+- **Left on the page on purpose:** lot and low-stock warnings on crop cycles and stock records, invite links, and billing,
+  announcement and sign-in banners, which must not vanish. These show alongside any toast.
+- **Errors:** `ErrorBanner` scrolls itself into view when it is out of sight, on every page.
+- **Not changed:** the phone app.
+
+| Command | Result |
+|---|---|
+| `frontend: npm run lint`, `npx tsc --noEmit`, `npm run build` | Passed |
+| `frontend: npm test` | Passed: **122 tests**. New `Toast.test.tsx` (6): what counts as a save, one toast for several writes, a page's message replacing the general one, closing by itself, and an error brought into view |
+| `mobile: npx tsc --noEmit`, `npm test` | Passed: **76 tests** |
+| Backend | Not run: no backend change |
+| Browser | Toast position checked with the same markup on the sign-in page: seen at desktop width, and measured at 375 x 812 (16 px from the edges, no sideways scroll; the pane's screenshot at that size was not usable). **Not checked signed in**, which needs the owner's password |
+
+## Premium design pass (2026-11-05)
+
+The owner asked for a premium redesign of every screen, with glass and light effects, changing the look only. It is a new
+layer, `frontend/src/premium.css`, loaded after `theme.css`, so all 59 pages get it without changing what they do. No API,
+schema or business rule changed.
+
+- **Glass:** translucent surfaces with a lit top edge, over a slowly drifting aurora backdrop.
+- **Glass flash:** a band of light crosses a card or button once when the pointer arrives.
+- **Light trace:** a point of light runs around the border of a figure card while the pointer is on it.
+- **Micro-interactions:** figures rise in one after another, pages fade in without reloading, buttons press, the form being
+  filled comes forward, loading shows a shimmer, table rows mark the one under the pointer.
+- **Limits:** movement needs a real pointer and stops for `prefers-reduced-motion`. Phones use solid fills instead of blur,
+  and print removes the effects.
+
+Bugs found by reviewing and fixed:
+
+- Tabs on the Billing and Platform pages had no styles, and neither did warnings, recovery codes, legal text and badges.
+- Amounts broke in the middle of a number on five-across figure cards (`₹3,60,650.` / `00`). Their size now follows the card.
+- Clickable rows in pop-ups shrank to their content.
+- Records on the farm page widened the whole page below about 1,500 px; the panels now stack until both have room.
+- 43 data tables had no scrolling box, so a wide one widened the page (the Pay page by 134 px). All tables now have one.
+- A fault in one page blanked the whole app. `ErrorBoundary` now shows a message with the menu still in place.
+
+**How it was reviewed:** a temporary page, never committed and now deleted, ran the real app in the browser on sample data,
+with no sign-in and no contact with any database. Every route was loaded at 1280 and 375 px wide and measured for sideways
+overflow.
+
+- 41 of 69 routes rendered, and none overflow now.
+- **28 routes were not seen,** because the sample data lacked what they need: report detail pages, crop cycle, animal, milk,
+  pond, batch detail, record detail, stock and workforce overviews, asset detail, Settings and Activity history. They use
+  the same shared classes, and a check of every class name found no other unstyled ones.
+- **Platform admin** also failed on the sample data, so its tabs were not seen either.
+- **Not checked against real data or on a real phone.** The sample data is not the owner's.
+
+Not changed: the phone app, the phone-width navigation layout, the confirm pop-ups that use the browser's own dialog, and
+dark mode, which the app does not have.
+
+| Command | Result |
+|---|---|
+| `frontend: npm run lint`, `npx tsc --noEmit`, `npm run build` | Passed |
+| `frontend: npm test` | Passed: **123 tests**, one new (`ErrorBoundary.test.tsx`) |
+| `mobile: npx tsc --noEmit`, `npm test` | Passed: **76 tests** |
+| `frontend/src/pages/farm.test.tsx` | Failed once under load: a timing race, as records load apart from the figures. It now waits for the records, with the same check |
+| Backend | Not run: no backend change |
+
 ## Known gaps and defects
 
 Security and platform:

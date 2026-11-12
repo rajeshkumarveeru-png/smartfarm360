@@ -5,6 +5,7 @@ import { api } from '../api/client';
 import type { Farm } from '../api/types';
 import { useTenant } from '../auth/useCurrentTenant';
 import { ErrorBanner, Loading } from '../components/common';
+import { Toast } from '../components/Toast';
 import type { CostObject } from '../finance/types';
 import { newIdempotencyKey } from '../finance/useFinanceData';
 import { currentLanguage, useNs } from '../i18n';
@@ -56,7 +57,7 @@ export function CollectManure({ onSaved }: { onSaved?: () => void }) {
     <form className="form-card form-grid" noValidate onSubmit={e => void save(e)}>
       <h4 className="full">{t('collectManure')}</h4>
       <ErrorBanner message={error} />
-      {message && <p className="hint full" role="status">{message}</p>}
+      <Toast message={message} onClose={() => setMessage('')} />
       <label>{t('date')}<input type="date" max={today()} value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} /></label>
       <label>{t('collectedFrom')}<select value={form.from} onChange={e => setForm({ ...form, from: e.target.value })}>
         <option value="">—</option>{activities.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
@@ -127,7 +128,7 @@ export default function BatchesPage() {
         </form>
       )}
       {!batches ? <Loading /> : batches.length === 0 ? <p className="hint">{t('noBatches')}</p> : (
-        <table className="data-table">
+        <div className="table-scroll"><table className="data-table">
           <thead><tr><th>{t('batch')}</th><th>{t('kindLabel')}</th><th>{t('startedOn')}</th><th>{t('statusLabel')}</th></tr></thead>
           <tbody>{batches.map(b => {
             const late = !b.finishedOn && b.readyBy && b.readyBy < today();
@@ -140,7 +141,7 @@ export default function BatchesPage() {
               </tr>
             );
           })}</tbody>
-        </table>
+        </table></div>
       )}
       <h3 className="section-space">{t('manure')}</h3>
       <CollectManure />

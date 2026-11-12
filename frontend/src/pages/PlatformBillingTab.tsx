@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { api } from '../api/client';
 import type { BillingSummary, ConsolePayment, ConsoleSubscription, PriceRow, ReconciliationRun, SubscriptionState } from '../api/types';
 import { ErrorBanner, Loading } from '../components/common';
+import { Toast } from '../components/Toast';
 import { currentLanguage, useNs } from '../i18n';
 import { describeError } from '../lib/errors';
 import { formatDate, formatMoney } from '../lib/format';
@@ -63,7 +64,7 @@ export default function PlatformBillingTab() {
   return (
     <>
       <ErrorBanner message={error} />
-      {notice && <div className="info-banner" role="status">{notice}</div>}
+      <Toast message={notice} onClose={() => setNotice('')} />
       <section className="panel">
         <ul className="plain-list">{STATES.map(s => <li key={s}>{tb(`state.${s}`)}: {summary.subscriptions[s] ?? 0}</li>)}</ul>
         <h4>{t('billing.reconciliation')}</h4>

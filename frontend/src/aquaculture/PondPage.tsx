@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import type { Farm } from '../api/types';
 import { useTenant } from '../auth/useCurrentTenant';
 import { ErrorBanner, Loading } from '../components/common';
+import { Toast } from '../components/Toast';
 import { currentLanguage, useNs } from '../i18n';
 import { describeError } from '../lib/errors';
 import { formatDate, formatNumber, today } from '../lib/format';
@@ -85,7 +86,7 @@ export default function PondPage() {
         {canWrite && !edit && <button type="button" className="secondary" onClick={() => setEdit(toForm())}>{tc('edit')}</button>}
       </div>
       <ErrorBanner message={error} />
-      {message && <p className="hint" role="status">{message}</p>}
+      <Toast message={message} onClose={() => setMessage('')} />
       {edit && (
         <form className="form-card form-grid" noValidate onSubmit={e => void savePond(e)}>
           <PondFields form={edit} set={p => setEdit(f => (f ? { ...f, ...p } : f))} farms={farms} />
@@ -99,7 +100,7 @@ export default function PondPage() {
 
       <h3 className="section-space">{t('crops')}</h3>
       {cycles.length === 0 ? <p className="hint">{t('noCycles')}</p> : (
-        <table className="data-table">
+        <div className="table-scroll"><table className="data-table">
           <thead><tr><th>{t('cycle')}</th><th>{t('statusLabel')}</th><th>{t('stocked')}</th><th>{t('harvested')}</th></tr></thead>
           <tbody>{cycles.map(c => (
             <tr key={c.id}>
@@ -107,7 +108,7 @@ export default function PondPage() {
               <td>{c.stockedOn ? formatDate(c.stockedOn, lang) : '—'}</td><td>{c.harvestedOn ? formatDate(c.harvestedOn, lang) : '—'}</td>
             </tr>
           ))}</tbody>
-        </table>
+        </table></div>
       )}
       {canWrite && pond.active && !pond.openCycle && (
         <form className="form-card form-grid" noValidate onSubmit={e => void startCycle(e)}>

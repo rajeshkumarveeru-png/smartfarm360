@@ -66,13 +66,13 @@ export default function AllocationPage() {
             <div key={`${g.accountCode}-${g.categoryId}-${g.farmId}`} className="section-space">
               <h3>{g.categoryId ? label({ code: g.categoryCode, name: g.categoryName }) : t(`ledger.${g.accountCode}`)}: {formatMoney(g.amount, lang)}</h3>
               {g.shares.length === 0 ? <p className="hint">{t('allocation.noCrops')}</p> : (
-                <table className="data-table">
+                <div className="table-scroll"><table className="data-table">
                   <thead><tr><th>{t('activity')}</th><th className="num">{t('allocation.acres')}</th><th className="num">{t('allocation.days')}</th><th className="num">{t('amount')}</th></tr></thead>
                   <tbody>{g.shares.map(s => (
                     <tr key={s.costObjectId}><td>{s.name}</td><td className="num">{formatNumber(s.areaAcres, lang, 2)}</td><td className="num">{s.days}</td>
                       <td className="num">{formatMoney(s.amount, lang)}</td></tr>
                   ))}</tbody>
-                </table>
+                </table></div>
               )}
             </div>
           ))}

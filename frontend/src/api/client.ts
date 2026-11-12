@@ -56,6 +56,16 @@ export function refreshSession(): Promise<TokenResponse | null> {
 
 type Init = { method?: string; body?: unknown; headers?: Record<string, string> };
 
+let savedListeners: ((deleted: boolean) => void)[] = [];
+/** Listens for saves to a farm business's records; returns how to stop. */
+export function onSaved(listener: (deleted: boolean) => void) {
+  savedListeners.push(listener);
+  return () => { savedListeners = savedListeners.filter(l => l !== listener); };
+}
+/** A write the user made to a farm business's records: not a calculation that saves nothing, an export, or billing, which says what happened itself. */
+const isSave = (path: string, method?: string) => Boolean(method && method !== 'GET') && path.startsWith('/api/v1/tenants/')
+  && !/\/(preview|exports)(\/|\?|$)|\/billing(\/|$)/.test(path);
+
 export async function api<T>(path: string, init: Init = {}, retry = true): Promise<T> {
   const headers: Record<string, string> = { Accept: 'application/json', ...(init.headers ?? {}) };
   if (init.body !== undefined) headers['Content-Type'] = 'application/json';
@@ -76,6 +86,7 @@ export async function api<T>(path: string, init: Init = {}, retry = true): Promi
     sessionEnded();
   }
   if (!response.ok) throw await toApiError(response);
+  if (isSave(path, init.method)) savedListeners.forEach(l => l(init.method === 'DELETE'));
   if (response.status === 204) return undefined as T;
   const text = await response.text();
   return (text ? JSON.parse(text) : undefined) as T;

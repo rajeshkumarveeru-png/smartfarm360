@@ -4,6 +4,7 @@ import { Trash2 } from 'lucide-react';
 import { api } from '../api/client';
 import { useTenant } from '../auth/useCurrentTenant';
 import { ErrorBanner, Loading } from '../components/common';
+import { Toast } from '../components/Toast';
 import { newIdempotencyKey } from '../finance/useFinanceData';
 import { currentLanguage, useNs } from '../i18n';
 import { describeError } from '../lib/errors';
@@ -88,7 +89,7 @@ export default function BatchPage() {
             {t('finish')}</button>)}
       </div>
       <ErrorBanner message={error} />
-      {message && <p className="hint" role="status">{message}</p>}
+      <Toast message={message} onClose={() => setMessage('')} />
 
       <div className="form-card form-grid filters">
         <label>{t('from')}<input type="date" value={range.from} onChange={e => setRange({ ...range, from: e.target.value })} /></label>
@@ -130,7 +131,7 @@ export default function BatchPage() {
         </form>
       )}
       {steps.length === 0 ? <p className="hint">{t('noSteps')}</p> : (
-        <table className="data-table">
+        <div className="table-scroll"><table className="data-table">
           <thead><tr><th>{t('date')}</th><th>{t('stepLabel')}</th><th className="num">{t('kgIn')}</th><th className="num">{t('kgOut')}</th><th className="num">{t('stepLoss')}</th>
             <th>{t('details')}</th><th /></tr></thead>
           <tbody>{steps.map(s => (
@@ -145,12 +146,12 @@ export default function BatchPage() {
                 <Trash2 size={16} aria-hidden /></button>}</td>
             </tr>
           ))}</tbody>
-        </table>
+        </table></div>
       )}
 
       <h3 className="section-space">{t('outputs')}</h3>
       {outputs.length > 0 && (
-        <table className="data-table">
+        <div className="table-scroll"><table className="data-table">
           <thead><tr><th>{t('date')}</th><th>{t('roleLabel')}</th><th>{t('item')}</th><th className="num">{t('quantity')}</th><th>{t('lot')}</th><th /></tr></thead>
           <tbody>{outputs.map(o => (
             <tr key={o.id} className={o.reversed ? 'muted' : undefined}>
@@ -163,7 +164,7 @@ export default function BatchPage() {
                 <Trash2 size={16} aria-hidden /></button>}</td>
             </tr>
           ))}</tbody>
-        </table>
+        </table></div>
       )}
       {open && (
         <form className="form-card form-grid" noValidate onSubmit={e => {

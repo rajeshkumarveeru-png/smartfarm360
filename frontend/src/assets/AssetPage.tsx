@@ -243,7 +243,7 @@ export default function AssetPage() {
         <label>{tf('to')}<input type="date" value={range.to} onChange={e => setRange({ ...range, to: e.target.value })} /></label>
       </div>
       {!costs ? <Loading /> : (
-        <table className="data-table report">
+        <div className="table-scroll"><table className="data-table report">
           <tbody>
             <tr><td>{t('depreciation')}</td><td className="num">{formatMoney(costs.depreciation, lang)}</td></tr>
             {costs.runningCosts.map(c => <tr key={`${c.accountCode}-${c.categoryId}`}><td>{c.categoryId ? categoryLabel({ code: c.categoryCode, name: c.categoryName }) : c.accountCode}</td>
@@ -251,7 +251,7 @@ export default function AssetPage() {
             <tr className="total"><td>{t('totalCost')}</td><td className="num">{formatMoney(costs.depreciation + costs.runningTotal, lang)}</td></tr>
             {costs.costPerHour != null && <tr><td>{t('costPerHour', { hours: formatNumber(costs.hours, lang, 1) })}</td><td className="num">{formatMoney(costs.costPerHour, lang)}</td></tr>}
           </tbody>
-        </table>
+        </table></div>
       )}
       <p className="hint">{t('runningCostsHelp')}</p>
     </>
