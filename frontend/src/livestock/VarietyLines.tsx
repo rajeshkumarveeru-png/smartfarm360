@@ -33,12 +33,12 @@ export function varietyProblem(rows: VarietyRow[], priced: boolean, t: (k: strin
 /** The rows as the API takes them. */
 export function varietyLines(rows: VarietyRow[], priced: boolean) {
   return rows.map(r => ({ lineId: r.lineId ? Number(r.lineId) : null, species: r.lineId ? null : r.species, variety: r.lineId ? null : r.variety.trim(),
-    heads: Number(r.heads), amount: priced ? r.amount : null }));
+    heads: Number(r.heads), amount: priced ? (Number(r.amount) * Number(r.heads)).toFixed(2) : null }));
 }
 
 /**
  * Several varieties at once (bin and batch varieties design, V2, V3): for a new batch, or birds bought for an existing
- * one, where {@code existing} lets a row add to a variety already in the batch.
+ * one, where {@code existing} lets a row add to a variety already in the batch. The UI accepts a per-head rate and sends the calculated line total as the API amount.
  */
 export default function VarietyLines({ rows, onChange, kind, priced, existing }: {
   rows: VarietyRow[]; onChange: (rows: VarietyRow[]) => void; kind: 'poultry' | 'smallStock'; priced: boolean; existing?: FlockLine[];
@@ -47,7 +47,7 @@ export default function VarietyLines({ rows, onChange, kind, priced, existing }:
   const lang = currentLanguage();
   const species = kind === 'poultry' ? BIRD_SPECIES : HERD_SPECIES;
   const update = (i: number, patch: Partial<VarietyRow>) => onChange(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
-  const total = rows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+  const total = rows.reduce((s, r) => s + (Number(r.amount) || 0) * (Number(r.heads) || 0), 0);
   const heads = rows.reduce((s, r) => s + (Number(r.heads) || 0), 0);
   return (
     <fieldset className="full lines variety-lines">
@@ -67,14 +67,15 @@ export default function VarietyLines({ rows, onChange, kind, priced, existing }:
               <datalist id={`varieties-${r.species}`}>{(SUGGESTIONS[r.species] ?? []).map(v => <option key={v} value={v} />)}</datalist></label>
           </>}
           <label>{t('heads')}<input inputMode="numeric" value={r.heads} onChange={e => update(i, { heads: e.target.value })} /></label>
-          {priced && <label>{t('priceTotal')}<input inputMode="decimal" value={r.amount} onChange={e => update(i, { amount: e.target.value })} /></label>}
+           {priced && <label>Purchase cost / head (₹)<input inputMode="decimal" placeholder="e.g. 250" value={r.amount} onChange={e => update(i, { amount: e.target.value })} />
+            <small>Line total: {formatMoney((Number(r.amount) || 0) * (Number(r.heads) || 0), lang)}</small></label>}
           {rows.length > 1 && <button type="button" className="icon-button" aria-label={t('removeVariety')} onClick={() => onChange(rows.filter((_, j) => j !== i))}>
             <X size={16} aria-hidden /></button>}
         </div>
       ))}
       <div className="variety-foot">
         <button type="button" className="secondary" onClick={() => onChange([...rows, emptyVariety(species[0])])}><Plus size={15} aria-hidden />{t('addVariety')}</button>
-        <span className="hint">{t('varietyTotals', { heads: String(heads) })}{priced ? ` · ${formatMoney(total, lang)}` : ''}</span>
+        <span className="hint">{t('varietyTotals', { heads: String(heads) })}{priced ? ` · Total purchase cost: ${formatMoney(total, lang)}` : ''}</span>
       </div>
     </fieldset>
   );

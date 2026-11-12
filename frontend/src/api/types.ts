@@ -25,7 +25,7 @@ export type TenantDetail = {
   settings: Settings; modules: ModuleStatus[];
 };
 
-export type Farm = { id: number; tenantId: number; name: string; farmType: string; village?: string; district?: string; state?: string; country: string; active: boolean };
+export type Farm = { id: number; tenantId: number; name: string; farmType?: string; village?: string; district?: string; state?: string; country: string; active: boolean; areaSummary?: string | null };
 export type Parcel = { id: number; tenantId: number; farmId: number; name: string; area: number; areaUnit: string; soilType?: string; irrigationType?: string; active: boolean };
 
 export type Member = { membershipId: number; userId: number; email: string; displayName: string; roles: RoleCode[]; joinedAt: string };

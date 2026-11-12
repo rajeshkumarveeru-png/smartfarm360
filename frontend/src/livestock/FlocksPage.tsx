@@ -55,7 +55,7 @@ export default function FlocksPage({ kind }: { kind: 'poultry' | 'smallStock' })
     if (problem) { setError(problem); return; }
     if (form.bought && !form.partyId && !form.financialAccountId) { setError(t('errors.purchase')); return; }
     // The varieties each have a price; the bill's amount is their total
-    const total = form.rows.reduce((sum, row) => sum + Number(row.amount), 0).toFixed(2);
+    const total = form.rows.reduce((sum, row) => sum + Number(row.amount) * Number(row.heads), 0).toFixed(2);
     setError('');
     try {
       await api(`${base}/flocks`, { method: 'POST', headers: { 'Idempotency-Key': key }, body: {
@@ -79,7 +79,7 @@ export default function FlocksPage({ kind }: { kind: 'poultry' | 'smallStock' })
       </div>
       <ErrorBanner message={error} />
       {open && (
-        <form className="form-card form-grid" noValidate onSubmit={e => void create(e)}>
+        <form className={`form-card form-grid flock-form${kind === 'poultry' ? ' poultry-form' : ''}`} noValidate onSubmit={e => void create(e)}>
           <label>{t('groupName')}<input maxLength={140} placeholder={t(kind === 'poultry' ? 'batchExample' : 'herdExample')} value={form.name} onChange={e => set({ name: e.target.value })} /></label>
           {kind === 'smallStock' && <label>{t('speciesLabel')}<select value={form.species} onChange={e => set({ species: e.target.value })}>
             <option value="GOAT">{t('species.GOAT')}</option><option value="SHEEP">{t('species.SHEEP')}</option></select></label>}
@@ -87,7 +87,12 @@ export default function FlocksPage({ kind }: { kind: 'poultry' | 'smallStock' })
             {PURPOSES[kind].map(p => <option key={p} value={p}>{t(`purpose.${p}`)}</option>)}</select></label>
           <label>{t(kind === 'poultry' ? 'placedOn' : 'startedOn')}<input type="date" max={today()} value={form.placedOn} onChange={e => set({ placedOn: e.target.value })} /></label>
           {kind === 'poultry' && <label>{t('ageAtPlacement')} <small>{tc('optional')}</small><input inputMode="numeric" value={form.ageDays} onChange={e => set({ ageDays: e.target.value })} /></label>}
-          {canBuy && <label className="check full"><input type="checkbox" checked={form.bought} onChange={e => set({ bought: e.target.checked })} />{t('boughtThem')}</label>}
+           {canBuy && <div className="full">
+            <label className="check"><input type="checkbox" checked={form.bought} onChange={e => set({ bought: e.target.checked })} />
+              Bought these birds? Record purchase cost in Finance &amp; Profit/Loss
+            </label>
+            {!form.bought && <p className="hint">Enable this option to enter the purchase cost per head. SmartFarm360 will calculate the total automatically and include the posted purchase bill in this batch's profit &amp; loss.</p>}
+          </div>}
           <VarietyLines kind={kind} rows={form.rows} priced={form.bought} onChange={rows => set({ rows })} />
           {form.bought && <>
             <label>{t('boughtFrom')} <small>{tc('optional')}</small><select value={form.partyId} onChange={e => set({ partyId: e.target.value })}>

@@ -38,5 +38,6 @@ export type TrendMonth = { month: string; revenue: number; costs: number; operat
 export type CropTile = { cycleId: number; name: string; cropName: string; status: string; daysSinceSowing: number | null; profitToDate: number | null;
   unsoldEstimate: number | null };
 export type Attention = { code: string; count: number; amount: number | null; detail: string | null };
+export type BusinessProfit = { module: 'FARM' | 'POULTRY' | 'MILK' | 'POND'; activeEntries: number; revenue: number; costs: number; profit: number };
 export type Dashboard = { asOf: string; actual: boolean; money: DashboardMoney | null; trend: { months: TrendMonth[]; topCosts: CategoryRow[] } | null;
-  crops: CropTile[] | null; attention: Attention[]; errors: { tile: string; code: string }[] };
+  crops: CropTile[] | null; businessProfits: BusinessProfit[]; attention: Attention[]; errors: { tile: string; code: string }[] };

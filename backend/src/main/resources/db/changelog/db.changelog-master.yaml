@@ -37,3 +37,5 @@ databaseChangeLog:
       file: db/changelog/018-bin-and-batch-lines.yaml
   - include:
       file: db/changelog/019-batch-day-lines.yaml
+  - include:
+      file: db/changelog/020-poultry-hatching.yaml

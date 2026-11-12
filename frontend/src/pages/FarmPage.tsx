@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ChevronRight, Layers, Leaf, MapPin, MapPinned, Plus, Receipt, Sprout, Trash2, TrendingDown, TrendingUp, Wallet, X } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Layers, Leaf, MapPinned, Plus, Receipt, Sprout, Trash2, TrendingDown, TrendingUp, Wallet, X } from 'lucide-react';
 import { api } from '../api/client';
 import type { Farm, Parcel } from '../api/types';
 import { useTenant } from '../auth/useCurrentTenant';
@@ -12,11 +12,11 @@ import { currentLanguage, useNs } from '../i18n';
 import { describeError } from '../lib/errors';
 import { formatDate, formatMoney, formatNumber } from '../lib/format';
 import { can } from '../lib/nav';
+import FarmCropNav from '../components/FarmCropNav';
 import { rangeFor } from '../reports/ranges';
 import { QuickRanges, useFiscalStartMonth } from '../reports/ReportTools';
 import type { CategoryBreakdown } from '../reports/types';
 import { FarmInsight, type Insight, useFarmCycles } from './FarmInsights';
-import { FARM_TYPE_KEYS } from './FarmsPage';
 
 const AREA_UNITS = ['ACRE', 'HECTARE', 'CENT', 'SQFT'] as const;
 
@@ -117,12 +117,12 @@ export default function FarmPage() {
 
   if (!farm) return error ? <ErrorBanner message={error} onRetry={loadFarm} /> : <Loading />;
   const money = (v: number) => formatMoney(v, lang);
-  const place = [farm.village, farm.district, farm.state].filter(Boolean).join(', ');
   const areaByUnit = parcels.reduce<Record<string, number>>((acc, p) => ({ ...acc, [p.areaUnit]: (acc[p.areaUnit] ?? 0) + Number(p.area) }), {});
   const profit = statement?.operatingProfit ?? 0;
 
   return (
     <section className="farm-workspace">
+      <FarmCropNav />
       <Link className="fw-back" to={`/t/${tenant.id}/farms`}><ArrowLeft size={16} aria-hidden />{t('back')}</Link>
       <header className="fw-hero">
         <div className="fw-hero-main">
@@ -130,10 +130,9 @@ export default function FarmPage() {
           <div>
             <h2>{farm.name}</h2>
             <p className="fw-meta">
-              <span className="pill">{t(FARM_TYPE_KEYS[farm.farmType] ?? 'other')}</span>
-              {place && <span><MapPin size={14} aria-hidden />{place}</span>}
-              <span><MapPinned size={14} aria-hidden />{t('parcels', { count: String(parcels.length) })}
-                {Object.entries(areaByUnit).map(([u, a]) => ` · ${formatNumber(a, lang)} ${tu(u)}`).join('')}</span>
+              <span><MapPinned size={14} aria-hidden />{Object.entries(areaByUnit).length
+                ? Object.entries(areaByUnit).map(([u, a]) => `${formatNumber(a, lang)} ${tu(u)}`).join(' · ')
+                : t('emptyLand')}</span>
             </p>
           </div>
         </div>

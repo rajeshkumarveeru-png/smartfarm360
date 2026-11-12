@@ -22,6 +22,9 @@ public final class DashboardDtos {
     /** Section B: the last 12 months and this month's largest costs (needs FINANCE_READ). */
     public record Trend(List<TrendMonth> months, List<CategoryRow> topCosts) {}
 
+    /** Actual module-level business results for the current month; only enabled modules with active records are returned. */
+    public record BusinessProfit(String module, int activeEntries, BigDecimal revenue, BigDecimal costs, BigDecimal profit) {}
+
     /**
      * A crop in the field. {@code profitToDate} is actual and needs FINANCE_READ; {@code unsoldEstimate} is a labelled
      * estimate and is never added into a total (H12).
@@ -38,6 +41,6 @@ public final class DashboardDtos {
     /** A tile that could not load; the rest of the dashboard still answers (H2). */
     public record TileError(String tile, String code) {}
 
-    public record Dashboard(LocalDate asOf, boolean actual, Money money, Trend trend, List<CropTile> crops, List<Attention> attention,
+    public record Dashboard(LocalDate asOf, boolean actual, Money money, Trend trend, List<CropTile> crops, List<BusinessProfit> businessProfits, List<Attention> attention,
                             List<TileError> errors) {}
 }

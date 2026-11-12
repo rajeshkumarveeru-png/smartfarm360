@@ -227,7 +227,7 @@ public class FlockService {
         return herd.group(ctx, g.id());
     }
 
-    /** One bill for the heads bought, a line per variety; with one variety and no price of its own, the bill's amount. */
+    /** One bill for the heads bought, a line per variety. VarietyLine.amount is the already-calculated line total (heads × per-head price); finance records it once. */
     private long bill(TenantContext ctx, Group g, LocalDate date, List<VarietyLine> wanted, List<Long> ids, Bill b, String key) {
         if (!ctx.has(Permission.FINANCE_WRITE)) throw ApiException.forbidden("FINANCE_PERMISSION_REQUIRED", "Recording a bill needs permission to record money.");
         if (b.partyId() == null && b.financialAccountId() == null) throw ApiException.badRequest("PAYER_REQUIRED", "Choose who sold them or the account it was paid from.");

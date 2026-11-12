@@ -8,6 +8,8 @@ import com.smartfarm360.platform.web.ApiException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -33,7 +35,7 @@ public class FarmService {
     public List<Farm> farms(TenantContext ctx, boolean includeInactive) {
         List<SfFarm> list = includeInactive ? farms.findByTenantIdOrderByNameAsc(ctx.tenantId())
                 : farms.findByTenantIdAndActiveTrueOrderByNameAsc(ctx.tenantId());
-        return list.stream().map(FarmService::toResponse).toList();
+        return list.stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
@@ -50,6 +52,15 @@ public class FarmService {
         farm.setDistrict(trimToNull(request.district()));
         if (request.state() != null && !request.state().isBlank()) farm.setState(request.state().trim());
         farm = farms.saveAndFlush(farm);
+        if (request.area() != null) {
+            SfLandParcel initialParcel = new SfLandParcel();
+            initialParcel.setTenant(farm.getTenant());
+            initialParcel.setFarm(farm);
+            initialParcel.setName("Main land");
+            initialParcel.setArea(request.area());
+            if (request.areaUnit() != null) initialParcel.setAreaUnit(request.areaUnit());
+            parcels.saveAndFlush(initialParcel);
+        }
         audit.record(ctx.tenantId(), ctx.userId(), "FARM_CREATED", "FARM", farm.getId(), Map.of("name", farm.getName()));
         return toResponse(farm);
     }
@@ -126,9 +137,15 @@ public class FarmService {
 
     private static String trimToNull(String s) { return s == null || s.isBlank() ? null : s.trim(); }
 
-    private static Farm toResponse(SfFarm f) {
+    private Farm toResponse(SfFarm f) {
+        Map<String, BigDecimal> totals = new LinkedHashMap<>();
+        parcels.findByTenantIdAndFarmIdAndActiveTrueOrderByNameAsc(f.getTenant().getId(), f.getId())
+                .forEach(p -> totals.merge(p.getAreaUnit(), p.getArea(), BigDecimal::add));
+        String areaSummary = totals.entrySet().stream()
+                .map(e -> e.getValue().stripTrailingZeros().toPlainString() + " " + e.getKey())
+                .collect(java.util.stream.Collectors.joining(" · "));
         return new Farm(f.getId(), f.getTenant().getId(), f.getName(), f.getFarmType(), f.getVillage(), f.getDistrict(),
-                f.getState(), f.getCountry(), f.isActive(), f.getCreatedAt());
+                f.getState(), f.getCountry(), f.isActive(), f.getCreatedAt(), areaSummary.isBlank() ? null : areaSummary);
     }
 
     private static LandParcel toResponse(SfLandParcel p) {
