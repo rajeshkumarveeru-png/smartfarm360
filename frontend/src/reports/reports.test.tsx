@@ -28,6 +28,7 @@ const dashboard: Dashboard = {
     yearCosts: 60000, yearNetProfit: 30000 },
   trend: { months, topCosts: [{ accountCode: '5100', categoryId: 8, categoryCode: 'LABOUR', categoryName: null, amount: 6000, share: 75, previous: null, change: null, changePercent: null }] },
   crops: [{ cycleId: 4, name: 'Samba 2026', cropName: 'Paddy', status: 'GROWING', daysSinceSowing: 30, profitToDate: 12000, unsoldEstimate: 5000 }],
+  businessProfits: [],
   attention: [{ code: 'WAGES_OWED', count: 1, amount: 4000, detail: null }, { code: 'DEPRECIATION_DUE', count: 1, amount: null, detail: '2026-08' }],
   errors: [],
 };
