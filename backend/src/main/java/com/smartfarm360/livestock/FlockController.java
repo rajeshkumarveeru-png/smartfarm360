@@ -86,6 +86,15 @@ public class FlockController {
         return flocks.purchase(ctx, groupId, r, key);
     }
 
+    @Idempotent
+    @PostMapping("/flocks/{groupId}/movements/{movementId}/purchase-cost")
+    @RequiresPermission(Permission.LIVESTOCK_WRITE)
+    @ResponseStatus(HttpStatus.CREATED)
+    public com.smartfarm360.finance.FinanceDtos.Document addPurchaseCost(TenantContext ctx, @PathVariable long groupId, @PathVariable long movementId,
+            @Valid @RequestBody PurchaseCostAdjustmentRequest r, @RequestHeader(value = KEY, required = false) String key) {
+        return flocks.addPurchaseCostAdjustment(ctx, groupId, movementId, r, key);
+    }
+
     @PostMapping("/flocks/{groupId}/sales")
     @RequiresPermission(Permission.LIVESTOCK_WRITE)
     @ResponseStatus(HttpStatus.CREATED)

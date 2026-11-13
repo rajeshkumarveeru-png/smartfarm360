@@ -92,6 +92,25 @@ public class CropController {
     @RequiresPermission(Permission.CROP_WRITE)
     public Cycle status(TenantContext ctx, @PathVariable long cycleId, @Valid @RequestBody StatusRequest b) { return service.changeStatus(ctx, cycleId, b); }
 
+    // ---- Scheduled field actions ----
+
+    @GetMapping("/cultivation-cycles/{cycleId}/action-plan")
+    @RequiresPermission(Permission.CROP_READ)
+    public List<ActionPlanItem> actionPlan(TenantContext ctx, @PathVariable long cycleId) { return service.actionPlan(ctx, cycleId); }
+
+    @PostMapping("/cultivation-cycles/{cycleId}/action-plan")
+    @RequiresPermission(Permission.CROP_ACTIVITY_WRITE)
+    @ResponseStatus(HttpStatus.CREATED)
+    public ActionPlanItem addActionPlan(TenantContext ctx, @PathVariable long cycleId, @Valid @RequestBody ActionPlanRequest request) {
+        return service.addActionPlan(ctx, cycleId, request);
+    }
+
+    @PostMapping("/crop-action-plans/{itemId}/complete")
+    @RequiresPermission(Permission.CROP_ACTIVITY_WRITE)
+    public List<ActionPlanItem> completeActionPlan(TenantContext ctx, @PathVariable long itemId, @Valid @RequestBody CompleteActionRequest request) {
+        return service.completeActionPlan(ctx, itemId, request);
+    }
+
     @GetMapping("/activities")
     @RequiresPermission(Permission.CROP_READ)
     public PageResponse<Activity> activities(TenantContext ctx, @RequestParam(required = false) Long cycleId,

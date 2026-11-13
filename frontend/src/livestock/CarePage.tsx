@@ -31,12 +31,19 @@ export default function CarePage() {
   const [calendar, setCalendar] = useState<BreedingCalendar | null>(null);
   const [health, setHealth] = useState<HealthReport | null>(null);
   const [form, setForm] = useState({ groupId: '', kind: 'VACCINATION', date: today(), description: '', nextDue: '', billAmount: '', billAccount: '' });
+  const [repeatDays, setRepeatDays] = useState('');
+  const [customRepeatDays, setCustomRepeatDays] = useState('');
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
   const [key, setKey] = useState(newIdempotencyKey);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
-  const from = plusDays(today(), -90), to = plusDays(today(), 60);
+  const from = plusDays(today(), -90), to = plusDays(today(), 90);
+  const setRepeat = (value: string) => {
+    setRepeatDays(value); setCustomRepeatDays('');
+    if (!value) { setForm(f => ({ ...f, nextDue: '' })); return; }
+    setForm(f => ({ ...f, nextDue: value !== 'CUSTOM' ? plusDays(f.date, Number(value)) : '' }));
+  };
   const load = useCallback(() => Promise.all([api<BreedingCalendar>(`${base}/reports/breeding?from=${today()}&to=${to}`),
     api<HealthReport>(`${base}/reports/health?from=${from}&to=${today()}`)]).then(([c, h]) => { setCalendar(c); setHealth(h); })
     .catch(e => setError(describeError(e))), [base, from, to]);
@@ -86,16 +93,20 @@ export default function CarePage() {
             api(`${base}/health`, { method: 'POST', headers: { 'Idempotency-Key': key }, body: { groupId: Number(form.groupId), kind: form.kind, date: form.date,
               description: form.description.trim(), nextDue: form.nextDue || null,
               bill: form.billAmount ? { amount: form.billAmount, financialAccountId: form.billAccount ? Number(form.billAccount) : null } : null } })
-              .then(() => { setMessage(t('healthRecorded')); setKey(newIdempotencyKey()); setForm({ ...form, description: '', nextDue: '', billAmount: '' }); return load(); })
+              .then(() => { setMessage(t('healthRecorded')); setKey(newIdempotencyKey()); setForm({ ...form, description: '', nextDue: '', billAmount: '' }); setRepeatDays(''); setCustomRepeatDays(''); return load(); })
               .catch(err => setError(describeError(err)));
           }}>
             <label>{t('group')}<select value={form.groupId} onChange={e => setForm({ ...form, groupId: e.target.value })}>
               <option value="">—</option>{groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></label>
             <label>{t('kindLabel')}<select value={form.kind} onChange={e => setForm({ ...form, kind: e.target.value })}>
               {HEALTH_KINDS.map(k => <option key={k} value={k}>{t(`event.${k}`)}</option>)}</select></label>
-            <label>{tf('date')}<input type="date" max={today()} value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} /></label>
+            <label>{tf('date')}<input type="date" max={today()} value={form.date} onChange={e => { const date = e.target.value; const n = repeatDays === 'CUSTOM' ? Number(customRepeatDays) : Number(repeatDays); setForm(f => ({ ...f, date, nextDue: repeatDays && Number.isInteger(n) && n > 0 ? plusDays(date, n) : f.nextDue })); }} /></label>
             <label>{t('description')}<input maxLength={300} placeholder={t('vaccineExample')} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></label>
-            <label>{t('nextDue')} <small>{tc('optional')}</small><input type="date" value={form.nextDue} onChange={e => setForm({ ...form, nextDue: e.target.value })} /></label>
+            <label>{lang === 'ta' ? 'அடுத்த பராமரிப்பு' : 'Repeat after'}<select value={repeatDays} onChange={e => setRepeat(e.target.value)}>
+              <option value="">{lang === 'ta' ? 'மீண்டும் வேண்டாம்' : 'Do not repeat'}</option><option value="30">30 days</option><option value="60">60 days</option><option value="90">90 days</option><option value="CUSTOM">Custom days</option>
+            </select></label>
+            {repeatDays === 'CUSTOM' && <label>{lang === 'ta' ? 'நாட்கள்' : 'Number of days'}<input type="number" min="1" max="3650" value={customRepeatDays} onChange={e => { setCustomRepeatDays(e.target.value); const n = Number(e.target.value); if (Number.isInteger(n) && n > 0 && n <= 3650) setForm(f => ({ ...f, nextDue: plusDays(f.date, n) })); }} /></label>}
+            <label>{t('nextDue')} <small>{tc('optional')}</small><input type="date" min={plusDays(form.date, 1)} value={form.nextDue} onChange={e => { setForm({ ...form, nextDue: e.target.value }); setRepeatDays(''); }} /></label>
             {can(tenant, 'FINANCE_WRITE') && <>
               <label>{t('billAmount')} <small>{tc('optional')}</small><input inputMode="decimal" value={form.billAmount} onChange={e => setForm({ ...form, billAmount: e.target.value })} /></label>
               {form.billAmount && <label>{tf('paidFrom')}<select value={form.billAccount} onChange={e => setForm({ ...form, billAccount: e.target.value })}>

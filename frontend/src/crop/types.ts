@@ -27,6 +27,8 @@ export type Harvest = {
   lotId: number | null; lotNo: string | null; grade: string | null; moisturePct: number | null; memoSaleValue: number | null; legacy: boolean;
   status: 'ACTIVE' | 'REVERSED'; documentId: number | null; notes: string | null;
 };
+export type ActionPlanItem = { id: number; cycleId: number; cycleName: string; cropName: string; actionType: string; description: string;
+  dueOn: string; completedOn: string | null; nextItemId: number | null };
 export type Observation = { id: number; cycleId: number; observedOn: string; kind: string; severity: string; fieldPart: string | null; notes: string | null;
   actionTaken: string | null; activityId: number | null; createdAt: string };
 export type WeatherNote = { id: number; farmId: number; date: string; rainfallMm: number | null; notes: string | null };

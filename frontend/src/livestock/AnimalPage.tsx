@@ -34,6 +34,8 @@ export default function AnimalPage() {
   const [parties, setParties] = useState<Party[]>([]);
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
   const [key, setKey] = useState(newIdempotencyKey);
+  const [repeatDays, setRepeatDays] = useState('');
+  const [customRepeatDays, setCustomRepeatDays] = useState('');
   const [error, setError] = useState('');
 
   const load = useCallback(() => api<AnimalCard>(`${base}/animals/${animalId}`).then(setCard).catch(e => setError(describeError(e))), [base, animalId]);
@@ -45,7 +47,8 @@ export default function AnimalPage() {
       .then(([p, a]) => { setParties(p.filter(x => x.active)); setAccounts(a.filter(x => x.active)); }).catch(() => undefined);
   }, [tenant]);
 
-  function start(next: Form) { setForm(next); setError(''); setF({ date: today() }); setCalves([{ tag: '', name: '', sex: 'FEMALE' }]); }
+  function start(next: Form) { setForm(next); setError(''); setF({ date: today() }); setCalves([{ tag: '', name: '', sex: 'FEMALE' }]); setRepeatDays(''); setCustomRepeatDays(''); }
+  function dateAfter(date: string, days: number) { const d = new Date(`${date}T12:00:00`); d.setDate(d.getDate() + days); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
   const set = (k: string, v: string) => setF(x => ({ ...x, [k]: v }));
   const bill = () => (f.billAmount ? { amount: f.billAmount, partyId: f.billParty ? Number(f.billParty) : null,
     financialAccountId: !f.billParty && f.billAccount ? Number(f.billAccount) : null } : null);
@@ -121,7 +124,7 @@ export default function AnimalPage() {
       {form !== '' && (
         <form className="form-card form-grid" noValidate onSubmit={e => void submit(e)}>
           <h3 className="full">{t(`form.${form}`)}</h3>
-          <label>{tf('date')}<input type="date" max={today()} value={f.date ?? ''} onChange={e => set('date', e.target.value)} /></label>
+          <label>{tf('date')}<input type="date" max={today()} value={f.date ?? ''} onChange={e => { const date = e.target.value; set('date', date); if (form === 'health' && repeatDays) { const n = repeatDays === 'CUSTOM' ? Number(customRepeatDays) : Number(repeatDays); if (Number.isInteger(n) && n > 0 && n <= 3650) set('nextDue', dateAfter(date, n)); } }} /></label>
           {form === 'move' && <label>{t('group')}<select value={f.groupId ?? ''} onChange={e => set('groupId', e.target.value)}>
             <option value="">—</option>{groups.filter(g => g.id !== a.groupId).map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></label>}
           {form === 'breeding' && <>
@@ -155,7 +158,11 @@ export default function AnimalPage() {
             <label>{t('kindLabel')}<select value={f.kind} onChange={e => set('kind', e.target.value)}>{HEALTH_KINDS.map(k => <option key={k} value={k}>{t(`event.${k}`)}</option>)}</select></label>
             <label>{t('description')}<input maxLength={300} value={f.description ?? ''} onChange={e => set('description', e.target.value)} /></label>
             <label>{t('withdrawalDays')} <small>{tc('optional')}</small><input inputMode="numeric" value={f.withdrawal ?? ''} onChange={e => set('withdrawal', e.target.value)} /></label>
-            <label>{t('nextDue')} <small>{tc('optional')}</small><input type="date" value={f.nextDue ?? ''} onChange={e => set('nextDue', e.target.value)} /></label>
+            <label>{lang === 'ta' ? 'மீண்டும் செய்ய வேண்டிய இடைவெளி' : 'Repeat after'}<select value={repeatDays} onChange={e => { const v = e.target.value; setRepeatDays(v); setCustomRepeatDays(''); set('nextDue', v && v !== 'CUSTOM' ? dateAfter(f.date || today(), Number(v)) : ''); }}>
+              <option value="">{lang === 'ta' ? 'மீண்டும் வேண்டாம்' : 'Do not repeat'}</option><option value="30">30 days</option><option value="60">60 days</option><option value="90">90 days</option><option value="CUSTOM">Custom days</option>
+            </select></label>
+            {repeatDays === 'CUSTOM' && <label>{lang === 'ta' ? 'நாட்கள்' : 'Number of days'}<input type="number" min="1" max="3650" value={customRepeatDays} onChange={e => { setCustomRepeatDays(e.target.value); const n = Number(e.target.value); if (Number.isInteger(n) && n > 0 && n <= 3650) set('nextDue', dateAfter(f.date || today(), n)); }} /></label>}
+            <label>{t('nextDue')} <small>{tc('optional')}</small><input type="date" min={dateAfter(f.date || today(), 1)} value={f.nextDue ?? ''} onChange={e => { set('nextDue', e.target.value); setRepeatDays(''); }} /></label>
             <label>{t('doneBy')} <small>{tc('optional')}</small><input maxLength={120} value={f.doneBy ?? ''} onChange={e => set('doneBy', e.target.value)} /></label>
             {billFields}
             <p className="hint full">{t('noAdvice')}</p>

@@ -179,7 +179,7 @@ public class LivestockReports {
         checkRange(from, to);
         List<Event> list = events.events(ctx, null, from, to).stream()
                 .filter(e -> List.of("TREATMENT", "VACCINATION", "DEWORMING", "HEALTH_OTHER").contains(e.kind())).toList();
-        return new HealthReport(from, to, list, nextDue(ctx, LocalDate.now().plusDays(30)), milk.withheld(ctx.tenantId(), LocalDate.now()));
+        return new HealthReport(from, to, list, nextDue(ctx, LocalDate.now().plusDays(90)), milk.withheld(ctx.tenantId(), LocalDate.now()));
     }
 
     /**
@@ -198,7 +198,7 @@ public class LivestockReports {
                           and not exists (select 1 from sf_animal_events l where l.tenant_id = e.tenant_id and l.kind = e.kind and l.event_date > e.event_date
                                           and coalesce(l.animal_id, -1) = coalesce(e.animal_id, -1) and coalesce(l.group_id, -1) = coalesce(e.group_id, -1))
                         union all
-                        select p.kind, 0, co.name, null, p.due_on from sf_health_plan_items p
+                        select p.kind, 0, co.name, p.description, p.due_on from sf_health_plan_items p
                         join sf_animal_groups g on g.id = p.group_id and g.tenant_id = p.tenant_id
                         join sf_cost_objects co on co.id = g.cost_object_id and co.tenant_id = p.tenant_id
                         where p.tenant_id = :t and p.done_event_id is null and p.due_on <= :until and co.active

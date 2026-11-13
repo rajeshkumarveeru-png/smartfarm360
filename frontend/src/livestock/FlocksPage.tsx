@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { api } from '../api/client';
@@ -20,6 +21,7 @@ const empty = (kind: 'poultry' | 'smallStock') => ({ name: '', species: kind ===
 /** Poultry batches or goat and sheep herds (J1, J2): heads now, and starting a batch or herd with its first count (J3). */
 export default function FlocksPage({ kind }: { kind: 'poultry' | 'smallStock' }) {
   const tenant = useTenant();
+  const navigate = useNavigate();
   const t = useNs('livestock');
   const tc = useNs('common');
   const tf = useNs('fin');
@@ -112,8 +114,11 @@ export default function FlocksPage({ kind }: { kind: 'poultry' | 'smallStock' })
         <div className="table-scroll"><table className="data-table">
           <thead><tr><th>{t('groupName')}</th><th>{t('purposeLabel')}</th><th>{t(kind === 'poultry' ? 'placedOn' : 'startedOn')}</th><th className="num">{t('heads')}</th></tr></thead>
           <tbody>{visible.map(g => (
-            <tr key={g.id}>
-              <td><Link to={`/t/${tenant.id}/livestock/${kind === 'poultry' ? 'poultry' : 'small-stock'}/${g.id}`}>{g.name}</Link>{g.closed && <small> · {t('closed')}</small>}
+            <tr key={g.id} className="sf-clickable-row" tabIndex={0} role="link"
+                aria-label={`Open ${g.name} details`}
+                onClick={() => navigate(`/t/${tenant.id}/livestock/${kind === 'poultry' ? 'poultry' : 'small-stock'}/${g.id}`)}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/t/${tenant.id}/livestock/${kind === 'poultry' ? 'poultry' : 'small-stock'}/${g.id}`); } }}>
+              <td><Link to={`/t/${tenant.id}/livestock/${kind === 'poultry' ? 'poultry' : 'small-stock'}/${g.id}`} onClick={e => e.stopPropagation()}>{g.name}</Link>{g.closed && <small> · {t('closed')}</small>}
                 {kind === 'smallStock' && <small> · {t(`species.${g.species}`)}</small>}</td>
               <td>{t(`purpose.${g.purpose}`)}</td><td>{g.placedOn ? formatDate(g.placedOn, lang) : '—'}</td>
               <td className="num">{formatNumber(g.animals, lang, 0)}</td>

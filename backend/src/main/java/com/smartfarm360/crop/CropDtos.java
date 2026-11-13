@@ -62,6 +62,16 @@ public final class CropDtos {
                         BigDecimal cultivatedArea, String areaUnit, BigDecimal areaAcres, BigDecimal expectedYield, String status,
                         Long costObjectId, Long daysSinceSowing, int harvestCount, List<String> warnings) {}
 
+    // ---- Scheduled field actions ----
+
+    public record ActionPlanRequest(@NotNull @Pattern(regexp = "WEEDING|IRRIGATION|PESTICIDE|FERTILIZER|LAND_PREPARATION|OTHER") String actionType,
+                                    @NotBlank @Size(max = 300) String description, @NotNull LocalDate dueOn) {}
+    public record CompleteActionRequest(@NotNull LocalDate completedOn, LocalDate nextDue) {}
+    public record ActionPlanItem(long id, long cycleId, String cycleName, String cropName, String actionType,
+                                 String description, LocalDate dueOn, LocalDate completedOn, Long nextItemId) {}
+    public record CropActionDue(long cycleId, String cycleName, String cropName, String actionType,
+                                String description, LocalDate dueOn) {}
+
     // ---- Activities and harvests (recording is in the operations module) ----
 
     public record ActivityPatch(LocalDate activityDate, @Size(max = 500) String notes, @PositiveOrZero @Max(10000) Integer workers,

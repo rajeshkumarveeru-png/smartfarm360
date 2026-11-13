@@ -15,6 +15,7 @@ import com.smartfarm360.aquaculture.WaterService;
 import com.smartfarm360.livestock.FlockReports;
 import com.smartfarm360.livestock.HerdService;
 import com.smartfarm360.livestock.LivestockDtos.Group;
+import com.smartfarm360.livestock.LivestockDtos.DueItem;
 import com.smartfarm360.organic.OrganicService;
 import com.smartfarm360.processing.ProcessingService;
 import com.smartfarm360.livestock.LivestockReports;
@@ -96,6 +97,16 @@ public class DashboardService {
         List<CropTile> cropTiles = ctx.has(Permission.CROP_READ) && module(ctx, FarmModule.CROP)
                 ? tile("crops", errors, () -> crops(ctx, finance)) : null;
         List<Attention> attention = new ArrayList<>();
+        if (ctx.has(Permission.CROP_READ) && module(ctx, FarmModule.CROP)) {
+            tile("cropActions", errors, () -> {
+                for (var due : crops.actionPlanDue(ctx, asOf.plusDays(90))) {
+                    String detail = due.cycleId() + "|" + due.cycleName() + " · " + due.cropName() + " · "
+                            + due.actionType() + " · " + due.description() + " · " + due.dueOn();
+                    attention.add(new Attention("CROP_ACTION_DUE", 1, null, detail));
+                }
+                return null;
+            });
+        }
         if (finance) {
             add(attention, tile("overdueSales", errors, () -> overdueSales(dues.get())));
             add(attention, tile("billsDueSoon", errors, () -> {
@@ -162,8 +173,15 @@ public class DashboardService {
                     // The morning's milk is expected by 10 a.m. farm time (livestock design, section 8)
                     if (afterTen && !livestock.milkRecorded(ctx, asOf, "MORNING")) attention.add(new Attention("MILK_NOT_RECORDED", 1, null, asOf.toString()));
                 }
-                int health = livestock.nextDue(ctx, asOf.plusDays(7)).size();
-                if (health > 0) attention.add(new Attention("HEALTH_DUE", health, null, null));
+                // Show every health-plan reminder due within the next 90 days as its own dashboard row.
+                // A single aggregated row hid later reminders (for example, a 60-day deworming cycle).
+                List<DueItem> healthDue = livestock.nextDue(ctx, asOf.plusDays(90));
+                for (DueItem due : healthDue) {
+                    String subject = due.tag() != null ? due.tag() : due.name();
+                    String detail = (due.name() == null ? "" : due.name() + " · ")
+                            + (subject == null ? due.kind() : subject + " · " + due.kind()) + " · " + due.due();
+                    attention.add(new Attention("HEALTH_DUE", 1, null, detail));
+                }
                 if (poultry) {
                     // Poultry, goats and sheep design, section 9: daily records and mortality
                     int missing = afterTen ? flocks.batchesWithoutRecord(ctx, asOf) : 0;

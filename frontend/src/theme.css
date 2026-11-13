@@ -1012,3 +1012,17 @@ button.im-row:focus-visible, a.im-row:focus-visible { outline: 2px solid var(--t
   .farm-create-form { grid-template-columns: minmax(0, 1fr); }
   .farm-create-form .farm-area-field .inline-fields { grid-template-columns: minmax(0, 1fr) 112px; }
 }
+
+
+/* Crop-specific reminders stay inside the crop card and remain visually distinct
+   from the general dashboard attention feed. */
+.db-crop-item { align-items: flex-start; }
+.db-crop-main { flex: 1; min-width: 0; }
+.db-crop-actions { margin: 10px 0 2px; padding: 0; }
+.db-crop-list .db-crop-actions li { display: block; padding: 0; background: transparent; }
+.db-crop-list .db-crop-actions li:hover { background: transparent; }
+.db-crop-actions a { display: flex; align-items: center; gap: 10px; }
+.db-crop-actions .db-attention-copy { display: flex; flex-direction: column; gap: 2px; }
+.db-crop-actions .db-attention-copy strong { font-size: var(--sf-fs-sm); }
+.db-crop-actions .db-attention-copy small { color: var(--sf-text-3); }
+.db-crop-actions .db-due-date { color: var(--sf-warning) !important; font-weight: 650; }
