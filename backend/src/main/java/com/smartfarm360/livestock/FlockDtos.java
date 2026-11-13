@@ -69,6 +69,9 @@ public final class FlockDtos {
         public PurchaseRequest(LocalDate date, Integer heads, Bill bill) { this(date, heads, bill, null); }
     }
 
+    /** Adds a missing/under-recorded purchase cost to an existing placement without changing its head count. */
+    public record PurchaseCostAdjustmentRequest(@NotNull LocalDate date, @NotNull @Valid Bill bill, @Size(max = 300) String notes) {}
+
     /** Birds or animals sold by head and live weight (J6); {@code rateBasis} KG or HEAD. */
     public record SaleRequest(@NotNull LocalDate date, @NotNull @Positive @Max(1_000_000) Integer heads,
                               @Positive @Digits(integer = 9, fraction = 3) BigDecimal kg, @NotNull @Pattern(regexp = "KG|HEAD") String rateBasis,

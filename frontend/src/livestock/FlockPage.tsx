@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ChevronRight, RotateCcw, Trash2 } from 'lucide-react';
+import { CalendarPlus, CheckCircle2, ChevronRight, Receipt, RotateCcw, Trash2, X, Repeat } from 'lucide-react';
 import { api } from '../api/client';
 import { useTenant } from '../auth/useCurrentTenant';
 import { ErrorBanner, Loading } from '../components/common';
 import { Toast } from '../components/Toast';
+import { InsightModal } from '../components/InsightModal';
 import type { FinancialAccount, Party } from '../finance/types';
 import RecordsPanel from '../finance/RecordsPanel';
 import DayRecords from './DayRecords';
@@ -85,13 +86,22 @@ export default function FlockPage() {
   const [stale, setStale] = useState(false);
   const [move, setMove] = useState({ date: today(), kind: 'DIED', heads: '', toGroupId: '', countedHeads: '', cause: '', lineId: '', newSpecies: 'CHICKEN', newVariety: '' });
   const [buy, setBuy] = useState({ date: today(), partyId: '', financialAccountId: '', rows: [emptyVariety('CHICKEN')] as VarietyRow[] });
+  const [costCorrection, setCostCorrection] = useState<{ movement: Movement; date: string; perHead: string; partyId: string; financialAccountId: string; notes: string } | null>(null);
   const [sale, setSale] = useState({ date: today(), heads: '', kg: '', rateBasis: 'KG', rate: '', partyId: '', financialAccountId: '', lineId: '' });
   const [lines, setLines] = useState<FlockLine[]>([]);
   const [birth, setBirth] = useState({ date: today(), alive: '', dead: '' });
   const [eggUse, setEggUse] = useState({ date: today(), homeUse: '', damaged: '', reason: '' });
   const [eggSale, setEggSale] = useState({ date: today(), quantity: '', unit: 'tray', amount: '', partyId: '', financialAccountId: '' });
   const [planForm, setPlanForm] = useState({ kind: 'VACCINATION', description: '', dueOn: today(), copyFrom: '' });
-  const [keys, setKeys] = useState({ buy: newIdempotencyKey(), sale: newIdempotencyKey(), eggUse: newIdempotencyKey(), eggSale: newIdempotencyKey(), health: newIdempotencyKey() });
+  const [completingPlan, setCompletingPlan] = useState<PlanItem | null>(null);
+  const [repeatDays, setRepeatDays] = useState('');
+  const [customRepeatDays, setCustomRepeatDays] = useState('');
+  const [repeatDate, setRepeatDate] = useState('');
+  const [planSearch, setPlanSearch] = useState('');
+  const [planKindFilter, setPlanKindFilter] = useState('ALL');
+  const [planStatusFilter, setPlanStatusFilter] = useState('OPEN');
+  const [planSort, setPlanSort] = useState('DUE_ASC');
+  const [keys, setKeys] = useState({ buy: newIdempotencyKey(), sale: newIdempotencyKey(), eggUse: newIdempotencyKey(), eggSale: newIdempotencyKey(), health: newIdempotencyKey(), costCorrection: newIdempotencyKey() });
   const [message, setMessage] = useState('');
   const [dayRecords, setDayRecords] = useState<DayRecord[]>([]);
   const dayFormRef = useRef<HTMLFormElement>(null);
@@ -101,6 +111,24 @@ export default function FlockPage() {
   const several = lines.length > 1;
   const poultry = group?.species === 'CHICKEN';
   const layers = poultry && group?.purpose !== 'BROILER';
+  const filteredPlan = plan.filter(p => {
+    const query = planSearch.trim().toLocaleLowerCase();
+    const matchesSearch = !query || `${p.description} ${p.kind}`.toLocaleLowerCase().includes(query);
+    const matchesKind = planKindFilter === 'ALL' || p.kind === planKindFilter;
+    const isDone = p.doneEventId != null;
+    const isOverdue = !isDone && p.dueOn < today();
+    const matchesStatus = planStatusFilter === 'ALL'
+      || (planStatusFilter === 'COMPLETED' && isDone)
+      || (planStatusFilter === 'OVERDUE' && isOverdue)
+      || (planStatusFilter === 'OPEN' && !isDone)
+      || (planStatusFilter === 'UPCOMING' && !isDone && p.dueOn >= today());
+    return matchesSearch && matchesKind && matchesStatus;
+  }).sort((a, b) => {
+    if (planSort === 'DUE_DESC') return b.dueOn.localeCompare(a.dueOn) || b.id - a.id;
+    if (planSort === 'ACTIVITY') return a.kind.localeCompare(b.kind) || a.description.localeCompare(b.description);
+    if (planSort === 'STATUS') return Number(a.doneEventId != null) - Number(b.doneEventId != null) || a.dueOn.localeCompare(b.dueOn);
+    return a.dueOn.localeCompare(b.dueOn) || a.id - b.id;
+  });
 
   const load = useCallback(async () => {
     setError(''); setMessage('');
@@ -342,6 +370,10 @@ export default function FlockPage() {
                   <button type="button" className="icon-button" aria-label={t('removeMovement')}
                           onClick={() => { if (window.confirm(t('confirmRemoveMovement'))) void send(`${base}/flock-movements/${m.id}`, 'DELETE', undefined, null, () => t('movementRemoved')); }}>
                     <Trash2 size={16} aria-hidden /></button>)}
+                {canMoney && !m.reversed && (m.kind === 'PLACED' || m.kind === 'BOUGHT') && (
+                  <button type="button" className="icon-button" aria-label="Add missing purchase cost" title="Add missing purchase cost"
+                          onClick={() => setCostCorrection({ movement: m, date: m.date, perHead: '', partyId: '', financialAccountId: '', notes: 'Missing poultry purchase cost' })}>
+                    <Receipt size={16} aria-hidden /></button>)}
                 {m.documentId && !m.reversed && canReverse && (
                   <button type="button" className="icon-button" aria-label={t('undoMovement')} title={t('undoMovement')}
                           onClick={() => { if (window.confirm(t('confirmUndoMovement'))) void send(`/api/v1/tenants/${tenant.id}/finance/documents/${m.documentId}/reverse`, 'POST',
@@ -352,6 +384,23 @@ export default function FlockPage() {
           ))}</tbody>
         </table></div>
       )}
+      {costCorrection && <form className="form-card form-grid section-space" onSubmit={e => {
+        e.preventDefault();
+        const total = Number(costCorrection.perHead) * costCorrection.movement.heads;
+        if (!money(costCorrection.perHead) || !(total > 0) || !payerOk(costCorrection)) { setError('Enter a valid cost per head and choose the supplier or payment account.'); return; }
+        void send(`/flocks/${groupId}/movements/${costCorrection.movement.id}/purchase-cost`, 'POST', {
+          date: costCorrection.date, bill: { amount: total, ...payer(costCorrection) }, notes: costCorrection.notes || null,
+        }, 'costCorrection', () => { setCostCorrection(null); return 'Missing purchase cost added to poultry profit and loss.'; });
+      }}>
+        <div className="full"><h4>Add missing purchase cost</h4><p className="hint">This adds an additional expense to the existing bird record; it does not change the recorded head count or overwrite the original bill. Enter only the missing amount per head.</p></div>
+        <label>Purchase date<input type="date" max={today()} value={costCorrection.date} onChange={e => setCostCorrection({ ...costCorrection, date: e.target.value })}/></label>
+        <label>Heads<input value={String(costCorrection.movement.heads)} readOnly disabled/></label>
+        <label>Missing cost / head (₹)<input inputMode="decimal" value={costCorrection.perHead} onChange={e => setCostCorrection({ ...costCorrection, perHead: e.target.value })}/></label>
+        <label>Total missing cost (₹)<input value={money(costCorrection.perHead) ? formatMoney(Number(costCorrection.perHead) * costCorrection.movement.heads, lang) : '₹0.00'} readOnly disabled/></label>
+        <PayerFields parties={parties} accounts={accounts} f={costCorrection} set={p => setCostCorrection({ ...costCorrection, ...p })} partyLabel={t('boughtFrom')} accountLabel={tf('paidFrom')}/>
+        <label className="full">Notes<input maxLength={300} value={costCorrection.notes} onChange={e => setCostCorrection({ ...costCorrection, notes: e.target.value })}/></label>
+        <div className="form-actions full"><button type="button" className="secondary" onClick={() => setCostCorrection(null)}><X size={15}/>Cancel</button><button className="primary">Save cost adjustment</button></div>
+      </form>}
       </>}
 
       {tab === 'heads' && open && !poultry && (
@@ -463,19 +512,56 @@ export default function FlockPage() {
       {tab === 'health' && <>
       <h3 className="section-space">{t('healthPlan')}</h3>
       <p className="hint">{t('healthPlanHelp')}</p>
-      {plan.length === 0 ? <p className="hint">{t('noPlan')}</p> : (
-        <div className="table-scroll"><table className="data-table">
-          <thead><tr><th>{t('dueLabel')}</th><th>{t('kindLabel')}</th><th>{t('description')}</th><th /></tr></thead>
-          <tbody>{plan.map(p => (
-            <tr key={p.id}>
-              <td>{formatDate(p.dueOn, lang)}</td><td>{t(`due.${p.kind}`)}</td><td>{p.description}</td>
-              <td>{p.doneEventId ? t('done') : open && (
-                <button type="button" className="secondary" onClick={() => void send(`${base}/health`, 'POST', { groupId: group.id, kind: p.kind, date: today(),
-                  description: p.description, planItemId: p.id }, 'health', () => t('healthRecorded'))}>{t('markDoneToday')}</button>)}</td>
-            </tr>
-          ))}</tbody>
-        </table></div>
-      )}
+      {plan.length === 0 ? <p className="hint">{t('noPlan')}</p> : <>
+        <div className="health-plan-filters" role="search" aria-label={lang === 'ta' ? 'சுகாதார திட்டத்தை வடிகட்டவும்' : 'Filter health plan'}>
+          <label className="health-plan-search">{lang === 'ta' ? 'தேடல்' : 'Search'}
+            <input type="search" value={planSearch} onChange={e => setPlanSearch(e.target.value)}
+              placeholder={lang === 'ta' ? 'செயல் அல்லது குறிப்பைத் தேடவும்' : 'Search activity or notes'} />
+          </label>
+          <label>{lang === 'ta' ? 'செயல் வகை' : 'Activity type'}
+            <select value={planKindFilter} onChange={e => setPlanKindFilter(e.target.value)}>
+              <option value="ALL">{lang === 'ta' ? 'அனைத்து வகைகளும்' : 'All types'}</option>
+              {HEALTH_KINDS.map(k => <option key={k} value={k}>{t(`due.${k}`)}</option>)}
+            </select>
+          </label>
+          <label>{lang === 'ta' ? 'நிலை' : 'Status'}
+            <select value={planStatusFilter} onChange={e => setPlanStatusFilter(e.target.value)}>
+              <option value="OPEN">{lang === 'ta' ? 'நிலுவையில்' : 'Open'}</option>
+              <option value="UPCOMING">{lang === 'ta' ? 'வரவுள்ளது' : 'Upcoming'}</option>
+              <option value="OVERDUE">{lang === 'ta' ? 'காலம் கடந்தது' : 'Overdue'}</option>
+              <option value="COMPLETED">{lang === 'ta' ? 'முடிந்தது' : 'Completed'}</option>
+              <option value="ALL">{lang === 'ta' ? 'அனைத்தும்' : 'All statuses'}</option>
+            </select>
+          </label>
+          <label>{lang === 'ta' ? 'வரிசைப்படுத்து' : 'Sort by'}
+            <select value={planSort} onChange={e => setPlanSort(e.target.value)}>
+              <option value="DUE_ASC">{lang === 'ta' ? 'முதலில் வரவேண்டிய தேதி' : 'Due date · earliest first'}</option>
+              <option value="DUE_DESC">{lang === 'ta' ? 'கடைசியாக வரவேண்டிய தேதி' : 'Due date · latest first'}</option>
+              <option value="ACTIVITY">{lang === 'ta' ? 'செயல் வகை' : 'Activity · A to Z'}</option>
+              <option value="STATUS">{lang === 'ta' ? 'நிலை' : 'Status'}</option>
+            </select>
+          </label>
+          <button type="button" className="secondary health-filter-reset" onClick={() => {
+            setPlanSearch(''); setPlanKindFilter('ALL'); setPlanStatusFilter('ALL'); setPlanSort('DUE_ASC');
+          }}>{lang === 'ta' ? 'அழிக்க' : 'Clear filters'}</button>
+        </div>
+        {filteredPlan.length === 0 ? <p className="hint health-plan-empty">{lang === 'ta' ? 'பொருந்தும் பதிவுகள் இல்லை.' : 'No health-plan items match these filters.'}</p> : (
+          <div className="table-scroll"><table className="data-table">
+            <thead><tr><th>{t('dueLabel')}</th><th>{t('kindLabel')}</th><th>{t('description')}</th><th>{lang === 'ta' ? 'நிலை' : 'Status'}</th><th /></tr></thead>
+            <tbody>{filteredPlan.map(p => (
+              <tr key={p.id}>
+                <td>{formatDate(p.dueOn, lang)}</td><td>{t(`due.${p.kind}`)}</td><td>{p.description}</td>
+                <td>{p.doneEventId ? <span className="health-plan-complete"><CheckCircle2 size={14} aria-hidden />{t('done')}</span>
+                  : <span className={`health-plan-status ${p.dueOn < today() ? 'is-overdue' : 'is-open'}`}>{p.dueOn < today() ? (lang === 'ta' ? 'காலம் கடந்தது' : 'Overdue') : (lang === 'ta' ? 'நிலுவையில்' : 'Open')}</span>}</td>
+                <td>{p.doneEventId ? null : open && (
+                  <button type="button" className="primary health-plan-action" onClick={() => {
+                    setCompletingPlan(p); setRepeatDays(''); setCustomRepeatDays(''); setRepeatDate('');
+                  }}><CheckCircle2 size={15} aria-hidden />{t('markDoneToday')}</button>)}</td>
+              </tr>
+            ))}</tbody>
+          </table></div>
+        )}
+      </>}
       {open && (
         <form className="form-card form-grid" noValidate onSubmit={e => {
           e.preventDefault();
@@ -488,7 +574,7 @@ export default function FlockPage() {
           <label>{t('description')}<input maxLength={300} placeholder={t(poultry ? 'planExample' : 'vaccineExample')} value={planForm.description}
                                           onChange={e => setPlanForm({ ...planForm, description: e.target.value })} /></label>
           <label>{t('dueLabel')}<input type="date" value={planForm.dueOn} onChange={e => setPlanForm({ ...planForm, dueOn: e.target.value })} /></label>
-          <div className="form-actions full"><button className="secondary">{t('addPlanItem')}</button></div>
+          <div className="form-actions full"><button className="primary health-plan-action"><CalendarPlus size={15} aria-hidden />{t('addPlanItem')}</button></div>
           {poultry && others.length > 0 && <>
             <label>{t('copyPlanFrom')}<select value={planForm.copyFrom} onChange={e => setPlanForm({ ...planForm, copyFrom: e.target.value })}>
               <option value="">—</option>{others.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></label>
@@ -498,6 +584,59 @@ export default function FlockPage() {
               {t('copyPlan')}</button></div>
           </>}
         </form>
+      )}
+      {completingPlan && (
+        <InsightModal tone="emerald" icon={<Repeat size={20} />} eyebrow={t('healthPlan')}
+          title={lang === 'ta' ? 'செயலை முடித்ததாக பதிவு செய்க' : 'Complete health activity'}
+          subtitle={`${t(`due.${completingPlan.kind}`)} · ${completingPlan.description}`}
+          onClose={() => setCompletingPlan(null)}
+          footer={<div className="form-actions">
+            <button type="button" className="secondary" onClick={() => setCompletingPlan(null)}>{tc('cancel')}</button>
+            <button type="button" className="primary health-plan-action" onClick={() => {
+              const daysToRepeat = repeatDays === 'CUSTOM' ? Number(customRepeatDays) : Number(repeatDays);
+              const nextDue = repeatDate || (repeatDays && daysToRepeat > 0 ? (() => {
+                const d = new Date(`${today()}T12:00:00`); d.setDate(d.getDate() + daysToRepeat);
+                return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+              })() : null);
+              if (repeatDays === 'CUSTOM' && (!Number.isInteger(daysToRepeat) || daysToRepeat < 1 || daysToRepeat > 3650)) {
+                setError(lang === 'ta' ? '1 முதல் 3650 நாட்களுக்குள் உள்ளிடவும்.' : 'Enter a custom interval from 1 to 3650 days.'); return;
+              }
+              if (repeatDate && repeatDate <= today()) {
+                setError(lang === 'ta' ? 'அடுத்த தேதி இன்றைக்குப் பிறகு இருக்க வேண்டும்.' : 'The next reminder date must be after today.'); return;
+              }
+              void send(`${base}/health`, 'POST', { groupId: group.id, kind: completingPlan.kind, date: today(),
+                description: completingPlan.description, planItemId: completingPlan.id, nextDue }, 'health', () => t('healthRecorded'));
+              setCompletingPlan(null);
+            }}><CheckCircle2 size={15} aria-hidden />{t('markDoneToday')}</button>
+          </div>}>
+          <div className="form-grid health-repeat-form">
+            <p className="hint full">{lang === 'ta' ? 'அடுத்த பராமரிப்பு எப்போது செய்ய வேண்டும் என்பதைத் தேர்வு செய்யவும். புதிய நினைவூட்டல் தானாக உருவாகும்.' : 'Choose when this activity should be repeated. A new health-plan reminder will be created automatically.'}</p>
+            <label className="full">{lang === 'ta' ? 'அடுத்த முறை' : 'Next reminder'}
+              <select value={repeatDays} onChange={e => { setRepeatDays(e.target.value); setRepeatDate(''); }}>
+                <option value="">{lang === 'ta' ? 'மீண்டும் திட்டமிட வேண்டாம்' : 'Do not repeat'}</option>
+                <option value="30">30 {lang === 'ta' ? 'நாட்கள்' : 'days'}</option>
+                <option value="60">60 {lang === 'ta' ? 'நாட்கள்' : 'days'}</option>
+                <option value="90">90 {lang === 'ta' ? 'நாட்கள்' : 'days'}</option>
+                <option value="CUSTOM">{lang === 'ta' ? 'தனிப்பயன் நாட்கள்' : 'Custom number of days'}</option>
+              </select>
+            </label>
+            {repeatDays === 'CUSTOM' && <label className="full">{lang === 'ta' ? 'நாட்களின் எண்ணிக்கை' : 'Repeat after (days)'}
+              <input type="number" min="1" max="3650" step="1" inputMode="numeric" value={customRepeatDays}
+                onChange={e => { setCustomRepeatDays(e.target.value); setRepeatDate(''); }}
+                placeholder={lang === 'ta' ? 'உதா. 45' : 'e.g. 45'} />
+            </label>}
+            <label className="full">{lang === 'ta' ? 'அல்லது அடுத்த தேதியைத் தேர்வு செய்யவும்' : 'Or choose an exact next due date'}
+              <input type="date" min={today()} value={repeatDate} onChange={e => { setRepeatDate(e.target.value); setRepeatDays(''); }} />
+            </label>
+            {(repeatDays && (repeatDays !== 'CUSTOM' || customRepeatDays) || repeatDate) && <p className="hint full">
+              {lang === 'ta' ? 'அடுத்த நினைவூட்டல்' : 'Next reminder date'}: <strong>{formatDate(repeatDate || (() => {
+                const days = repeatDays === 'CUSTOM' ? Number(customRepeatDays) : Number(repeatDays);
+                const d = new Date(`${today()}T12:00:00`); d.setDate(d.getDate() + days);
+                return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+              })(), lang)}</strong>
+            </p>}
+          </div>
+        </InsightModal>
       )}
       </>}
     </>

@@ -247,6 +247,33 @@ public class FlockService {
         return doc.summary().id();
     }
 
+    /** Books a supplemental young-stock expense for an existing head movement whose original cost was omitted. */
+    @Transactional
+    public Document addPurchaseCostAdjustment(TenantContext ctx, long groupId, long movementId, PurchaseCostAdjustmentRequest r, String key) {
+        notFuture(r.date());
+        Group g = counted(ctx, groupId);
+        if (!ctx.has(Permission.FINANCE_WRITE)) throw ApiException.forbidden("FINANCE_PERMISSION_REQUIRED", "Recording a purchase cost needs finance write permission.");
+        Map<String, Object> movement = jdbc.sql("select heads, kind, line_id, document_id, move_date from sf_head_movements where tenant_id=:t and group_id=:g and id=:id for update")
+                .param("t", ctx.tenantId()).param("g", groupId).param("id", movementId).query().listOfRows().stream().findFirst()
+                .orElseThrow(() -> ApiException.notFound("MOVEMENT_NOT_FOUND", "The poultry head record was not found."));
+        String kind = (String) movement.get("kind");
+        if (!Set.of("PLACED", "BOUGHT").contains(kind)) throw ApiException.badRequest("NOT_A_PURCHASE_MOVEMENT", "A missing purchase cost can only be added to a bought or placed bird record.");
+        if (r.date().isBefore((LocalDate) movement.get("move_date"))) throw ApiException.badRequest("COST_DATE_BEFORE_PURCHASE", "The cost date cannot be before the bird purchase date.");
+        if (r.bill().partyId() == null && r.bill().financialAccountId() == null) throw ApiException.badRequest("PAYER_REQUIRED", "Choose the supplier or the cash/bank account.");
+        int heads = ((Number) movement.get("heads")).intValue();
+        Long lineId = ((Number) movement.get("line_id")).longValue();
+        String variety = jdbc.sql("select coalesce(variety, lower(species)) from sf_flock_lines where tenant_id=:t and id=:l")
+                .param("t", ctx.tenantId()).param("l", lineId).query(String.class).single();
+        List<LineRequest> billLines = List.of(new LineRequest(herd.systemCategory("YOUNG_STOCK"),
+                "Additional purchase cost for " + heads + " " + variety + " · " + g.name(), BigDecimal.valueOf(heads), null, null,
+                r.bill().amount(), g.costObjectId(), g.farmId()));
+        Document doc = documents.createInvoice(ctx, DocType.BILL, new InvoiceRequest(r.date(), null, r.bill().partyId(), g.farmId(),
+                r.bill().partyId() == null ? r.bill().financialAccountId() : null, billLines, r.notes(), r.bill().referenceNo(), true, r.bill().paidNow()), key);
+        audit.record(ctx.tenantId(), ctx.userId(), "POULTRY_PURCHASE_COST_ADDED", "ANIMAL_GROUP", g.id(),
+                Map.of("movementId", movementId, "documentId", doc.summary().id(), "amount", r.bill().amount()));
+        return doc;
+    }
+
     @Transactional
     public Movement purchase(TenantContext ctx, long groupId, PurchaseRequest r, String key) {
         notFuture(r.date());

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CalendarDays, MapPin, Plus, RotateCcw, Ruler, ShoppingBag, Sprout, Trash2, Wallet } from 'lucide-react';
+import { ArrowLeft, CalendarDays, CheckCircle2, MapPin, Plus, RotateCcw, Ruler, ShoppingBag, Sprout, Trash2, Wallet } from 'lucide-react';
 import { api } from '../api/client';
 import type { Page } from '../api/types';
 import { useTenant } from '../auth/useCurrentTenant';
@@ -13,7 +13,7 @@ import { formatDate, formatMoney, formatNumber, today } from '../lib/format';
 import { can } from '../lib/nav';
 import type { Item, Lot, Unit } from '../stock/types';
 import { baseUnitLabel, isQuantity, unitChoices } from '../stock/types';
-import type { Activity, Cycle, CycleReport, Harvest, Observation } from './types';
+import type { ActionPlanItem, Activity, Cycle, CycleReport, Harvest, Observation } from './types';
 import { ACTIVITY_TYPES, OBSERVATION_KINDS, SEVERITIES } from './types';
 import { ExportBar } from '../reports/ReportTools';
 import RecordsPanel from '../finance/RecordsPanel';
@@ -41,6 +41,12 @@ export default function CyclePage() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [harvests, setHarvests] = useState<Harvest[]>([]);
   const [observations, setObservations] = useState<Observation[]>([]);
+  const [actionPlans, setActionPlans] = useState<ActionPlanItem[]>([]);
+  const [actionForm, setActionForm] = useState({ actionType: 'WEEDING', description: '', dueOn: today() });
+  const [completingAction, setCompletingAction] = useState<ActionPlanItem | null>(null);
+  const [repeatDays, setRepeatDays] = useState('');
+  const [customRepeatDays, setCustomRepeatDays] = useState('');
+  const [repeatDate, setRepeatDate] = useState('');
   const [form, setForm] = useState<'' | 'activity' | 'harvest' | 'observation'>('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -50,11 +56,12 @@ export default function CyclePage() {
   const load = useCallback(async () => {
     setError('');
     try {
-      const [c, a, h, o] = await Promise.all([
+      const [c, a, h, o, p] = await Promise.all([
         api<Cycle>(`${base}/cultivation-cycles/${cycleId}`), api<Page<Activity>>(`${base}/activities?cycleId=${cycleId}&size=100`),
         api<Page<Harvest>>(`${base}/harvests?cycleId=${cycleId}&size=100`), api<Observation[]>(`${base}/cultivation-cycles/${cycleId}/observations`),
+        api<ActionPlanItem[]>(`${base}/cultivation-cycles/${cycleId}/action-plan`),
       ]);
-      setCycle(c); setActivities(a.items); setHarvests(h.items); setObservations(o);
+      setCycle(c); setActivities(a.items); setHarvests(h.items); setObservations(o); setActionPlans(p);
     } catch (e) {
       setError(describeError(e));
     }
@@ -76,6 +83,32 @@ export default function CyclePage() {
   async function act(path: string, body?: unknown, method = 'POST') {
     setError(''); setNotice('');
     try { await api(`${base}${path}`, { method, body }); await load(); } catch (e) { setError(describeError(e)); }
+  }
+
+  async function addFieldAction(e: React.FormEvent) {
+    e.preventDefault();
+    if (!actionForm.description.trim()) { setError(lang === 'ta' ? 'செயல் விவரத்தை உள்ளிடவும்.' : 'Enter an action description.'); return; }
+    try {
+      await api(`${base}/cultivation-cycles/${cycleId}/action-plan`, { method: 'POST', body: { ...actionForm, description: actionForm.description.trim() } });
+      setActionForm({ ...actionForm, description: '' }); await load();
+    } catch (e) { setError(describeError(e)); }
+  }
+
+  async function completeFieldAction(item: ActionPlanItem) {
+    const days = repeatDays === 'CUSTOM' ? Number(customRepeatDays) : Number(repeatDays);
+    let nextDue: string | null = repeatDate || null;
+    if (!nextDue && repeatDays && days > 0) {
+      const d = new Date(`${today()}T12:00:00`); d.setDate(d.getDate() + days);
+      nextDue = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+    if (repeatDays === 'CUSTOM' && (!Number.isInteger(days) || days < 1 || days > 3650)) {
+      setError(lang === 'ta' ? '1 முதல் 3650 நாட்கள் வரை உள்ளிடவும்.' : 'Enter a repeat interval between 1 and 3650 days.'); return;
+    }
+    if (nextDue && nextDue <= today()) { setError(lang === 'ta' ? 'அடுத்த தேதி இன்றைக்குப் பிறகு இருக்க வேண்டும்.' : 'The next due date must be after today.'); return; }
+    try {
+      await api(`${base}/crop-action-plans/${item.id}/complete`, { method: 'POST', body: { completedOn: today(), nextDue } });
+      setCompletingAction(null); setRepeatDays(''); setCustomRepeatDays(''); setRepeatDate(''); await load();
+    } catch (e) { setError(describeError(e)); }
   }
 
   if (!cycle) return error ? <ErrorBanner message={error} /> : <Loading />;
@@ -133,6 +166,38 @@ export default function CyclePage() {
       <ErrorBanner message={error} />
       {notice && <p className="low-stock-label" role="status">{notice}</p>}
       {canWrite && <StageActions cycle={cycle} onAction={(action, date) => void act(`/cultivation-cycles/${cycle.id}/status`, { action, date: date || null })} />}
+
+      <section className="form-card crop-action-plan section-space">
+        <div className="section-head"><div><h3>{lang === 'ta' ? 'வயல் செயல்கள் & நினைவூட்டல்கள்' : 'Field activities & reminders'}</h3>
+          <p className="hint">{lang === 'ta' ? 'களை எடுப்பு, நீர்ப்பாசனம், பூச்சிக்கொல்லி மற்றும் உரமிடும் பணிகளை முன்கூட்டியே திட்டமிடுங்கள்.' : 'Plan weeding, irrigation, pesticide spraying and fertiliser work ahead of time.'}</p></div>
+          <span className="count">{actionPlans.filter(x => !x.completedOn).length}</span></div>
+        {actionPlans.length > 0 && <div className="activity-list">
+          {actionPlans.map(item => <article className={`activity-row${item.completedOn ? ' is-muted' : ''}`} key={item.id}>
+            <div className="cycle-main"><b>{item.actionType === 'WEEDING' ? (lang === 'ta' ? 'களை எடுப்பு' : 'Weeding') : item.actionType === 'IRRIGATION' ? (lang === 'ta' ? 'நீர்ப்பாசனம்' : 'Irrigation') : item.actionType === 'PESTICIDE' ? (lang === 'ta' ? 'பூச்சிக்கொல்லி தெளிப்பு' : 'Pesticide spraying') : item.actionType === 'FERTILIZER' ? (lang === 'ta' ? 'உரமிடுதல்' : 'Fertilising') : item.actionType === 'LAND_PREPARATION' ? (lang === 'ta' ? 'நிலம் தயார் செய்தல்' : 'Land preparation') : (lang === 'ta' ? 'மற்றவை' : 'Other')}</b>
+              <small> · {formatDate(item.dueOn, lang)}{item.completedOn ? ` · ${lang === 'ta' ? 'முடிக்கப்பட்டது' : 'Completed'} ${formatDate(item.completedOn, lang)}` : ''}</small>
+              {item.description && <div><small>{item.description}</small></div>}
+            </div>
+            {!item.completedOn && canRecord && <button type="button" className="primary" onClick={() => { setCompletingAction(item); setRepeatDays(''); setCustomRepeatDays(''); setRepeatDate(''); }}><CheckCircle2 size={15} />{lang === 'ta' ? 'முடிந்தது' : 'Mark done'}</button>}
+          </article>)}
+        </div>}
+        {completingAction && <div className="form-card form-grid crop-action-repeat">
+          <h4 className="full">{lang === 'ta' ? 'அடுத்த செயலை திட்டமிடுங்கள்' : `Complete: ${completingAction.description}`}</h4>
+          <label className="full">{lang === 'ta' ? 'மீண்டும் செய்ய வேண்டிய இடைவெளி' : 'Repeat after'}
+            <select value={repeatDays} onChange={e => { setRepeatDays(e.target.value); setRepeatDate(''); }}>
+              <option value="">{lang === 'ta' ? 'மீண்டும் திட்டமிட வேண்டாம்' : 'Do not repeat'}</option><option value="7">7 days</option><option value="15">15 days</option><option value="30">30 days</option><option value="45">45 days</option><option value="60">60 days</option><option value="90">90 days</option><option value="CUSTOM">Custom days</option>
+            </select></label>
+          {repeatDays === 'CUSTOM' && <label>{lang === 'ta' ? 'நாட்கள்' : 'Number of days'}<input type="number" min="1" max="3650" value={customRepeatDays} onChange={e => setCustomRepeatDays(e.target.value)} /></label>}
+          <label>{lang === 'ta' ? 'அல்லது அடுத்த தேதியைத் தேர்வு செய்யவும்' : 'Or choose next due date'}<input type="date" min={today()} value={repeatDate} onChange={e => { setRepeatDate(e.target.value); setRepeatDays(''); }} /></label>
+          <div className="form-actions full"><button type="button" className="secondary" onClick={() => setCompletingAction(null)}>{tc('cancel')}</button><button type="button" className="primary" onClick={() => void completeFieldAction(completingAction)}>{lang === 'ta' ? 'சேமி & முடிக்கவும்' : 'Save completion'}</button></div>
+        </div>}
+        {canRecord && open && <form className="form-grid crop-action-create" onSubmit={e => void addFieldAction(e)}>
+          <label>{lang === 'ta' ? 'செயல்' : 'Action'}<select value={actionForm.actionType} onChange={e => setActionForm({ ...actionForm, actionType: e.target.value })}>
+            <option value="WEEDING">Weeding</option><option value="IRRIGATION">Irrigation</option><option value="PESTICIDE">Pesticide spraying</option><option value="FERTILIZER">Fertilising</option><option value="LAND_PREPARATION">Land preparation</option><option value="OTHER">Other</option></select></label>
+          <label>{lang === 'ta' ? 'விவரம்' : 'Description'}<input maxLength={300} required value={actionForm.description} onChange={e => setActionForm({ ...actionForm, description: e.target.value })} placeholder={lang === 'ta' ? 'உதா. 2வது களை எடுப்பு' : 'e.g. Second weeding'} /></label>
+          <label>{lang === 'ta' ? 'செய்ய வேண்டிய தேதி' : 'Due date'}<input type="date" required value={actionForm.dueOn} onChange={e => setActionForm({ ...actionForm, dueOn: e.target.value })} /></label>
+          <div className="form-actions"><button className="primary"><Plus size={15} />{lang === 'ta' ? 'திட்டமிடு' : 'Schedule activity'}</button></div>
+        </form>}
+      </section>
 
       {report && (
         <>

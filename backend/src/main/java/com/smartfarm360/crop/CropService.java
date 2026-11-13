@@ -172,6 +172,78 @@ public class CropService {
                 .orElseThrow(() -> ApiException.notFound("CYCLE_NOT_FOUND", "Crop cycle not found.")));
     }
 
+    // ---- Farmer-managed field action reminders ---------------------------------------------------------------
+
+    private static final String ACTION_PLAN_SELECT = """
+            select p.id, p.cycle_id, c.name, cm.name, p.action_type, p.description, p.due_on, p.completed_on, p.next_item_id
+            from sf_crop_action_plan_items p
+            join sf_cultivation_cycles c on c.id = p.cycle_id and c.tenant_id = p.tenant_id
+            join sf_crop_masters cm on cm.id = c.crop_id and cm.tenant_id = c.tenant_id
+            """;
+
+    @Transactional(readOnly = true)
+    public List<ActionPlanItem> actionPlan(TenantContext ctx, long cycleId) {
+        cycle(ctx, cycleId);
+        return jdbc.sql(ACTION_PLAN_SELECT + " where p.tenant_id = :t and p.cycle_id = :c order by p.completed_on nulls first, p.due_on, p.id")
+                .param("t", ctx.tenantId()).param("c", cycleId).query((rs, i) -> new ActionPlanItem(rs.getLong(1), rs.getLong(2),
+                        rs.getString(3), rs.getString(4), rs.getString(5), rs.getString(6), rs.getObject(7, LocalDate.class),
+                        rs.getObject(8, LocalDate.class), (Long) rs.getObject(9))).list();
+    }
+
+    @Transactional
+    public ActionPlanItem addActionPlan(TenantContext ctx, long cycleId, ActionPlanRequest request) {
+        requireOpenCycle(ctx.tenantId(), cycleId);
+        long id = jdbc.sql("insert into sf_crop_action_plan_items (tenant_id, cycle_id, action_type, description, due_on, created_by) " +
+                        "values (:t, :c, :kind, :description, :due, :u) returning id")
+                .param("t", ctx.tenantId()).param("c", cycleId).param("kind", request.actionType())
+                .param("description", request.description().trim()).param("due", request.dueOn()).param("u", ctx.userId())
+                .query(Long.class).single();
+        audit.record(ctx.tenantId(), ctx.userId(), "CROP_ACTION_PLANNED", "CROP_CYCLE", cycleId,
+                Map.of("actionType", request.actionType(), "dueOn", request.dueOn().toString()));
+        return actionPlan(ctx, cycleId).stream().filter(x -> x.id() == id).findFirst().orElseThrow();
+    }
+
+    @Transactional
+    public List<ActionPlanItem> completeActionPlan(TenantContext ctx, long itemId, CompleteActionRequest request) {
+        ActionPlanItem item = jdbc.sql(ACTION_PLAN_SELECT + " where p.id = :id and p.tenant_id = :t for update of p")
+                .param("id", itemId).param("t", ctx.tenantId()).query((rs, i) -> new ActionPlanItem(rs.getLong(1), rs.getLong(2),
+                        rs.getString(3), rs.getString(4), rs.getString(5), rs.getString(6), rs.getObject(7, LocalDate.class),
+                        rs.getObject(8, LocalDate.class), (Long) rs.getObject(9))).optional()
+                .orElseThrow(() -> ApiException.notFound("CROP_ACTION_NOT_FOUND", "Field action reminder not found."));
+        if (item.completedOn() != null) throw ApiException.conflict("CROP_ACTION_ALREADY_COMPLETED", "This field action is already completed.");
+        if (request.nextDue() != null && !request.nextDue().isAfter(request.completedOn()))
+            throw ApiException.badRequest("INVALID_NEXT_DUE", "The next action date must be after the completion date.");
+        jdbc.sql("update sf_crop_action_plan_items set completed_on = :done, completed_by = :u where id = :id and tenant_id = :t and completed_on is null")
+                .param("done", request.completedOn()).param("u", ctx.userId()).param("id", itemId).param("t", ctx.tenantId()).update();
+        if (request.nextDue() != null) {
+            long nextId = jdbc.sql("insert into sf_crop_action_plan_items (tenant_id, cycle_id, action_type, description, due_on, created_by) " +
+                            "values (:t, :c, :kind, :description, :due, :u) returning id")
+                    .param("t", ctx.tenantId()).param("c", item.cycleId()).param("kind", item.actionType())
+                    .param("description", item.description()).param("due", request.nextDue()).param("u", ctx.userId()).query(Long.class).single();
+            jdbc.sql("update sf_crop_action_plan_items set next_item_id = :next where id = :id and tenant_id = :t")
+                    .param("next", nextId).param("id", itemId).param("t", ctx.tenantId()).update();
+        }
+        audit.record(ctx.tenantId(), ctx.userId(), "CROP_ACTION_COMPLETED", "CROP_CYCLE", item.cycleId(),
+                Map.of("actionType", item.actionType(), "completedOn", request.completedOn().toString()));
+        return actionPlan(ctx, item.cycleId());
+    }
+
+    @Transactional(readOnly = true)
+    public List<CropActionDue> actionPlanDue(TenantContext ctx, LocalDate until) {
+        return jdbc.sql("""
+                        select p.cycle_id, c.name, cm.name, p.action_type, p.description, p.due_on
+                        from sf_crop_action_plan_items p
+                        join sf_cultivation_cycles c on c.id = p.cycle_id and c.tenant_id = p.tenant_id
+                        join sf_crop_masters cm on cm.id = c.crop_id and cm.tenant_id = c.tenant_id
+                        where p.tenant_id = :t and p.completed_on is null and p.due_on <= :until
+                          and c.active and c.status not in ('CLOSED','CANCELLED')
+                        order by p.due_on, p.id
+                        """)
+                .param("t", ctx.tenantId()).param("until", until)
+                .query((rs, i) -> new CropActionDue(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getString(4),
+                        rs.getString(5), rs.getObject(6, LocalDate.class))).list();
+    }
+
     @Transactional
     public Cycle createCycle(TenantContext ctx, CycleRequest b) {
         long t = ctx.tenantId();

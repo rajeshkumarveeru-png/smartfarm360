@@ -11,6 +11,15 @@ type Hatch = { id: number; groupId: number; lineId: number; variety: string | nu
   expectedOn: string | null; eggs: number; fertile: number | null; hatched: number | null; failed: number | null;
   resultOn: string | null; notes: string | null; completed: boolean };
 
+const incubationDaysFor = (species?: string) => species === 'QUAIL' ? 17 : species === 'DUCK' || species === 'TURKEY' ? 28 : 21;
+const addDays = (isoDate: string, days: number) => {
+  if (!isoDate || !Number.isInteger(days) || days < 1 || days > 60) return '';
+  const d = new Date(`${isoDate}T12:00:00`);
+  d.setDate(d.getDate() + days);
+  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
 export default function HatchingPanel({ groupId, lines, editable, onChanged }: {
   groupId: number; lines: FlockLine[]; editable: boolean; onChanged: () => void;
 }) {
@@ -19,17 +28,18 @@ export default function HatchingPanel({ groupId, lines, editable, onChanged }: {
   const lang = currentLanguage();
   const [rows, setRows] = useState<Hatch[] | null>(null);
   const [error, setError] = useState('');
-  const [form, setForm] = useState({ lineId: lines[0] ? String(lines[0].id) : '', collectedOn: today(), incubatedOn: today(), expectedOn: '', eggs: '', notes: '' });
+  const [form, setForm] = useState({ lineId: lines[0] ? String(lines[0].id) : '', collectedOn: today(), incubatedOn: today(), incubationDays: String(incubationDaysFor(lines[0]?.species)), eggs: '', notes: '' });
+  const expectedOn = addDays(form.incubatedOn, Number(form.incubationDays));
   const [results, setResults] = useState<Record<number, { resultOn: string; fertile: string; hatched: string; failed: string }>>({});
   const load = useCallback(() => api<Hatch[]>(`${base}/flocks/${groupId}/hatches`).then(setRows).catch(e => setError(describeError(e))), [base, groupId]);
   useEffect(() => { void load(); }, [load]);
 
   async function create(e: React.FormEvent) {
     e.preventDefault(); setError('');
-    if (!form.lineId || !/^\d+$/.test(form.eggs) || Number(form.eggs) < 1) { setError('Choose a bird variety and enter the number of eggs.'); return; }
+    if (!form.lineId || !/^\d+$/.test(form.eggs) || Number(form.eggs) < 1 || !/^\d+$/.test(form.incubationDays) || Number(form.incubationDays) < 1 || Number(form.incubationDays) > 60 || !expectedOn) { setError('Choose a bird variety, enter eggs and a valid incubation period (1–60 days).'); return; }
     try {
       await api(`${base}/flocks/${groupId}/hatches`, { method: 'POST', body: { lineId: Number(form.lineId), collectedOn: form.collectedOn,
-        incubatedOn: form.incubatedOn, expectedOn: form.expectedOn || null, eggs: Number(form.eggs), notes: form.notes || null } });
+        incubatedOn: form.incubatedOn, expectedOn, eggs: Number(form.eggs), notes: form.notes || null } });
       setForm({ ...form, eggs: '', notes: '' }); await load();
     } catch (e) { setError(describeError(e)); }
   }
@@ -50,11 +60,12 @@ export default function HatchingPanel({ groupId, lines, editable, onChanged }: {
     <p className="hint">Record eggs incubated by variety. When the hatch is complete, enter the result; successful chicks are added to this batch's bird count.</p>
     <ErrorBanner message={error} />
     {editable && <form className="form-card form-grid" onSubmit={e => void create(e)}>
-      <label>Bird variety<select value={form.lineId} onChange={e => setForm({ ...form, lineId: e.target.value })}>
+      <label>Bird variety<select value={form.lineId} onChange={e => { const line = lines.find(x => x.id === Number(e.target.value)); setForm({ ...form, lineId: e.target.value, incubationDays: String(incubationDaysFor(line?.species)) }); }}>
         <option value="">Select variety</option>{lines.map(l => <option key={l.id} value={l.id}>{l.variety || l.species}</option>)}</select></label>
       <label>Eggs collected on<input type="date" max={today()} value={form.collectedOn} onChange={e => setForm({ ...form, collectedOn: e.target.value })}/></label>
       <label>Incubation date<input type="date" max={today()} value={form.incubatedOn} onChange={e => setForm({ ...form, incubatedOn: e.target.value })}/></label>
-      <label>Expected hatch date<input type="date" min={form.incubatedOn} value={form.expectedOn} onChange={e => setForm({ ...form, expectedOn: e.target.value })}/></label>
+      <label>Incubation period (days)<input type="number" min="1" max="60" step="1" inputMode="numeric" value={form.incubationDays} onChange={e => setForm({ ...form, incubationDays: e.target.value })}/><small>Default varies by bird type; you can change it.</small></label>
+      <label>Expected hatch date<input type="date" value={expectedOn} readOnly disabled/><small>Calculated from incubation date + days.</small></label>
       <label>Eggs incubated<input inputMode="numeric" value={form.eggs} onChange={e => setForm({ ...form, eggs: e.target.value })}/></label>
       <label className="full">Notes<input maxLength={300} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })}/></label>
       <div className="form-actions full"><button className="primary">Save incubation batch</button></div>

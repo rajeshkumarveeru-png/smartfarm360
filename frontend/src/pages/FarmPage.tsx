@@ -132,7 +132,7 @@ export default function FarmPage() {
             <p className="fw-meta">
               <span><MapPinned size={14} aria-hidden />{Object.entries(areaByUnit).length
                 ? Object.entries(areaByUnit).map(([u, a]) => `${formatNumber(a, lang)} ${tu(u)}`).join(' · ')
-                : t('emptyLand')}</span>
+                : farm.areaSummary || t('emptyLand')}</span>
             </p>
           </div>
         </div>
@@ -213,11 +213,12 @@ export default function FarmPage() {
       </> : <p className="info-banner">{t('noMoneyAccess')}</p>}
 
       <div className="fw-section-head">
-        <div><h3>{t('land')} <span className="count">{parcels.length}</span></h3></div>
-        {canWrite && <button className="primary" onClick={() => setShowParcel(x => !x)}><Plus size={17} aria-hidden />{t('addLand')}</button>}
+        <div><h3>{t('land')} <span className="count">{parcels.length}</span></h3><p className="hint">{lang === 'ta' ? 'பண்ணையின் மொத்த பரப்பளவு ஏற்கனவே பதிவு செய்யப்பட்டுள்ளது. தனித்தனி வயல்களைப் பயிர் கண்காணிப்புக்கு மட்டும் சேர்க்கவும்.' : 'Your farm’s total area is already recorded. Add individual fields only if you need field-level crop tracking.'}</p></div>
+        {canWrite && <button className="secondary" onClick={() => setShowParcel(x => !x)}><Plus size={17} aria-hidden />{lang === 'ta' ? 'வயல் / பகுதி சேர்க்க (விருப்பம்)' : 'Add field / parcel (optional)'}</button>}
       </div>
       {showParcel && (
         <form className="form-card form-grid" onSubmit={submitParcel} noValidate>
+          <p className="hint full">{lang === 'ta' ? 'இது விருப்பமானது. மொத்த நிலப்பரப்பை மீண்டும் உள்ளிட வேண்டாம்; தனி வயல் விவரங்களை மட்டும் சேர்க்கவும்.' : 'Optional: do not re-enter the total farm area here. Use this only to split the farm into individual fields.'}</p>
           <label>{t('parcelName')}<input maxLength={120} value={parcelForm.name} onChange={e => setParcelForm({ ...parcelForm, name: e.target.value })} /></label>
           <div className="inline-fields">
             <label>{t('area')}<input type="number" min="0.001" step="0.001" inputMode="decimal" value={parcelForm.area} onChange={e => setParcelForm({ ...parcelForm, area: e.target.value })} /></label>

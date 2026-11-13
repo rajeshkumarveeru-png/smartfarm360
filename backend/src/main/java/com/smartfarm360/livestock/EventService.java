@@ -125,12 +125,19 @@ public class EventService {
                         values (:t, :a, :g, :k, :d, :desc, :by, :w, :next, :doc, :sdoc, :u) returning id""")
                 .param("t", ctx.tenantId()).param("a", r.animalId()).param("g", r.animalId() == null ? groupId : null).param("k", r.kind())
                 .param("d", r.date()).param("desc", r.description().trim()).param("by", HerdService.trim(r.doneBy())).param("w", withdrawal)
-                .param("next", r.nextDue()).param("doc", billDoc).param("sdoc", stockDoc).param("u", ctx.userId()).query(Long.class).single();
+                .param("next", r.planItemId() == null ? r.nextDue() : null).param("doc", billDoc).param("sdoc", stockDoc).param("u", ctx.userId()).query(Long.class).single();
         if (r.planItemId() != null) {
             // The plan item this event carries out (poultry, goats and sheep design, J9)
             int n = jdbc.sql("update sf_health_plan_items set done_event_id = :e where id = :p and tenant_id = :t and group_id = :g")
                     .param("e", id).param("p", r.planItemId()).param("t", ctx.tenantId()).param("g", groupId).update();
             if (n == 0) throw ApiException.notFound("PLAN_ITEM_NOT_FOUND", "Health plan item not found.");
+            if (r.nextDue() != null) {
+                jdbc.sql("""
+                                insert into sf_health_plan_items (tenant_id, group_id, kind, description, due_on, created_by)
+                                values (:t, :g, :k, :desc, :due, :u)""")
+                        .param("t", ctx.tenantId()).param("g", groupId).param("k", r.kind())
+                        .param("desc", r.description().trim()).param("due", r.nextDue()).param("u", ctx.userId()).update();
+            }
         }
         audit.record(ctx.tenantId(), ctx.userId(), "ANIMAL_HEALTH_RECORDED", "ANIMAL_EVENT", id, Map.of("kind", r.kind(), "for", target));
         return event(ctx, id);
